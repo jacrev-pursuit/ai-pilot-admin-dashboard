@@ -148,7 +148,7 @@ const BuilderView = () => {
         <Button 
           type="link" 
           icon={<ExpandOutlined />}
-          onClick={() => handleExpand('peerFeedback', record)}
+          onClick={() => handleExpand('peer_feedback', record)}
         >
           {renderPeerFeedbackSentiment(text, record)}
         </Button>

@@ -5,9 +5,11 @@ import {
   DashboardOutlined,
   TeamOutlined,
   BarChartOutlined,
-  SettingOutlined
+  SettingOutlined,
+  UserOutlined
 } from '@ant-design/icons';
 import BuilderView from './components/BuilderView';
+import BuilderDetailsPage from './components/BuilderDetailsPage';
 
 const { Header, Sider, Content } = Layout;
 
@@ -35,11 +37,8 @@ const Navigation = () => {
         <Menu.Item key="/builders" icon={<TeamOutlined />}>
           <Link to="/builders">Builders</Link>
         </Menu.Item>
-        <Menu.Item key="/metrics" icon={<BarChartOutlined />}>
-          <Link to="/metrics">Metrics</Link>
-        </Menu.Item>
-        <Menu.Item key="/settings" icon={<SettingOutlined />}>
-          <Link to="/settings">Settings</Link>
+        <Menu.Item key="/builder-details" icon={<UserOutlined />}>
+          <Link to="/builder-details">Builder Details</Link>
         </Menu.Item>
       </Menu>
     </Sider>
@@ -56,8 +55,8 @@ function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/builders" element={<BuilderView />} />
-              <Route path="/metrics" element={<Metrics />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/builders/:builderId" element={<BuilderDetailsPage />} />
+              <Route path="/builder-details" element={<BuilderDetailsPage />} />
             </Routes>
           </Content>
         </Layout>

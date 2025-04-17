@@ -139,8 +139,8 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     },
     {
       title: 'Feedback',
-      dataIndex: 'feedback_text',
-      key: 'feedback_text',
+      dataIndex: 'feedback',
+      key: 'feedback',
       render: (text) => (
         <Text>
           {text || 'No feedback provided'}
@@ -149,25 +149,27 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     },
     {
       title: 'Sentiment',
-      dataIndex: 'sentiment',
-      key: 'sentiment',
-      render: (sentiment) => (
-        <Tag color={
-          sentiment === 'Very Positive' ? 'green' :
-          sentiment === 'Positive' ? 'cyan' :
-          sentiment === 'Neutral' ? 'default' :
-          sentiment === 'Negative' ? 'orange' :
-          sentiment === 'Very Negative' ? 'red' :
-          'default'
-        }>
-          {sentiment || 'N/A'}
-        </Tag>
-      ),
+      dataIndex: 'sentiment_label',
+      key: 'sentiment_label',
+      render: (label) => {
+        const sentimentMap = {
+          'Very Positive': 'green',
+          'Positive': 'cyan',
+          'Neutral': 'default',
+          'Negative': 'orange',
+          'Very Negative': 'red'
+        };
+        return (
+          <Tag color={sentimentMap[label] || 'default'}>
+            {label || 'N/A'}
+          </Tag>
+        )
+      },
     },
     {
       title: 'Date',
-      dataIndex: 'created_at',
-      key: 'created_at',
+      dataIndex: 'timestamp',
+      key: 'timestamp',
       render: (date) => {
         if (!date) return 'N/A';
         try {
@@ -205,19 +207,6 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     setLoadingDetails(loading);
   }, [builder, type, data, loading]);
 
-  // Calculate average grade
-  const getAverageGrade = () => {
-    if (!data || data.length === 0) return 'N/A';
-    
-    const totalScore = data.reduce((acc, curr) => {
-      const score = type === 'workProduct' ? parseFloat(curr.scores || 0) : parseFloat(curr.score || 0);
-      return acc + (isNaN(score) ? 0 : score);
-    }, 0);
-    
-    const avgScore = totalScore / data.length;
-    return getLetterGrade(avgScore);
-  };
-
   return (
     <Modal
       title={`${type === 'workProduct' ? 'Work Product' : type === 'comprehension' ? 'Comprehension' : 'Peer Feedback'} Details for ${builder?.name || 'Builder'}`}
@@ -238,9 +227,6 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
             <Space direction="vertical">
               <Text>
                 Total {type === 'workProduct' ? 'Tasks' : type === 'comprehension' ? 'Questions' : 'Feedback Items'}: {data?.length || 0}
-              </Text>
-              <Text>
-                Average Grade: <Tag color={getGradeColor(getAverageGrade())}>{getAverageGrade()}</Tag>
               </Text>
             </Space>
           </Card>

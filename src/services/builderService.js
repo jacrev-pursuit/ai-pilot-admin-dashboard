@@ -1,11 +1,15 @@
 // API base URL
-const API_BASE_URL = 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+console.log(`Using API URL: ${API_URL}`);
 
 export const fetchBuilderData = async (startDate, endDate) => {
-  console.log('Fetching builder data for date range:', startDate, endDate);
+  const effectiveStartDate = startDate || '2000-01-01';
+  const effectiveEndDate = endDate || '2100-12-31';
+  console.log('Fetching builder data with dates:', { startDate: effectiveStartDate, endDate: effectiveEndDate });
   
   try {
-    const response = await fetch(`${API_BASE_URL}/api/builders?startDate=${startDate}&endDate=${endDate}`);
+    const response = await fetch(`${API_URL}/api/builders?startDate=${effectiveStartDate}&endDate=${effectiveEndDate}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -13,26 +17,29 @@ export const fetchBuilderData = async (startDate, endDate) => {
     console.log('Builder data fetched successfully:', data);
     return data;
   } catch (error) {
-    console.error('Error fetching builder data:', error);
+    console.error('Failed to fetch builder data:', error);
     throw error;
   }
 };
 
 export const fetchBuilderDetails = async (userId, type, startDate, endDate) => {
-  console.log('Fetching builder details for user:', userId, 'type:', type);
-  
+  const effectiveStartDate = startDate || '2000-01-01';
+  const effectiveEndDate = endDate || '2100-12-31';
+  console.log('Fetching details for:', { userId, type, startDate: effectiveStartDate, endDate: effectiveEndDate });
+  const url = `${API_URL}/api/builders/${userId}/details?type=${type}&startDate=${effectiveStartDate}&endDate=${effectiveEndDate}`;
+  console.log('Fetching from URL:', url);
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/builders/${userId}/details?type=${type}&startDate=${startDate}&endDate=${endDate}`
-    );
+    const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json();
+      console.error('API Error Response:', errorData);
+      throw new Error(errorData.error?.message || errorData.error || `HTTP error! status: ${response.status}`);
     }
     const data = await response.json();
-    console.log('Builder details fetched successfully:', data);
+    console.log(`Successfully fetched ${type} details for user ${userId}:`, data);
     return data;
   } catch (error) {
-    console.error('Error fetching builder details:', error);
+    console.error(`Failed to fetch ${type} details for user ${userId}:`, error);
     throw error;
   }
 }; 
