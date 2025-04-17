@@ -3,7 +3,11 @@ const API_URL = 'http://localhost:3001';
 export const executeQuery = async () => {
   try {
     console.log('Fetching builder metrics from API...');
-    const response = await fetch(`${API_URL}/api/builder-metrics`);
+    // Get date range for last 30 days
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    const response = await fetch(`${API_URL}/api/builders?startDate=${startDate}&endDate=${endDate}`);
     
     if (!response.ok) {
       const errorData = await response.json();
