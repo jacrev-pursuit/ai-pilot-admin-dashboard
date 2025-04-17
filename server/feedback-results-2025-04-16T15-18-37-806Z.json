@@ -1,0 +1,772 @@
+[
+  {
+    "id": 404,
+    "from_user_id": 60,
+    "to_user_id": 89,
+    "feedback_text": "She always will to talk, great to work with.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Positive attitude towards communication. Great to work with.",
+    "created_at": {
+      "value": "2025-04-15T01:09:13.008284000Z"
+    },
+    "processed_at": "2025-04-16T15:17:20.023Z"
+  },
+  {
+    "id": 405,
+    "from_user_id": 85,
+    "to_user_id": 95,
+    "feedback_text": "super funny, very smart, has cool ideas about projects",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Great sense of humor that brings positivity to the team. High intelligence that contributes valuable insights. Innovative ideas that can benefit project outcomes.",
+    "created_at": {
+      "value": "2025-04-15T01:43:32.730188000Z"
+    },
+    "processed_at": "2025-04-16T15:17:22.281Z"
+  },
+  {
+    "id": 406,
+    "from_user_id": 85,
+    "to_user_id": 57,
+    "feedback_text": "he gave amazing feedback today it was very inspirational and i valued it because it gave me an idea",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Inspirational feedback that provided valuable ideas.",
+    "created_at": {
+      "value": "2025-04-15T01:43:32.730188000Z"
+    },
+    "processed_at": "2025-04-16T15:17:23.489Z"
+  },
+  {
+    "id": 407,
+    "from_user_id": 85,
+    "to_user_id": 68,
+    "feedback_text": "Super smart, lots of cool ideas, has alot to say",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.7,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: High intelligence and creativity. Abundance of innovative ideas.\n\nAdditional Comments: Impressed by the level of intellect and creativity displayed.",
+    "created_at": {
+      "value": "2025-04-15T01:43:32.730188000Z"
+    },
+    "processed_at": "2025-04-16T15:17:24.784Z"
+  },
+  {
+    "id": 408,
+    "from_user_id": 28,
+    "to_user_id": 37,
+    "feedback_text": "She really helped me with my problem statement. And ill be bothering her for my civic app.",
+    "sentiment_score": 0.3,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective assistance with problem statement. Willingness to help with civic app.",
+    "created_at": {
+      "value": "2025-04-15T01:45:08.733501000Z"
+    },
+    "processed_at": "2025-04-16T15:17:25.953Z"
+  },
+  {
+    "id": 409,
+    "from_user_id": 25,
+    "to_user_id": 12,
+    "feedback_text": "Jake gave me a few ideas for the educational project I have in mind and a website I could use for inspiration. I really appreciated that. ",
+    "sentiment_score": 0.7,
+    "sentiment_magnitude": 0.7,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing helpful ideas for an educational project. Offering a website for inspiration.\n\nAdditional Comments: The recipient appreciated Jake's input and found it valuable for their project.",
+    "created_at": {
+      "value": "2025-04-15T01:45:32.879896000Z"
+    },
+    "processed_at": "2025-04-16T15:17:27.474Z"
+  },
+  {
+    "id": 410,
+    "from_user_id": 95,
+    "to_user_id": 68,
+    "feedback_text": "Your ability to communicate clearly, adapt quickly to feedback, really helped us push the project forward. Looking forward to seeing what you build next!",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Clear communication skills that helped push the project forward. Ability to adapt quickly to feedback.\n\nAdditional Comments: Excited to see the progress and results of your future projects.",
+    "created_at": {
+      "value": "2025-04-15T01:46:00.554815000Z"
+    },
+    "processed_at": "2025-04-16T15:17:29.131Z"
+  },
+  {
+    "id": 411,
+    "from_user_id": 68,
+    "to_user_id": 57,
+    "feedback_text": "He is a great peer to work along with. He gave me great feedback idea to implement into my project. And I can't wait to try it out.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Great peer to work with. Provided valuable feedback ideas.\n\nAdditional Comments: Excited to implement the feedback into the project.",
+    "created_at": {
+      "value": "2025-04-15T01:46:32.368989000Z"
+    },
+    "processed_at": "2025-04-16T15:17:30.497Z"
+  },
+  {
+    "id": 412,
+    "from_user_id": 22,
+    "to_user_id": 68,
+    "feedback_text": "i think isaiah was really helpful he has more technical knowledge than me so hearing advise on how i should set up my backend was really helpful\n",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Isaiah's technical knowledge was helpful in providing valuable advice on setting up the backend.",
+    "created_at": {
+      "value": "2025-04-15T01:51:16.773544000Z"
+    },
+    "processed_at": "2025-04-16T15:17:31.908Z"
+  },
+  {
+    "id": 413,
+    "from_user_id": 17,
+    "to_user_id": 54,
+    "feedback_text": "Great at listening to and receiving feedback. ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective at listening to and receiving feedback.",
+    "created_at": {
+      "value": "2025-04-15T01:52:22.400269000Z"
+    },
+    "processed_at": "2025-04-16T15:17:32.775Z"
+  },
+  {
+    "id": 414,
+    "from_user_id": 57,
+    "to_user_id": 68,
+    "feedback_text": "Suggested a knob/equalizer for the app",
+    "sentiment_score": 0.2,
+    "sentiment_magnitude": 0.5,
+    "sentiment_category": "Neutral",
+    "summary": "Opportunities: Consider adding a knob/equalizer feature to the app to enhance user experience.",
+    "created_at": {
+      "value": "2025-04-15T01:53:08.736347000Z"
+    },
+    "processed_at": "2025-04-16T15:17:33.736Z"
+  },
+  {
+    "id": 415,
+    "from_user_id": 11,
+    "to_user_id": 76,
+    "feedback_text": "Saeed! Thank you for asking so many clarifying questions during my presentation, and helping me qualify a lot of my music theory stuff to the rest of the table. You're a wonderful resource, and I'm glad I get to work with you!",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Active participation and asking clarifying questions. Being a valuable resource for music theory.\n\nAdditional Comments: Great teamwork and collaboration shown by helping others understand music theory.",
+    "created_at": {
+      "value": "2025-04-15T01:53:18.199577000Z"
+    },
+    "processed_at": "2025-04-16T15:17:34.895Z"
+  },
+  {
+    "id": 416,
+    "from_user_id": 11,
+    "to_user_id": 48,
+    "feedback_text": "Thank you for asking lots of questions during my presentation! Your perspective as a non-musician pointing out how targeted my solution was led me to really think carefully about my design.",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Engaging inquisitive nature. Providing valuable perspective.",
+    "created_at": {
+      "value": "2025-04-15T01:53:18.199577000Z"
+    },
+    "processed_at": "2025-04-16T15:17:36.721Z"
+  },
+  {
+    "id": 417,
+    "from_user_id": 55,
+    "to_user_id": 17,
+    "feedback_text": "She helped me understand how to approach getting my problem statement done by the end of today, which was greatly appreciated!",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective guidance on approaching problem statement. Appreciated support in meeting deadline.",
+    "created_at": {
+      "value": "2025-04-15T01:54:10.452212000Z"
+    },
+    "processed_at": "2025-04-16T15:17:37.714Z"
+  },
+  {
+    "id": 418,
+    "from_user_id": 18,
+    "to_user_id": 39,
+    "feedback_text": "Thank you for being supportive! ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Supportive attitude that fosters a positive environment.",
+    "created_at": {
+      "value": "2025-04-15T01:55:09.199050000Z"
+    },
+    "processed_at": "2025-04-16T15:17:38.654Z"
+  },
+  {
+    "id": 419,
+    "from_user_id": 48,
+    "to_user_id": 11,
+    "feedback_text": "You're awesome, your problem statement is awesome",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Being described as awesome. Having an awesome problem statement.",
+    "created_at": {
+      "value": "2025-04-15T01:55:14.650414000Z"
+    },
+    "processed_at": "2025-04-16T15:17:43.417Z"
+  },
+  {
+    "id": 420,
+    "from_user_id": 12,
+    "to_user_id": 25,
+    "feedback_text": "lila is really supportive and kind. ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Supportive nature that creates a positive environment. Kindness that fosters good relationships.",
+    "created_at": {
+      "value": "2025-04-15T01:55:38.558523000Z"
+    },
+    "processed_at": "2025-04-16T15:17:44.338Z"
+  },
+  {
+    "id": 421,
+    "from_user_id": 86,
+    "to_user_id": 28,
+    "feedback_text": "Raj did a fantastic job of walking me through his problem statement. It inspired me to revise my own. Great role model and team player.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective at explaining problem statements. Inspiring others to improve their work. Great role model and team player.",
+    "created_at": {
+      "value": "2025-04-15T01:55:52.128737000Z"
+    },
+    "processed_at": "2025-04-16T15:17:45.401Z"
+  },
+  {
+    "id": 422,
+    "from_user_id": 83,
+    "to_user_id": 94,
+    "feedback_text": "Jen is very nice, and always brings a friendly vibe to the table its cool to work with her in the group\n",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Brings a friendly vibe to the group. Nice and pleasant to work with.",
+    "created_at": {
+      "value": "2025-04-15T01:57:04.473342000Z"
+    },
+    "processed_at": "2025-04-16T15:17:46.589Z"
+  },
+  {
+    "id": 424,
+    "from_user_id": 75,
+    "to_user_id": 82,
+    "feedback_text": "Fun to talk with.  Good insight.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.7,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Engaging and enjoyable conversationalist. Provides valuable insights.",
+    "created_at": {
+      "value": "2025-04-15T01:57:04.795109000Z"
+    },
+    "processed_at": "2025-04-16T15:17:47.936Z"
+  },
+  {
+    "id": 423,
+    "from_user_id": 75,
+    "to_user_id": 77,
+    "feedback_text": "Very deep conversation.  Will be a good builder when he gets technical chops.",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Engages in deep conversations. Potential to be a good builder.\n\nOpportunities: Develop technical chops to enhance skills.",
+    "created_at": {
+      "value": "2025-04-15T01:57:04.795109000Z"
+    },
+    "processed_at": "2025-04-16T15:17:49.064Z"
+  },
+  {
+    "id": 425,
+    "from_user_id": 75,
+    "to_user_id": 60,
+    "feedback_text": "Very insightful.  Pleasant.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Insightful feedback that provides valuable perspectives. Creating a pleasant experience for the recipient.",
+    "created_at": {
+      "value": "2025-04-15T01:57:04.795109000Z"
+    },
+    "processed_at": "2025-04-16T15:17:50.154Z"
+  },
+  {
+    "id": 426,
+    "from_user_id": 65,
+    "to_user_id": 46,
+    "feedback_text": "Understood frameworks efficiently and was able to apply the systems to their own project quickly ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Efficient understanding of frameworks. Quick application of systems to their own project.",
+    "created_at": {
+      "value": "2025-04-15T01:58:17.088865000Z"
+    },
+    "processed_at": "2025-04-16T15:17:51.355Z"
+  },
+  {
+    "id": 427,
+    "from_user_id": 35,
+    "to_user_id": 32,
+    "feedback_text": "great thoughtful feedback and was super helpful in ideas ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing thoughtful feedback. Being super helpful with ideas.",
+    "created_at": {
+      "value": "2025-04-15T01:58:43.765390000Z"
+    },
+    "processed_at": "2025-04-16T15:17:52.494Z"
+  },
+  {
+    "id": 428,
+    "from_user_id": 41,
+    "to_user_id": 49,
+    "feedback_text": "She was very supportive and helped me catch up what i missed yesterday and i was able to get on track and keep up with the work.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing support to catch up on missed work. Helping recipient get back on track with their tasks.",
+    "created_at": {
+      "value": "2025-04-15T02:00:16.023877000Z"
+    },
+    "processed_at": "2025-04-16T15:17:53.800Z"
+  },
+  {
+    "id": 429,
+    "from_user_id": 49,
+    "to_user_id": 41,
+    "feedback_text": "Ashley supported to stay focus and put while doing my project\n",
+    "sentiment_score": 0.5,
+    "sentiment_magnitude": 0.5,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Supporting focus and determination during the project.",
+    "created_at": {
+      "value": "2025-04-15T02:01:32.175813000Z"
+    },
+    "processed_at": "2025-04-16T15:17:54.897Z"
+  },
+  {
+    "id": 430,
+    "from_user_id": 88,
+    "to_user_id": 46,
+    "feedback_text": "I was able to receive insightful feedback from her project in order to better assess my project especially when coming up with a clear problem statement. ",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing insightful feedback for project assessment. Assisting in crafting a clear problem statement.",
+    "created_at": {
+      "value": "2025-04-15T02:01:57.489004000Z"
+    },
+    "processed_at": "2025-04-16T15:17:55.998Z"
+  },
+  {
+    "id": 431,
+    "from_user_id": 67,
+    "to_user_id": 66,
+    "feedback_text": "Ray brings great energy to every table and/or group he's apart of. The realist mentality combined with his encouraging nature, and sense of humor are a comforting. Also his ability to lead with respect of his peers.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Brings great energy to every group. Realist mentality combined with encouraging nature and sense of humor. Ability to lead with respect for peers.",
+    "created_at": {
+      "value": "2025-04-15T02:02:06.593888000Z"
+    },
+    "processed_at": "2025-04-16T15:17:58.731Z"
+  },
+  {
+    "id": 432,
+    "from_user_id": 92,
+    "to_user_id": 10,
+    "feedback_text": "Truly an amazing teacher and mentor I am really grateful ",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Exceptional teaching and mentoring abilities. Gratefulness expressed towards the recipient.",
+    "created_at": {
+      "value": "2025-04-15T02:02:30.783085000Z"
+    },
+    "processed_at": "2025-04-16T15:18:00.150Z"
+  },
+  {
+    "id": 433,
+    "from_user_id": 80,
+    "to_user_id": 87,
+    "feedback_text": "Insightful and thoughtful feedback",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Insightful feedback that provides valuable perspectives. Thoughful approach that shows care and consideration.",
+    "created_at": {
+      "value": "2025-04-15T02:02:43.928937000Z"
+    },
+    "processed_at": "2025-04-16T15:18:01.625Z"
+  },
+  {
+    "id": 434,
+    "from_user_id": 80,
+    "to_user_id": 92,
+    "feedback_text": "Eager to help and encouraging to be around",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Eagerness to help. Encouraging presence.",
+    "created_at": {
+      "value": "2025-04-15T02:02:43.928937000Z"
+    },
+    "processed_at": "2025-04-16T15:18:02.631Z"
+  },
+  {
+    "id": 435,
+    "from_user_id": 77,
+    "to_user_id": 60,
+    "feedback_text": "I loved his idea for his App!",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Creative and innovative idea for an app.",
+    "created_at": {
+      "value": "2025-04-15T02:02:52.116656000Z"
+    },
+    "processed_at": "2025-04-16T15:18:04.496Z"
+  },
+  {
+    "id": 436,
+    "from_user_id": 20,
+    "to_user_id": 65,
+    "feedback_text": "Very helpful and creative. Building things that are interesting and useful. ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Helpful and creative approach. Ability to build interesting and useful things.",
+    "created_at": {
+      "value": "2025-04-15T02:03:32.757273000Z"
+    },
+    "processed_at": "2025-04-16T15:18:05.699Z"
+  },
+  {
+    "id": 437,
+    "from_user_id": 82,
+    "to_user_id": 89,
+    "feedback_text": "I like your approach to the problem. \nI recomend you to focus more, overalm you are adorable",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Approach to problem-solving. Adorableness.\n\nOpportunities: Focusing more on tasks.",
+    "created_at": {
+      "value": "2025-04-15T02:06:38.587338000Z"
+    },
+    "processed_at": "2025-04-16T15:18:07.064Z"
+  },
+  {
+    "id": 439,
+    "from_user_id": 82,
+    "to_user_id": 77,
+    "feedback_text": "You had productive day, I recommend some time managment. But I loved that you got insites",
+    "sentiment_score": 0.4,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Productive day.\n\nOpportunities: Time management improvement.\n\nAdditional Comments: Great job on having a productive day and gaining insights. Working on time management could further enhance your efficiency..",
+    "created_at": {
+      "value": "2025-04-15T02:06:38.587338000Z"
+    },
+    "processed_at": "2025-04-16T15:18:08.676Z"
+  },
+  {
+    "id": 441,
+    "from_user_id": 82,
+    "to_user_id": 81,
+    "feedback_text": "I liked your sterategy to get into the problem. I recommend some time managment to not get lost in details",
+    "sentiment_score": 0.4,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective strategy for problem-solving.\n\nOpportunities: Implementing time management techniques to avoid getting lost in details.",
+    "created_at": {
+      "value": "2025-04-15T02:06:38.587338000Z"
+    },
+    "processed_at": "2025-04-16T15:18:10.035Z"
+  },
+  {
+    "id": 440,
+    "from_user_id": 82,
+    "to_user_id": 60,
+    "feedback_text": "Good job with being productive and deep search ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Productivity in completing tasks. Ability to conduct thorough research.",
+    "created_at": {
+      "value": "2025-04-15T02:06:38.587338000Z"
+    },
+    "processed_at": "2025-04-16T15:18:11.476Z"
+  },
+  {
+    "id": 438,
+    "from_user_id": 82,
+    "to_user_id": 75,
+    "feedback_text": "You have done a lot. Good job with being productive. I recommend to not go that deep when not necessary",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Being productive.\n\nOpportunities: Avoid going too deep when not necessary.",
+    "created_at": {
+      "value": "2025-04-15T02:06:38.587338000Z"
+    },
+    "processed_at": "2025-04-16T15:18:12.886Z"
+  },
+  {
+    "id": 442,
+    "from_user_id": 14,
+    "to_user_id": 31,
+    "feedback_text": "Always helpful when i bounce ideas off him",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Readily offers help and support when ideas are shared.",
+    "created_at": {
+      "value": "2025-04-15T02:06:50.241647000Z"
+    },
+    "processed_at": "2025-04-16T15:18:14.348Z"
+  },
+  {
+    "id": 443,
+    "from_user_id": 59,
+    "to_user_id": 20,
+    "feedback_text": "Mohan brought great energy and clear thinking to our discussions, especially when connecting AI concepts to our ideas. He asked me thoughtful questions when sharing my problem statement making class more engaging.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Great energy and clear thinking brought to discussions. Connecting AI concepts to ideas effectively.\n\nAdditional Comments: Asking thoughtful questions to engage in problem statements.",
+    "created_at": {
+      "value": "2025-04-15T02:08:43.092604000Z"
+    },
+    "processed_at": "2025-04-16T15:18:15.937Z"
+  },
+  {
+    "id": 444,
+    "from_user_id": 96,
+    "to_user_id": 12,
+    "feedback_text": "Gave great feedback",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing valuable feedback.",
+    "created_at": {
+      "value": "2025-04-15T02:09:48.777383000Z"
+    },
+    "processed_at": "2025-04-16T15:18:16.788Z"
+  },
+  {
+    "id": 445,
+    "from_user_id": 96,
+    "to_user_id": 51,
+    "feedback_text": "Gave great feedback and also had an interesting problem to solve.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing great feedback. Presenting an interesting problem to solve.",
+    "created_at": {
+      "value": "2025-04-15T02:09:48.777383000Z"
+    },
+    "processed_at": "2025-04-16T15:18:19.359Z"
+  },
+  {
+    "id": 446,
+    "from_user_id": 96,
+    "to_user_id": 83,
+    "feedback_text": "Clear thinker, can breakdown and explain complex issues. Great listener",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Ability to breakdown and explain complex issues clearly. Great listener.",
+    "created_at": {
+      "value": "2025-04-15T02:09:48.777383000Z"
+    },
+    "processed_at": "2025-04-16T15:18:20.852Z"
+  },
+  {
+    "id": 447,
+    "from_user_id": 31,
+    "to_user_id": 23,
+    "feedback_text": "I really appreciated the excellent feedback you gave me on how to showcase my web application. Your idea of combining a learning experience that starts with the fundamentals and gradually guides users into more advanced investment strategies was insightful and exactly the kind of direction I needed.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing excellent feedback on showcasing the web application. Insightful idea of combining a learning experience from fundamentals to advanced strategies.",
+    "created_at": {
+      "value": "2025-04-15T02:20:54.530054000Z"
+    },
+    "processed_at": "2025-04-16T15:18:21.875Z"
+  },
+  {
+    "id": 448,
+    "from_user_id": 45,
+    "to_user_id": 100,
+    "feedback_text": "Cool Person, also thinks outside of the box. ",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.5,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Thinks outside of the box.\n\nAdditional Comments: Described as a cool person.",
+    "created_at": {
+      "value": "2025-04-15T02:23:46.885726000Z"
+    },
+    "processed_at": "2025-04-16T15:18:23.059Z"
+  },
+  {
+    "id": 450,
+    "from_user_id": 94,
+    "to_user_id": 90,
+    "feedback_text": "Thank you for sharing your feedback and your projects. I really appreciate you.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Appreciation for feedback and projects.",
+    "created_at": {
+      "value": "2025-04-15T03:00:49.924578000Z"
+    },
+    "processed_at": "2025-04-16T15:18:25.304Z"
+  },
+  {
+    "id": 451,
+    "from_user_id": 94,
+    "to_user_id": 25,
+    "feedback_text": "Thank you for sharing your feedback and your projects. I really appreciate you.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Appreciation for feedback and projects.",
+    "created_at": {
+      "value": "2025-04-15T03:00:49.924578000Z"
+    },
+    "processed_at": "2025-04-16T15:18:26.636Z"
+  },
+  {
+    "id": 449,
+    "from_user_id": 94,
+    "to_user_id": 73,
+    "feedback_text": "Thank you for sharing your feedback and your projects. I really appreciate you.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Appreciation for feedback and projects.",
+    "created_at": {
+      "value": "2025-04-15T03:00:49.924578000Z"
+    },
+    "processed_at": "2025-04-16T15:18:27.688Z"
+  },
+  {
+    "id": 452,
+    "from_user_id": 87,
+    "to_user_id": 26,
+    "feedback_text": "Francis seems to have a very diverse background ranging from technical experience to also being very creative. He's able to talk in depth about a wide range of topics. Because of this, Francis is able to provide really great actionable feedback on a wide range of topics. This opens up the floor for great discussions about our topics for that day and AI in general.",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Diverse background combining technical expertise and creativity. Ability to discuss a wide range of topics in depth. Provides actionable feedback that sparks great discussions.",
+    "created_at": {
+      "value": "2025-04-15T03:39:39.783392000Z"
+    },
+    "processed_at": "2025-04-16T15:18:28.896Z"
+  },
+  {
+    "id": 455,
+    "from_user_id": 98,
+    "to_user_id": 54,
+    "feedback_text": "I really liked how organized and prepared Cherice is for all of the assignments and group discussions. I enjoyed being in the group with you today!",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: High level of organization and preparation for assignments and group discussions. Positive impact on group dynamics.\n\nAdditional Comments: Cherice's organizational skills are commendable and greatly contribute to the group's success.",
+    "created_at": {
+      "value": "2025-04-15T04:18:10.432843000Z"
+    },
+    "processed_at": "2025-04-16T15:18:31.219Z"
+  },
+  {
+    "id": 453,
+    "from_user_id": 98,
+    "to_user_id": 87,
+    "feedback_text": "Very resourceful with a lot of knowledge! Enjoyed our group conversations today. Great future ahead.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Resourceful with a lot of knowledge. Great at group conversations.\n\nAdditional Comments: Encouraging outlook for a successful future.",
+    "created_at": {
+      "value": "2025-04-15T04:18:10.432843000Z"
+    },
+    "processed_at": "2025-04-16T15:18:32.224Z"
+  },
+  {
+    "id": 454,
+    "from_user_id": 98,
+    "to_user_id": 32,
+    "feedback_text": "Amazing team player! Has a lot of knowledge about computers. I enjoyed being in the group with you today.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Strong team player. Extensive knowledge about computers.\n\nAdditional Comments: Great to have such a knowledgeable and collaborative team member.",
+    "created_at": {
+      "value": "2025-04-15T04:18:10.432843000Z"
+    },
+    "processed_at": "2025-04-16T15:18:33.537Z"
+  },
+  {
+    "id": 456,
+    "from_user_id": 19,
+    "to_user_id": 56,
+    "feedback_text": "I asked xiaoyi to give others some feedback during our presentations and he stepped up and gave more feedback so i thought that was good.",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Proactively providing feedback during presentations.",
+    "created_at": {
+      "value": "2025-04-15T22:35:29.507335000Z"
+    },
+    "processed_at": "2025-04-16T15:18:35.105Z"
+  },
+  {
+    "id": 457,
+    "from_user_id": 73,
+    "to_user_id": 90,
+    "feedback_text": "Her projected tool is supposed to encourage regular people to use AI. I suggested that the AI would need to help them complete tasks or solve a problem in order for the user to want to use it and see a benefit",
+    "sentiment_score": 0.3,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Focus on encouraging regular people to use AI. Recognizing the need for the AI to help users complete tasks or solve problems.",
+    "created_at": {
+      "value": "2025-04-15T23:21:58.483873000Z"
+    },
+    "processed_at": "2025-04-16T15:18:36.402Z"
+  },
+  {
+    "id": 458,
+    "from_user_id": 51,
+    "to_user_id": 96,
+    "feedback_text": "I provided Isaiah feedback on his app that helps young adults with kids apply financial literacy. My feedback was on suggesting starting with the kids at a young age, teaching them at 8 to save money and manage it as well.",
+    "sentiment_score": 0.4,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Focus on financial literacy for young adults with kids. Suggesting starting financial education at a young age.\n\nOpportunities: Consider providing more specific strategies or resources for teaching financial literacy to kids.",
+    "created_at": {
+      "value": "2025-04-15T23:27:41.869321000Z"
+    },
+    "processed_at": "2025-04-16T15:18:37.805Z"
+  }
+]

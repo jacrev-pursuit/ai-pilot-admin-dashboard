@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "from_user_id": 48,
+    "to_user_id": 100,
+    "feedback_text": "You were awesome in our team, something I admired from you was your continued communication and shared knowledge. I always am impressed on how well you can articulate your thoughts into words, and your enthusiastic and friendly approach to everyone!",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Excellent communication skills that enhance team dynamics. Impressive ability to articulate thoughts clearly. Enthusiastic and friendly approach that fosters positive interactions.",
+    "created_at": {
+      "value": "2025-04-01T01:30:25.831761000Z"
+    },
+    "processed_at": "2025-04-16T15:13:22.448Z"
+  },
+  {
+    "id": 2,
+    "from_user_id": 11,
+    "to_user_id": 48,
+    "feedback_text": "I'm testing to see how this feedback function works. You're always a joy to work with, and you articulate your ideas really well.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Joy to work with. Articulate in expressing ideas.\n\nAdditional Comments: Positive feedback on collaboration and communication skills.",
+    "created_at": {
+      "value": "2025-04-01T01:32:36.751627000Z"
+    },
+    "processed_at": "2025-04-16T15:13:23.769Z"
+  },
+  {
+    "id": 3,
+    "from_user_id": 48,
+    "to_user_id": 11,
+    "feedback_text": "Your positivity, knowledge, and voice really made me understand the pain points in my knowledge gap of my previous days. Thank you for always providing the humor we need when the stress becomes high!",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Positivity that helps in understanding pain points. Knowledge and voice that clarify knowledge gaps. Providing humor to alleviate stress.\n\nAdditional Comments: The recipient's positivity, knowledge, and humor have a significant impact on the feedback provider's understanding and stress levels..",
+    "created_at": {
+      "value": "2025-04-01T01:34:56.768381000Z"
+    },
+    "processed_at": "2025-04-16T15:13:25.041Z"
+  },
+  {
+    "id": 4,
+    "from_user_id": 69,
+    "to_user_id": 92,
+    "feedback_text": "I appreciate his proactive approach to problem solving; he jumps in and find solutions and significantly contributes to our team's success",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Proactive approach to problem-solving. Contribution to team success.",
+    "created_at": {
+      "value": "2025-04-01T01:36:25.906769000Z"
+    },
+    "processed_at": "2025-04-16T15:13:25.955Z"
+  },
+  {
+    "id": 5,
+    "from_user_id": 48,
+    "to_user_id": 29,
+    "feedback_text": "You are someone who I relate to when it comes to how we view ourselves in our work. You allowed me to feel comfortable in feeling uncomfortable with my knowledge gap, and getting to understand these concepts we learned in our groups really helped my understanding of the work.\n",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.7,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Creating a comfortable environment for others to address knowledge gaps. Helping others understand concepts in group settings.",
+    "created_at": {
+      "value": "2025-04-01T01:37:28.229384000Z"
+    },
+    "processed_at": "2025-04-16T15:13:26.884Z"
+  }
+]

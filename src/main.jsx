@@ -1,13 +1,20 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import { BrowserRouter as Router } from 'react-router-dom'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
+import './index.css'
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <Router>
+console.log('Starting React application...');
+
+const root = document.getElementById('root');
+console.log('Found root element:', root);
+
+try {
+  ReactDOM.createRoot(root).render(
+    <React.StrictMode>
       <App />
-    </Router>
-  </StrictMode>,
-)
+    </React.StrictMode>
+  );
+  console.log('React mounted successfully');
+} catch (error) {
+  console.error('Failed to mount React:', error);
+}

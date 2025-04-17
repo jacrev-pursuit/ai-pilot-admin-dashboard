@@ -4,10 +4,33 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <title>AI Pilot Dashboard</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #242424;
+        color: white;
+      }
+      #root {
+        min-height: 100vh;
+      }
+      .fallback {
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        display: none;
+      }
+      #root:empty + .fallback {
+        display: block;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div class="fallback">
+      If you see this message, React is not rendering properly.
+      Check the console for errors.
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
