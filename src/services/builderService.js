@@ -9,7 +9,7 @@ export const fetchBuilderData = async (startDate, endDate) => {
   console.log('Fetching builder data with dates:', { startDate: effectiveStartDate, endDate: effectiveEndDate });
   
   try {
-    const response = await fetch(`${API_URL}/api/builders?startDate=${effectiveStartDate}&endDate=${effectiveEndDate}`);
+    const response = await fetch(`${API_URL}/builders?startDate=${effectiveStartDate}&endDate=${effectiveEndDate}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -26,7 +26,7 @@ export const fetchBuilderDetails = async (userId, type, startDate, endDate) => {
   const effectiveStartDate = startDate || '2000-01-01';
   const effectiveEndDate = endDate || '2100-12-31';
   console.log('Fetching details for:', { userId, type, startDate: effectiveStartDate, endDate: effectiveEndDate });
-  const url = `${API_URL}/api/builders/${userId}/details?type=${type}&startDate=${effectiveStartDate}&endDate=${effectiveEndDate}`;
+  const url = `${API_URL}/builders/${userId}/details?type=${type}&startDate=${effectiveStartDate}&endDate=${effectiveEndDate}`;
   console.log('Fetching from URL:', url);
   try {
     const response = await fetch(url);

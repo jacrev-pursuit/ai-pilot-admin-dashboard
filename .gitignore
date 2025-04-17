@@ -26,3 +26,4 @@ dist-ssr
 service_account.json
 service_account.json
 service_account.json
+server/service-account-key.json
