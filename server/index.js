@@ -23,15 +23,14 @@ const bigquery = new BigQuery({
 
 // Dataset name
 const DATASET = 'pilot_agent_public';
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID;
 
 // API endpoint to fetch builder data
 app.get('/api/builders', async (req, res) => {
-  const { startDate, endDate } = req.query;
+  // Use query parameters or default if not provided
+  const startDate = req.query.startDate || '2000-01-01';
+  const endDate = req.query.endDate || '2100-12-31';
   
-  if (!startDate || !endDate) {
-    return res.status(400).json({ error: 'Missing startDate or endDate parameters' });
-  }
-
   const query = `
     WITH builder_metrics AS (
       SELECT 
@@ -44,12 +43,12 @@ app.get('/api/builders', async (req, res) => {
         AVG(CASE WHEN DATE(fsa.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate) THEN fsa.sentiment_score END) as avg_peer_feedback_sentiment,
         AVG(CASE WHEN DATE(tr.date) BETWEEN DATE(@startDate) AND DATE(@endDate) THEN CAST(tr.scores AS FLOAT64) END) as work_product_score,
         AVG(CASE WHEN DATE(qer.grading_timestamp) BETWEEN DATE(@startDate) AND DATE(@endDate) THEN qer.score END) as comprehension_score
-      FROM \`${DATASET}.users\` u
-      LEFT JOIN \`${DATASET}.task_responses\` tr ON u.user_id = tr.user_id
-      LEFT JOIN \`${DATASET}.conversation_messages\` cm ON u.user_id = cm.user_id
-      LEFT JOIN \`${DATASET}.sentiment_results\` sr ON u.user_id = sr.user_id
-      LEFT JOIN \`${DATASET}.feedback_sentiment_analysis\` fsa ON u.user_id = CAST(fsa.to_user_id AS INT64)
-      LEFT JOIN \`${DATASET}.question_evaluation_results\` qer ON u.user_id = qer.user_id
+      FROM \`${PROJECT_ID}.${DATASET}.users\` u
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.task_responses\` tr ON u.user_id = tr.user_id
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.conversation_messages\` cm ON u.user_id = cm.user_id
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.sentiment_results\` sr ON u.user_id = sr.user_id
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.feedback_sentiment_analysis\` fsa ON CAST(u.user_id AS STRING) = fsa.to_user_id
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.question_evaluation_results\` qer ON u.user_id = qer.user_id
       GROUP BY u.user_id, u.first_name, u.last_name
     )
     SELECT 
@@ -86,7 +85,7 @@ app.get('/api/builders', async (req, res) => {
   };
 
   try {
-    logger.info('Executing BigQuery query', { endpoint: '/api/builders' });
+    logger.info('Executing BigQuery query for /api/builders', { query: options.query, params: options.params });
     const [rows] = await bigquery.query(options);
     logger.info('Successfully retrieved builder data', { rowCount: rows.length });
     res.json(rows);
@@ -97,7 +96,6 @@ app.get('/api/builders', async (req, res) => {
       stack: error.stack
     });
     
-    // Provide a more user-friendly error message for permission issues
     if (error.code === 403) {
       return res.status(403).json({ 
         error: 'Permission denied. The service account does not have sufficient permissions to access BigQuery.',
@@ -118,10 +116,12 @@ app.get('/api/builders', async (req, res) => {
 // API endpoint to fetch builder details
 app.get('/api/builders/:userId/details', async (req, res) => {
   const { userId } = req.params;
-  const { type, startDate, endDate } = req.query;
+  const type = req.query.type;
+  const startDate = req.query.startDate || '2000-01-01';
+  const endDate = req.query.endDate || '2100-12-31';
   
-  if (!userId || !type || !startDate || !endDate) {
-    return res.status(400).json({ error: 'Missing required parameters' });
+  if (!userId || !type) {
+    return res.status(400).json({ error: 'Missing required parameters: userId and type' });
   }
 
   let query = '';
@@ -135,8 +135,8 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         tr.feedback,
         tr.scores,
         tr.grading_timestamp
-      FROM \`${DATASET}.task_responses\` tr
-      JOIN \`${DATASET}.tasks\` t ON CAST(tr.task_id AS STRING) = CAST(t.id AS STRING)
+      FROM \`${PROJECT_ID}.${DATASET}.task_responses\` tr
+      JOIN \`${PROJECT_ID}.${DATASET}.tasks\` t ON CAST(tr.task_id AS STRING) = CAST(t.id AS STRING)
       WHERE CAST(tr.user_id AS INT64) = CAST(@userId AS INT64)
       AND DATE(tr.date) BETWEEN DATE(@startDate) AND DATE(@endDate)
       ORDER BY tr.grading_timestamp DESC
@@ -148,40 +148,64 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         t.task_title,
         qer.score,
         qer.grading_timestamp
-      FROM \`${DATASET}.question_evaluation_results\` qer
-      JOIN \`${DATASET}.tasks\` t ON qer.task_id = t.id
-      WHERE qer.user_id = @userId
+      FROM \`${PROJECT_ID}.${DATASET}.question_evaluation_results\` qer
+      JOIN \`${PROJECT_ID}.${DATASET}.tasks\` t ON qer.task_id = t.id
+      WHERE qer.user_id = CAST(@userId AS INT64)
       AND qer.grading_timestamp BETWEEN @startDate AND @endDate
       ORDER BY qer.grading_timestamp DESC
     `;
-  } else if (type === 'peerFeedback') {
+  } else if (type === 'peer_feedback') {
     query = `
       WITH feedback_data AS (
         SELECT 
-          pf.id,
-          pf.feedback_text,
-          pf.created_at,
+          pf.id as feedback_id,
+          pf.feedback_text as feedback,
+          pf.created_at as timestamp, 
           pf.from_user_id,
-          pf.to_user_id,
-          fsa.sentiment_category,
-          fsa.summary
-        FROM \`${DATASET}.peer_feedback\` pf
-        LEFT JOIN \`${DATASET}.feedback_sentiment_analysis\` fsa 
+          fsa.sentiment_score,
+          fsa.sentiment_category
+        FROM \`${PROJECT_ID}.${DATASET}.peer_feedback\` pf
+        LEFT JOIN \`${PROJECT_ID}.${DATASET}.feedback_sentiment_analysis\` fsa 
           ON CAST(pf.id AS STRING) = CAST(fsa.id AS STRING)
-        WHERE CAST(pf.to_user_id AS INT64) = CAST(@userId AS INT64)
-          AND DATE(pf.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+        WHERE pf.to_user_id = CAST(@userId AS INT64)
+          AND pf.created_at BETWEEN @startDate AND @endDate
       )
       SELECT 
-        fd.id,
-        fd.feedback_text,
-        fd.sentiment_category as sentiment,
-        fd.summary,
-        fd.created_at,
+        fd.feedback_id,
+        fd.feedback,
+        fd.sentiment_score,
+        fd.sentiment_category as sentiment_label,
+        fd.timestamp,
         CONCAT(u.first_name, ' ', u.last_name) as reviewer_name
       FROM feedback_data fd
-      LEFT JOIN \`${DATASET}.users\` u 
-        ON CAST(fd.from_user_id AS INT64) = u.user_id
-      ORDER BY fd.created_at DESC
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.users\` u 
+        ON fd.from_user_id = u.user_id
+      ORDER BY fd.timestamp DESC
+    `;
+  } else if (type === 'prompts') {
+    query = `
+      SELECT
+        message_id,
+        content,
+        created_at
+      FROM \`${PROJECT_ID}.${DATASET}.conversation_messages\`
+      WHERE user_id = CAST(@userId AS INT64)
+        AND message_role = 'user'
+        AND created_at BETWEEN @startDate AND @endDate
+      ORDER BY created_at DESC
+    `;
+  } else if (type === 'sentiment') {
+    query = `
+      SELECT 
+        id, 
+        sentiment_score, 
+        sentiment_category, 
+        summary, 
+        created_at
+      FROM \`${PROJECT_ID}.${DATASET}.feedback_sentiment_analysis\`
+      WHERE CAST(to_user_id AS INT64) = CAST(@userId AS INT64)
+        AND created_at BETWEEN @startDate AND @endDate
+      ORDER BY created_at DESC
     `;
   } else {
     return res.status(400).json({ error: 'Invalid type parameter' });
@@ -200,7 +224,8 @@ app.get('/api/builders/:userId/details', async (req, res) => {
     logger.info('Executing BigQuery details query', { 
       endpoint: `/api/builders/${userId}/details`,
       type: type,
-      params: options.params
+      params: options.params,
+      query: query
     });
     const [rows] = await bigquery.query(options);
     logger.info('Successfully retrieved builder details', { 
