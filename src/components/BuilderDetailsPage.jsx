@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Typography, DatePicker, Table, Tabs, Spin, message, Button, Select, Space } from 'antd';
+import { Card, Typography, DatePicker, Table, Tabs, Spin, message, Button, Select, Space, Row, Col, Tag, Modal } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { fetchBuilderData, fetchBuilderDetails } from '../services/builderService';
@@ -32,6 +32,31 @@ const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 const { Option } = Select;
+
+// --- Grade Helper Functions (Copied from BuilderView) ---
+const getLetterGrade = (score) => {
+  if (score === null || score === undefined) return 'F';
+  const numScore = parseFloat(score);
+  if (isNaN(numScore)) return 'F';
+  if (numScore >= 0.9) return 'A+';
+  if (numScore >= 0.8) return 'A';
+  if (numScore >= 0.75) return 'A-';
+  if (numScore >= 0.7) return 'B+';
+  if (numScore >= 0.6) return 'B';
+  if (numScore >= 0.55) return 'B-';
+  if (numScore >= 0.5) return 'C+';
+  return 'C';
+};
+
+const getGradeColor = (grade) => {
+  if (grade === 'N/A') return 'default';
+  const firstChar = grade.charAt(0);
+  if (firstChar === 'A') return 'green';
+  if (firstChar === 'B') return 'cyan';
+  if (firstChar === 'C') return 'orange';
+  if (firstChar === 'D' || firstChar === 'F') return 'red';
+  return 'default';
+};
 
 // --- Data Processing Functions for Charts ---
 
@@ -103,8 +128,8 @@ const processPromptCountData = (data) => {
 // --- Chart Components ---
 
 const SentimentChart = ({ data }) => {
-  const chartData = processLineChartData(data, 'created_at', 'sentiment_score', 'Sentiment Score');
-  const options = { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, title: { display: true, text: 'Sentiment Score Over Time', color: chartColors.text } } };
+  const chartData = processLineChartData(data, 'date', 'sentiment_score', 'Daily Sentiment Score');
+  const options = { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, title: { display: true, text: 'Daily Sentiment Score Over Time', color: chartColors.text } } };
   return <div style={chartContainer}><Line options={options} data={chartData} /></div>;
 };
 
@@ -143,6 +168,10 @@ const BuilderDetailsPage = () => {
   const [peerFeedbackData, setPeerFeedbackData] = useState([]);
   const [promptsData, setPromptsData] = useState([]);
   const [sentimentData, setSentimentData] = useState([]);
+
+  // Need state for the modal
+  const [workProductModalVisible, setWorkProductModalVisible] = useState(false);
+  const [selectedWorkProduct, setSelectedWorkProduct] = useState(null);
 
   // Fetch all builders for the filter dropdown
   useEffect(() => {
@@ -233,11 +262,11 @@ const BuilderDetailsPage = () => {
 
   const handleBuilderChange = (value) => {
     setSelectedBuilderId(value);
-     // Clear existing data when builder changes to avoid showing old data briefly
+     // Clear existing data when builder changes
     setWorkProductData([]); 
     setComprehensionData([]); 
     setPeerFeedbackData([]); 
-    setPromptsData([]); 
+    setPromptsData([]); // Keep clearing prompts data
     setSentimentData([]); 
   };
 
@@ -257,40 +286,91 @@ const BuilderDetailsPage = () => {
 
   // Define columns for each table
   const workProductColumns = [
-    { title: 'Task Title', dataIndex: 'task_title', key: 'task_title' },
-    { title: 'Response Content', dataIndex: 'response_content', key: 'response_content', ellipsis: true },
-    { title: 'Feedback', dataIndex: 'feedback', key: 'feedback', ellipsis: true },
-    { title: 'Scores', dataIndex: 'scores', key: 'scores' },
-    { title: 'Graded At', dataIndex: 'grading_timestamp', key: 'grading_timestamp', render: (ts) => ts ? dayjs(ts?.value || ts).format('YYYY-MM-DD HH:mm') : 'N/A' },
+    { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '15%' },
+    { title: 'Date', dataIndex: 'task_date', key: 'task_date', render: (d) => d ? dayjs(d?.value || d).format('YYYY-MM-DD') : 'N/A', width: '15%' },
+    { title: 'Feedback', dataIndex: 'feedback', key: 'feedback', width: '50%' },
+    { 
+      title: 'Score',
+      dataIndex: 'scores', 
+      key: 'scores', 
+      render: (score) => {
+        const grade = getLetterGrade(score);
+        return (
+          <Space>
+            <span>{score}</span>
+            <Tag color={getGradeColor(grade)}>{grade}</Tag>
+          </Space>
+        );
+      },
+      width: '10%' 
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: '10%',
+      render: (_, record) => (
+        <Button size="small" onClick={() => showWorkProductDetails(record)}>
+          View Details
+        </Button>
+      ),
+    },
   ];
 
   const comprehensionColumns = [
-    { title: 'Task Title', dataIndex: 'task_title', key: 'task_title' },
-    { title: 'Score', dataIndex: 'score', key: 'score' },
-    { title: 'Graded At', dataIndex: 'grading_timestamp', key: 'grading_timestamp', render: (ts) => ts ? dayjs(ts?.value || ts).format('YYYY-MM-DD HH:mm') : 'N/A' },
+    { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '25%' },
+    { title: 'Date', dataIndex: 'task_date', key: 'task_date', render: (d) => d ? dayjs(d?.value || d).format('YYYY-MM-DD') : 'N/A', width: '15%' },
+    { 
+      title: 'Score', 
+      dataIndex: 'score', 
+      key: 'score', 
+      render: (score) => {
+        const grade = getLetterGrade(score);
+        return (
+          <Space>
+            <span>{score}</span>
+            <Tag color={getGradeColor(grade)}>{grade}</Tag>
+          </Space>
+        );
+      },
+      width: '60%'
+    },
   ];
 
   const peerFeedbackColumns = [
     { title: 'Reviewer Name', dataIndex: 'reviewer_name', key: 'reviewer_name' },
-    { title: 'Feedback', dataIndex: 'feedback', key: 'feedback', ellipsis: true },
+    { title: 'Feedback', dataIndex: 'feedback', key: 'feedback' },
     { title: 'Sentiment Score', dataIndex: 'sentiment_score', key: 'sentiment_score' },
     { title: 'Sentiment Label', dataIndex: 'sentiment_label', key: 'sentiment_label' },
     { title: 'Timestamp', dataIndex: 'timestamp', key: 'timestamp', render: (ts) => ts ? dayjs(ts?.value || ts).format('YYYY-MM-DD HH:mm') : 'N/A' },
   ];
   
-  const promptsColumns = [
-    { title: 'Timestamp', dataIndex: 'created_at', key: 'created_at', render: (ts) => ts ? dayjs(ts?.value || ts).format('YYYY-MM-DD HH:mm') : 'N/A' },
-    { title: 'Content', dataIndex: 'content', key: 'content', ellipsis: true },
-    { title: 'Message ID', dataIndex: 'message_id', key: 'message_id' },
-  ];
-  
   const sentimentColumns = [
-      { title: 'Timestamp', dataIndex: 'created_at', key: 'created_at', render: (ts) => ts ? dayjs(ts?.value || ts).format('YYYY-MM-DD HH:mm') : 'N/A' },
-      { title: 'Sentiment Score', dataIndex: 'sentiment_score', key: 'sentiment_score' },
+      { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => d ? dayjs(d?.value || d).format('YYYY-MM-DD') : 'N/A' },
+      { 
+        title: 'Sentiment Score', 
+        dataIndex: 'sentiment_score', 
+        key: 'sentiment_score', 
+        render: (score) => {
+          const numScore = parseFloat(score);
+          return isNaN(numScore) ? 'N/A' : numScore.toFixed(1);
+        }
+      },
       { title: 'Sentiment Category', dataIndex: 'sentiment_category', key: 'sentiment_category' },
-      { title: 'Summary', dataIndex: 'summary', key: 'summary', ellipsis: true },
-      { title: 'ID', dataIndex: 'id', key: 'id' },
+      { title: 'Sentiment Reason', dataIndex: 'sentiment_reason', key: 'sentiment_reason' },
+      { title: 'Message Count', dataIndex: 'message_count', key: 'message_count' },
   ];
+
+  // Function to show modal
+  const showWorkProductDetails = (record) => {
+    setSelectedWorkProduct(record);
+    setWorkProductModalVisible(true);
+  };
+
+  // Function to hide modal
+  const hideWorkProductDetails = () => {
+    setWorkProductModalVisible(false);
+    setSelectedWorkProduct(null); // Clear selected record
+  };
 
   return (
     <div style={{ padding: '20px' }}>
@@ -342,13 +422,21 @@ const BuilderDetailsPage = () => {
             <Spin spinning={loading}>
              {/* Chart Section */}
              <Card title="Metrics Over Time" style={{ marginBottom: '20px' }}>
-                <Space direction="vertical" style={{ width: '100%' }}>
-                    {/* Only render charts if data exists to avoid errors */}
+                {/* Use Row and Col for layout */}
+                <Row gutter={[16, 16]}> 
+                  <Col xs={24} md={12}>
                     {sentimentData.length > 0 && <SentimentChart data={sentimentData} />}
+                  </Col>
+                  <Col xs={24} md={12}>
                     {peerFeedbackData.length > 0 && <PeerFeedbackChart data={peerFeedbackData} />}
+                  </Col>
+                  <Col xs={24} md={12}>
                     {workProductData.length > 0 && <WorkProductChart data={workProductData} />}
+                  </Col>
+                  <Col xs={24} md={12}>
                     {promptsData.length > 0 && <PromptsChart data={promptsData} />}
-                 </Space>
+                  </Col>
+                </Row>
              </Card>
              
               {/* Details Section */}
@@ -363,17 +451,40 @@ const BuilderDetailsPage = () => {
                     <TabPane tab="Peer Feedback" key="peer_feedback">
                       <Table dataSource={peerFeedbackData} columns={peerFeedbackColumns} rowKey="feedback_id" size="small" />
                     </TabPane>
-                    <TabPane tab="Prompts" key="prompts">
-                        <Table dataSource={promptsData} columns={promptsColumns} rowKey="message_id" size="small" />
-                    </TabPane>
                     <TabPane tab="Sentiment" key="sentiment">
-                        <Table dataSource={sentimentData} columns={sentimentColumns} rowKey="id" size="small" />
+                        <Table dataSource={sentimentData} columns={sentimentColumns} rowKey="date" size="small" />
                     </TabPane>
                   </Tabs>
               </Card>
             </Spin>
           )}
       </Space>
+
+      {/* Work Product Details Modal */}
+      <Modal
+        title={selectedWorkProduct?.task_title || "Work Product Details"}
+        open={workProductModalVisible}
+        onCancel={hideWorkProductDetails}
+        footer={[
+          <Button key="close" onClick={hideWorkProductDetails}>
+            Close
+          </Button>,
+        ]}
+        width={800} // Make modal wider
+      >
+        {selectedWorkProduct && (
+          <div>
+            <h4>Response Content:</h4>
+            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#f0f0f0', padding: '10px', borderRadius: '4px' }}>
+              {selectedWorkProduct.response_content}
+            </pre>
+            <h4 style={{ marginTop: '16px' }}>Feedback:</h4>
+            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#f0f0f0', padding: '10px', borderRadius: '4px' }}>
+              {selectedWorkProduct.feedback}
+            </pre>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

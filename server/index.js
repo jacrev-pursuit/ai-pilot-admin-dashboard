@@ -134,9 +134,12 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         tr.response_content,
         tr.feedback,
         tr.scores,
+        cd.day_date as task_date,
         tr.grading_timestamp
       FROM \`${PROJECT_ID}.${DATASET}.task_responses\` tr
       JOIN \`${PROJECT_ID}.${DATASET}.tasks\` t ON CAST(tr.task_id AS STRING) = CAST(t.id AS STRING)
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.time_blocks\` tb ON t.block_id = tb.id
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.curriculum_days\` cd ON tb.day_id = cd.id
       WHERE CAST(tr.user_id AS INT64) = CAST(@userId AS INT64)
       AND DATE(tr.date) BETWEEN DATE(@startDate) AND DATE(@endDate)
       ORDER BY tr.grading_timestamp DESC
@@ -147,14 +150,22 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         qer.task_id,
         t.task_title,
         qer.score,
+        cd.day_date as task_date,
         qer.grading_timestamp
       FROM \`${PROJECT_ID}.${DATASET}.question_evaluation_results\` qer
       JOIN \`${PROJECT_ID}.${DATASET}.tasks\` t ON qer.task_id = t.id
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.time_blocks\` tb ON t.block_id = tb.id
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.curriculum_days\` cd ON tb.day_id = cd.id
       WHERE qer.user_id = CAST(@userId AS INT64)
       AND qer.grading_timestamp BETWEEN @startDate AND @endDate
       ORDER BY qer.grading_timestamp DESC
     `;
   } else if (type === 'peer_feedback') {
+    // Explicitly construct table names (without backticks)
+    const peerFeedbackTable = `${PROJECT_ID}.${DATASET}.peer_feedback`;
+    const sentimentTable = `${PROJECT_ID}.${DATASET}.feedback_sentiment_analysis`;
+    const usersTable = `${PROJECT_ID}.${DATASET}.users`;
+
     query = `
       WITH feedback_data AS (
         SELECT 
@@ -164,8 +175,8 @@ app.get('/api/builders/:userId/details', async (req, res) => {
           pf.from_user_id,
           fsa.sentiment_score,
           fsa.sentiment_category
-        FROM \`${PROJECT_ID}.${DATASET}.peer_feedback\` pf
-        LEFT JOIN \`${PROJECT_ID}.${DATASET}.feedback_sentiment_analysis\` fsa 
+        FROM \`${peerFeedbackTable}\` pf 
+        LEFT JOIN \`${sentimentTable}\` fsa 
           ON CAST(pf.id AS STRING) = CAST(fsa.id AS STRING)
         WHERE pf.to_user_id = CAST(@userId AS INT64)
           AND pf.created_at BETWEEN @startDate AND @endDate
@@ -178,7 +189,7 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         fd.timestamp,
         CONCAT(u.first_name, ' ', u.last_name) as reviewer_name
       FROM feedback_data fd
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.users\` u 
+      LEFT JOIN \`${usersTable}\` u 
         ON fd.from_user_id = u.user_id
       ORDER BY fd.timestamp DESC
     `;
@@ -197,15 +208,15 @@ app.get('/api/builders/:userId/details', async (req, res) => {
   } else if (type === 'sentiment') {
     query = `
       SELECT 
-        id, 
+        date,
         sentiment_score, 
         sentiment_category, 
-        summary, 
-        created_at
-      FROM \`${PROJECT_ID}.${DATASET}.feedback_sentiment_analysis\`
-      WHERE CAST(to_user_id AS INT64) = CAST(@userId AS INT64)
-        AND created_at BETWEEN @startDate AND @endDate
-      ORDER BY created_at DESC
+        sentiment_reason, 
+        message_count
+      FROM \`${PROJECT_ID}.${DATASET}.sentiment_results\`
+      WHERE user_id = CAST(@userId AS INT64)
+        AND date BETWEEN DATE(@startDate) AND DATE(@endDate)
+      ORDER BY date DESC
     `;
   } else {
     return res.status(400).json({ error: 'Invalid type parameter' });
