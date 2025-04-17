@@ -2,12 +2,22 @@
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import fetch from 'node-fetch';
+import { BigQuery } from '@google-cloud/bigquery';
 
 // Read the service account file
 const serviceAccount = JSON.parse(fs.readFileSync('./service_account.json', 'utf8'));
 console.log('Service account loaded:', {
   project_id: serviceAccount.project_id,
   client_email: serviceAccount.client_email
+});
+
+const bigquery = new BigQuery({
+  projectId: process.env.VITE_PROJECT_ID,
+  credentials: {
+    client_email: process.env.VITE_CLIENT_EMAIL,
+    private_key: process.env.VITE_PRIVATE_KEY,
+    private_key_id: process.env.VITE_PRIVATE_KEY_ID,
+  },
 });
 
 // Function to get access token

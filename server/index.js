@@ -13,7 +13,7 @@ app.use(express.json());
 
 // Create a BigQuery client
 const bigquery = new BigQuery({
-  projectId: process.env.VITE_PROJECT_ID || 'pursuit-ops',
+  projectId: process.env.VITE_PROJECT_ID,
   credentials: {
     client_email: process.env.VITE_CLIENT_EMAIL,
     private_key: process.env.VITE_PRIVATE_KEY,
