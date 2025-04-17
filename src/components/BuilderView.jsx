@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Table, DatePicker, Space, Card, Button, Typography, message, Spin, Tag } from 'antd';
-import { ExpandOutlined } from '@ant-design/icons';
+import { Table, DatePicker, Space, Card, Button, Typography, message, Spin, Tag, Select } from 'antd';
+import { ExpandOutlined, ArrowUpOutlined, ArrowDownOutlined, DownOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { fetchBuilderData, fetchBuilderDetails } from '../services/builderService';
 import BuilderDetailsModal from './BuilderDetailsModal';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
+const { Option } = Select;
 
 // Helper function to convert numeric score to letter grade
 const getLetterGrade = (score) => {
@@ -49,34 +50,100 @@ const BuilderView = () => {
   const [detailsData, setDetailsData] = useState([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [builderFilter, setBuilderFilter] = useState('all');
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  // Function to handle sorting
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Function to get sort icon based on current sort state
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) return <DownOutlined style={{ color: '#888', fontSize: '12px', marginLeft: '8px', opacity: 0.8 }} />;
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUpOutlined style={{ color: '#4f46e5', fontSize: '14px', marginLeft: '8px' }} /> 
+      : <ArrowDownOutlined style={{ color: '#4f46e5', fontSize: '14px', marginLeft: '8px' }} />;
+  };
+
+  // Sort the data based on the current sort configuration
+  const sortedBuilders = [...builders].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    
+    const aValue = a[sortConfig.key];
+    const bValue = b[sortConfig.key];
+    
+    if (aValue === null) return 1;
+    if (bValue === null) return -1;
+    
+    if (typeof aValue === 'string') {
+      return sortConfig.direction === 'asc' 
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    }
+    
+    return sortConfig.direction === 'asc' 
+      ? aValue - bValue
+      : bValue - aValue;
+  });
 
   const columns = [
     {
-      title: 'Name',
+      title: (
+        <div onClick={() => handleSort('name')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'name' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Builder Name {getSortIcon('name')}
+        </div>
+      ),
       dataIndex: 'name',
       key: 'name',
+      width: '20%',
+      render: (text) => text.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' '),
     },
     {
-      title: 'Tasks Completed',
+      title: (
+        <div onClick={() => handleSort('tasks_completed_percentage')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'tasks_completed_percentage' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Tasks Completed {getSortIcon('tasks_completed_percentage')}
+        </div>
+      ),
       dataIndex: 'tasks_completed_percentage',
       key: 'tasks_completed_percentage',
-      render: (text) => `${text}%`,
+      width: '15%',
+      render: (text) => text === null ? '-' : `${text}%`,
     },
     {
-      title: 'Prompts Sent',
+      title: (
+        <div onClick={() => handleSort('prompts_sent')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'prompts_sent' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Prompts Sent {getSortIcon('prompts_sent')}
+        </div>
+      ),
       dataIndex: 'prompts_sent',
       key: 'prompts_sent',
+      width: '12%',
     },
     {
-      title: 'Daily Sentiment',
+      title: (
+        <div onClick={() => handleSort('daily_sentiment')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'daily_sentiment' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Daily Sentiment {getSortIcon('daily_sentiment')}
+        </div>
+      ),
       dataIndex: 'daily_sentiment',
       key: 'daily_sentiment',
+      width: '15%',
       render: (text, record) => renderDailySentiment(text, record),
     },
     {
-      title: 'Peer Feedback Sentiment',
+      title: (
+        <div onClick={() => handleSort('peer_feedback_sentiment')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'peer_feedback_sentiment' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Peer Feedback Sentiment {getSortIcon('peer_feedback_sentiment')}
+        </div>
+      ),
       dataIndex: 'peer_feedback_sentiment',
       key: 'peer_feedback_sentiment',
+      width: '18%',
       render: (text, record) => (
         <Button 
           type="link" 
@@ -88,9 +155,14 @@ const BuilderView = () => {
       ),
     },
     {
-      title: 'Work Product Score',
+      title: (
+        <div onClick={() => handleSort('work_product_score')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'work_product_score' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Work Product Score {getSortIcon('work_product_score')}
+        </div>
+      ),
       dataIndex: 'work_product_score',
       key: 'work_product_score',
+      width: '15%',
       render: (text, record) => {
         return (
           <Button 
@@ -104,9 +176,14 @@ const BuilderView = () => {
       },
     },
     {
-      title: 'Comprehension Score',
+      title: (
+        <div onClick={() => handleSort('comprehension_score')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'comprehension_score' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Comprehension Score {getSortIcon('comprehension_score')}
+        </div>
+      ),
       dataIndex: 'comprehension_score',
       key: 'comprehension_score',
+      width: '15%',
       render: (text, record) => {
         const grade = getLetterGrade(text);
         return (
@@ -153,6 +230,10 @@ const BuilderView = () => {
     } else {
       await fetchData(null, null);
     }
+  };
+
+  const handleBuilderFilterChange = (value) => {
+    setBuilderFilter(value);
   };
 
   const fetchData = async (startDate, endDate) => {
@@ -213,32 +294,71 @@ const BuilderView = () => {
     return <Tag color={color}>{grade}</Tag>;
   };
 
+  // Filter builders based on the selected builder filter
+  const filteredBuilders = builderFilter === 'all' 
+    ? sortedBuilders 
+    : sortedBuilders.filter(builder => builder.user_id.toString() === builderFilter);
+
   return (
-    <div style={{ padding: '24px' }}>
-      <Title level={2}>Builder Performance Overview</Title>
+    <div className="builder-view-container">
+      <div className="builder-view-header">
+        <Title level={2}>Builder Performance Overview</Title>
+      </div>
       
-      <Card style={{ marginBottom: '24px' }}>
-        <Space>
-          <RangePicker
-            value={dateRange}
-            onChange={handleDateRangeChange}
-            allowClear={true}
-          />
-        </Space>
-      </Card>
-
-      {error && (
-        <Card style={{ marginBottom: '24px' }}>
-          <Typography.Text type="danger">{error}</Typography.Text>
+      <div className="builder-view-content">
+        <Card className="filter-card">
+          <Space className="filter-space">
+            <RangePicker
+              value={dateRange}
+              onChange={handleDateRangeChange}
+              allowClear={true}
+              className="date-range-picker"
+            />
+            <Select
+              defaultValue="all"
+              style={{ width: 200 }}
+              onChange={handleBuilderFilterChange}
+              placeholder="Filter by Builder"
+              className="builder-select"
+              showSearch
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              }
+            >
+              <Option value="all">All Builders</Option>
+              {builders
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(builder => (
+                  <Option key={builder.user_id} value={builder.user_id.toString()}>
+                    {builder.name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
+                  </Option>
+                ))}
+            </Select>
+          </Space>
         </Card>
-      )}
 
-      <Table
-        columns={columns}
-        dataSource={builders}
-        loading={loading}
-        rowKey="user_id"
-      />
+        {error && (
+          <Card className="error-card">
+            <Typography.Text type="danger">{error}</Typography.Text>
+          </Card>
+        )}
+
+        <Table
+          columns={columns}
+          dataSource={filteredBuilders}
+          loading={loading}
+          rowKey="user_id"
+          scroll={{ x: 'max-content' }}
+          className="builder-table"
+          pagination={{ 
+            pageSize: 10,
+            position: ['bottomCenter'],
+            style: { color: 'white' }
+          }}
+          rowClassName={() => 'table-row'}
+        />
+      </div>
 
       <BuilderDetailsModal
         visible={modalVisible}

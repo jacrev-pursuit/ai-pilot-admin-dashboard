@@ -11,7 +11,12 @@ const openai = new OpenAI({
 
 // Initialize BigQuery client
 const bigquery = new BigQuery({
-  keyFilename: './service_account.json'
+  projectId: process.env.PROJECT_ID,
+  credentials: {
+    client_email: process.env.CLIENT_EMAIL,
+    private_key: process.env.PRIVATE_KEY.replace(/\\n/g, '\n'),
+    private_key_id: process.env.PRIVATE_KEY_ID,
+  }
 });
 
 async function analyzeFeedbackWithGPT(text) {

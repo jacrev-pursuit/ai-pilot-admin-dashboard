@@ -1,27 +1,221 @@
 @import 'antd/dist/reset.css';
 
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color-scheme: dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-}
-
-* {
+/* Base styles */
+body {
   margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #242424;
+  color: #fff;
 }
 
-html, body, #root {
-  min-width: 320px;
+#root {
   min-height: 100vh;
   background-color: #242424;
 }
 
-#root {
+.ant-layout {
+  min-height: 100vh;
+  background-color: #242424;
+}
+
+.ant-layout-content {
+  background-color: #242424;
+}
+
+/* Builder View Container */
+.builder-view-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.builder-view-header {
+  margin-bottom: 24px;
+}
+
+.builder-view-header h2 {
+  color: #fff;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.builder-view-content {
+  background-color: #333;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Filter Card */
+.filter-card {
+  background-color: #333;
+  border: none;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.filter-space {
   display: flex;
-  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+/* Date Range Picker */
+.date-range-picker {
+  background-color: #444;
+  border: 1px solid #555;
+  border-radius: 6px;
+}
+
+.date-range-picker:hover {
+  border-color: #4f46e5;
+}
+
+.date-range-picker .ant-picker-input > input {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.date-range-picker .ant-picker-separator {
+  color: #aaa;
+}
+
+.date-range-picker .ant-picker-suffix {
+  color: #aaa;
+}
+
+.date-range-picker .ant-picker-clear {
+  color: #aaa;
+}
+
+.date-range-picker .ant-picker-clear:hover {
+  color: #fff;
+}
+
+.date-range-picker .ant-picker-focused {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+}
+
+/* Builder Select */
+.builder-select {
+  background-color: #444;
+  border: 1px solid #555;
+  border-radius: 6px;
+}
+
+.builder-select .ant-select-selector {
+  background-color: #444 !important;
+  border: 1px solid #555 !important;
+}
+
+.builder-select .ant-select-selection-item {
+  color: #fff;
+}
+
+/* Table Styles */
+.builder-table {
+  background-color: #333;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.builder-table .ant-table {
+  background-color: #333;
+}
+
+.builder-table .ant-table-thead > tr > th {
+  background-color: #444;
+  color: #fff;
+  font-weight: 600;
+  padding: 16px;
+  border-bottom: 1px solid #555;
+}
+
+.builder-table .ant-table-tbody > tr > td {
+  background-color: #333;
+  color: #fff;
+  padding: 16px;
+  border-bottom: 1px solid #555;
+}
+
+.builder-table .ant-table-tbody > tr:hover > td {
+  background-color: #444;
+}
+
+.builder-table .ant-table-row {
+  transition: background-color 0.3s;
+}
+
+/* Pagination */
+.builder-table .ant-pagination {
+  margin-top: 24px;
+}
+
+.builder-table .ant-pagination-item {
+  background-color: #444;
+  border-color: #555;
+}
+
+.builder-table .ant-pagination-item a {
+  color: #fff;
+}
+
+.builder-table .ant-pagination-item-active {
+  background-color: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.builder-table .ant-pagination-prev button,
+.builder-table .ant-pagination-next button {
+  background-color: #444;
+  border-color: #555;
+  color: #fff;
+}
+
+/* Tags */
+.ant-tag {
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-weight: 500;
+}
+
+/* Buttons */
+.ant-btn-link {
+  color: #4f46e5;
+  padding: 4px 8px;
+}
+
+.ant-btn-link:hover {
+  color: #6366f1;
+  background-color: rgba(79, 70, 229, 0.1);
+}
+
+/* Error Card */
+.error-card {
+  background-color: #333;
+  border: 1px solid #ff4d4f;
+  margin-bottom: 24px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .builder-view-container {
+    padding: 16px;
+  }
+  
+  .filter-space {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .builder-table {
+    overflow-x: auto;
+  }
 }

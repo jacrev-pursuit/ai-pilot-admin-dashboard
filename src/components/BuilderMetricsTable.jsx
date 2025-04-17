@@ -49,6 +49,11 @@ const BuilderMetricsTable = () => {
     });
   };
 
+  const formatBuilderName = (name) => {
+    if (!name) return '';
+    return name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -105,6 +110,11 @@ const BuilderMetricsTable = () => {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) return '↕️';
+    return sortConfig.direction === 'asc' ? '↑' : '↓';
   };
 
   const sortedData = [...data].sort((a, b) => {
@@ -223,9 +233,12 @@ const BuilderMetricsTable = () => {
                   padding: '12px',
                   textAlign: 'left',
                   borderBottom: '2px solid #505050',
-                  width: '20%'
+                  width: '20%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
                 }}>
-              Builder Name {sortConfig.key === 'builder_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              Builder Name <span style={{ color: sortConfig.key === 'builder_name' ? '#4f46e5' : '#888' }}>{getSortIcon('builder_name')}</span>
             </th>
             <th onClick={() => handleSort('completion_rate')} 
                 style={{ 
@@ -233,9 +246,12 @@ const BuilderMetricsTable = () => {
                   padding: '12px',
                   textAlign: 'left',
                   borderBottom: '2px solid #505050',
-                  width: '20%'
+                  width: '20%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
                 }}>
-              Task Completion Rate {sortConfig.key === 'completion_rate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              Task Completion Rate <span style={{ color: sortConfig.key === 'completion_rate' ? '#4f46e5' : '#888' }}>{getSortIcon('completion_rate')}</span>
             </th>
             <th onClick={() => handleSort('total_prompts')} 
                 style={{ 
@@ -243,9 +259,12 @@ const BuilderMetricsTable = () => {
                   padding: '12px',
                   textAlign: 'left',
                   borderBottom: '2px solid #505050',
-                  width: '15%'
+                  width: '15%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
                 }}>
-              Total Prompts {sortConfig.key === 'total_prompts' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              Total Prompts <span style={{ color: sortConfig.key === 'total_prompts' ? '#4f46e5' : '#888' }}>{getSortIcon('total_prompts')}</span>
             </th>
             <th onClick={() => handleSort('avg_sentiment_score')} 
                 style={{ 
@@ -253,9 +272,12 @@ const BuilderMetricsTable = () => {
                   padding: '12px',
                   textAlign: 'left',
                   borderBottom: '2px solid #505050',
-                  width: '20%'
+                  width: '20%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
                 }}>
-              Sentiment {sortConfig.key === 'avg_sentiment_score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              Sentiment <span style={{ color: sortConfig.key === 'avg_sentiment_score' ? '#4f46e5' : '#888' }}>{getSortIcon('avg_sentiment_score')}</span>
             </th>
             <th style={{ 
               padding: '12px',
@@ -277,7 +299,7 @@ const BuilderMetricsTable = () => {
                       background: '#404040'
                     }
                   }}>
-                <td style={{ padding: '12px', borderBottom: '1px solid #505050' }}>{row.builder_name}</td>
+                <td style={{ padding: '12px', borderBottom: '1px solid #505050' }}>{formatBuilderName(row.builder_name)}</td>
                 <td style={{ padding: '12px', borderBottom: '1px solid #505050' }}>{row.completion_rate}%</td>
                 <td style={{ padding: '12px', borderBottom: '1px solid #505050' }}>{row.total_prompts}</td>
                 <td style={{ padding: '12px', borderBottom: '1px solid #505050' }}>
