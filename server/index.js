@@ -268,6 +268,112 @@ app.get('/api/builders/:userId/details', async (req, res) => {
   }
 });
 
+// API endpoint for daily prompt trends
+app.get('/api/trends/prompts', async (req, res) => {
+  const startDate = req.query.startDate || '2000-01-01';
+  const endDate = req.query.endDate || '2100-12-31';
+
+  const query = `
+    SELECT
+      DATE(cm.created_at) as date,
+      COUNT(cm.message_id) as prompt_count
+    FROM \`${PROJECT_ID}.${DATASET}.conversation_messages\` cm
+    INNER JOIN \`${PROJECT_ID}.${DATASET}.curriculum_days\` cd
+      ON DATE(cm.created_at) = cd.day_date
+    WHERE
+      cm.message_role = 'user'
+      AND DATE(cm.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+    GROUP BY 1
+    ORDER BY 1 ASC
+  `;
+
+  const options = {
+    query: query,
+    params: { startDate, endDate },
+    location: 'us-central1',
+  };
+
+  try {
+    logger.info('Executing BigQuery query for /api/trends/prompts', { params: options.params });
+    const [rows] = await bigquery.query(options);
+    logger.info('Successfully retrieved prompt trends', { rowCount: rows.length });
+    res.json(rows);
+  } catch (error) {
+    logger.error('Error executing BigQuery prompt trends query', {
+      error: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    res.status(500).json({ error: 'Failed to fetch prompt trends' });
+  }
+});
+
+// API endpoint for daily sentiment trends
+app.get('/api/trends/sentiment', async (req, res) => {
+  const startDate = req.query.startDate || '2000-01-01';
+  const endDate = req.query.endDate || '2100-12-31';
+
+  const query = `
+    SELECT
+      DATE(date) as date,
+      AVG(sentiment_score) as sentiment_score
+    FROM \`${PROJECT_ID}.${DATASET}.sentiment_results\`
+    WHERE date BETWEEN DATE(@startDate) AND DATE(@endDate)
+    GROUP BY date
+    ORDER BY date ASC
+  `;
+
+  const options = {
+    query: query,
+    params: { startDate: startDate, endDate: endDate },
+    location: 'us-central1',
+  };
+
+  try {
+    logger.info('Fetching sentiment trends', { params: options.params });
+    const [rows] = await bigquery.query(options);
+    logger.info('Successfully fetched sentiment trends', { rowCount: rows.length });
+    res.json(rows);
+  } catch (error) {
+    logger.error('Error fetching sentiment trends', { error: error.message, stack: error.stack });
+    res.status(500).json({ error: 'Failed to fetch sentiment trends' });
+  }
+});
+
+// API endpoint for peer feedback sentiment trends
+app.get('/api/trends/peer-feedback', async (req, res) => {
+  const startDate = req.query.startDate || '2000-01-01';
+  const endDate = req.query.endDate || '2100-12-31';
+
+  const query = `
+    SELECT
+      DATE(created_at) as date,
+      sentiment_category,
+      COUNT(*) as count
+    FROM \`${PROJECT_ID}.${DATASET}.feedback_sentiment_analysis\`
+    WHERE DATE(created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+      AND sentiment_category IS NOT NULL
+    GROUP BY date, sentiment_category
+    ORDER BY date ASC, sentiment_category ASC
+  `;
+
+  const options = {
+    query: query,
+    params: { startDate: startDate, endDate: endDate },
+    location: 'us-central1',
+  };
+
+  try {
+    logger.info('Fetching peer feedback sentiment trends', { params: options.params });
+    const [rows] = await bigquery.query(options);
+    logger.info('Successfully fetched peer feedback sentiment trends', { rowCount: rows.length });
+    res.json(rows);
+  } catch (error) {
+    logger.error('Error fetching peer feedback sentiment trends', { error: error.message, stack: error.stack });
+    res.status(500).json({ error: 'Failed to fetch peer feedback sentiment trends' });
+  }
+});
+
 // Only start the server if this file is run directly
 if (require.main === module) {
   app.listen(port, () => {
