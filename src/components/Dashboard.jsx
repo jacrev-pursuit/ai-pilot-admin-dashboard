@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import BuilderMetricsTable from './BuilderMetricsTable';
 // Import chart styles
 import { chartContainer, baseChartOptions } from './ChartStyles';
+import { getLetterGrade, getGradeColor } from '../utils/gradingUtils'; // Import grading util
 
 const { RangePicker } = DatePicker;
 const { Text, Title } = Typography;
@@ -111,6 +112,20 @@ const processSentimentCountsForBarChart = (rawData) => {
   return result;
 };
 
+// Define possible grades and colors for the distribution chart
+const gradeCategories = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'F'];
+const gradeColors = {
+  'A+': '#2f9e44',
+  'A': '#40c057',
+  'A-': '#69db7c',
+  'B+': '#3bc9db',
+  'B': '#66d9e8',
+  'B-': '#99e9f2',
+  'C+': '#ff922b',
+  'C': '#ffa94d',
+  'F': '#ff6b6b'
+};
+
 const PilotOverview = () => {
   const [trendDateRange, setTrendDateRange] = useState([
     dayjs().subtract(30, 'days'),
@@ -139,6 +154,20 @@ const PilotOverview = () => {
   const [selectedDailySentDate, setSelectedDailySentDate] = useState('');
   const [selectedDailySentCategory, setSelectedDailySentCategory] = useState('');
   const dailySentimentChartRef = React.useRef(); // Ref for the daily sentiment chart
+
+  // State for Grade Distribution Chart
+  const [gradeDistData, setGradeDistData] = useState(null);
+  const [gradeDistLoading, setGradeDistLoading] = useState(false);
+  const [gradeDistError, setGradeDistError] = useState(null);
+  const gradeDistChartRef = React.useRef(); // Ref for grade dist chart
+
+  // State for grade submissions modal
+  const [gradeSubmissionsModalVisible, setGradeSubmissionsModalVisible] = useState(false);
+  const [gradeSubmissions, setGradeSubmissions] = useState([]);
+  const [gradeSubmissionsLoading, setGradeSubmissionsLoading] = useState(false);
+  const [gradeSubmissionsError, setGradeSubmissionsError] = useState(null);
+  const [selectedGradeTask, setSelectedGradeTask] = useState('');
+  const [selectedGradeCategory, setSelectedGradeCategory] = useState('');
 
   useEffect(() => {
     const fetchTrends = async () => {
@@ -194,6 +223,112 @@ const PilotOverview = () => {
 
     fetchTrends();
   }, [trendDateRange]);
+
+  // New useEffect for Grade Distribution
+  useEffect(() => {
+    const fetchGradeDistribution = async () => {
+      if (!trendDateRange || trendDateRange.length !== 2) return;
+
+      setGradeDistLoading(true);
+      setGradeDistError(null);
+      const startDate = trendDateRange[0].format('YYYY-MM-DD');
+      const endDate = trendDateRange[1].format('YYYY-MM-DD');
+
+      try {
+        const response = await fetch(`${API_URL}/api/grades/distribution?startDate=${startDate}&endDate=${endDate}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error fetching grade distribution: ${response.status}`);
+        }
+        const rawData = await response.json();
+        console.log("[Debug] Raw Grade Dist Data:", rawData);
+
+        // Process data for grouped bar chart
+        const gradesByTask = rawData.reduce((acc, item) => {
+          const taskDate = item.task_date?.value ? dayjs(item.task_date.value).format('MMM D') : 'No Date';
+          const taskTitle = `${item.task_title || 'Unknown Task'} (${taskDate})`; // Combine title and date
+          const grade = getLetterGrade(item.score);
+
+          if (!acc[taskTitle]) {
+            acc[taskTitle] = {};
+            gradeCategories.forEach(g => { acc[taskTitle][g] = 0; }); // Initialize all grades
+          }
+          if (gradeCategories.includes(grade)) {
+              acc[taskTitle][grade]++;
+          }
+          return acc;
+        }, {});
+        console.log("[Debug] Grades By Task:", gradesByTask);
+
+        const taskLabels = Object.keys(gradesByTask);
+
+        const datasets = gradeCategories.map(grade => ({
+          label: grade,
+          data: taskLabels.map(task => gradesByTask[task][grade] || 0),
+          backgroundColor: gradeColors[grade] || '#adb5bd' // Fallback color
+        }));
+        console.log("[Debug] Grade Datasets:", datasets);
+
+        setGradeDistData({
+          labels: taskLabels,
+          datasets: datasets
+        });
+
+      } catch (error) {
+        console.error("Failed to fetch grade distribution data:", error);
+        setGradeDistError(error.message);
+      } finally {
+        setGradeDistLoading(false);
+      }
+    };
+
+    fetchGradeDistribution();
+  }, [trendDateRange]);
+
+  // --- Chart Options --- //
+  // Options for Grade Distribution Chart (Stacked Bar)
+  const gradeChartOptions = (onClickHandler) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    onClick: onClickHandler, // Pass click handler
+    plugins: {
+      legend: {
+        position: 'right',
+      },
+      title: {
+        display: true,
+        text: 'Grade Distribution per Task'
+      },
+      tooltip: {
+        mode: 'index', // Show tooltip for all bars in the group
+        intersect: false,
+      }
+    },
+    scales: {
+      x: {
+        stacked: true,
+        title: {
+            display: true,
+            text: 'Task Title'
+        },
+        ticks: {
+             // Potentially shorten labels if they are too long
+             callback: function(value, index, values) {
+                const label = this.getLabelForValue(value);
+                return label.length > 20 ? label.substring(0, 17) + '...' : label;
+            }
+        }
+      },
+      y: {
+        stacked: true,
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Number of Submissions'
+        }
+      }
+    }
+  });
 
   // --- Click Handlers for Charts --- //
   const handleDailySentimentChartClick = async (event, elements) => {
@@ -290,6 +425,56 @@ const PilotOverview = () => {
     }
   };
 
+  // Click handler for Grade Distribution Chart
+  const handleGradeChartClick = async (event, elements) => {
+    console.log('[Debug] Grade chart clicked!', event);
+    const chart = gradeDistChartRef.current;
+    if (!chart || !elements || elements.length === 0) {
+      console.log('[Debug] No grade chart element found');
+      return;
+    }
+
+    const { datasetIndex, index } = elements[0];
+    const clickedGrade = chart.data.datasets[datasetIndex].label; // e.g., 'A+', 'B'
+    const clickedTaskLabel = chart.data.labels[index]; // e.g., 'Task Title (MMM D)'
+
+    // Extract title and date from label
+    const match = clickedTaskLabel.match(/^(.*)\s\(([^)]+)\)$/);
+    if (!match) {
+        console.error('Could not parse task label:', clickedTaskLabel);
+        return;
+    }
+    const taskTitle = match[1];
+    const taskDateStr = match[2]; // 'MMM D' format
+
+    const year = trendDateRange[1].year(); // Use year from date range
+    const dateForAPI = dayjs(`${taskDateStr} ${year}`, 'MMM D YYYY').format('YYYY-MM-DD');
+
+    console.log(`[Debug] Grade Click: Task=${taskTitle}, Date=${dateForAPI}, Grade=${clickedGrade}`);
+
+    setSelectedGradeTask(clickedTaskLabel); // Store full label for modal title
+    setSelectedGradeCategory(clickedGrade);
+    setGradeSubmissionsLoading(true);
+    setGradeSubmissionsError(null);
+    setGradeSubmissionsModalVisible(true);
+    setGradeSubmissions([]);
+
+    try {
+      const response = await fetch(`${API_URL}/api/grades/submissions?task_title=${encodeURIComponent(taskTitle)}&task_date=${dateForAPI}&grade=${clickedGrade}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error fetching grade submissions: ${response.status}`);
+      }
+      const data = await response.json();
+      setGradeSubmissions(data);
+    } catch (error) {
+      console.error("Failed to fetch grade submission details:", error);
+      setGradeSubmissionsError(error.message);
+    } finally {
+      setGradeSubmissionsLoading(false);
+    }
+  };
+
   return (
     <div>
       <div style={{
@@ -355,6 +540,24 @@ const PilotOverview = () => {
             </Col>
           </Row>
         )}
+      </Card>
+
+      {/* Grade Distribution Chart Section */}
+      <Card style={{ marginBottom: '24px' }}>
+         <Title level={4} style={{ margin: 0, marginBottom: '16px' }}>Grade Distribution per Task</Title>
+         {gradeDistLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
+         {gradeDistError && <Alert message="Error loading grade distribution" description={gradeDistError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
+         {!gradeDistLoading && !gradeDistError && gradeDistData && gradeDistData.labels.length > 0 ? (
+            <div style={{ ...chartContainer, height: '450px' }}>
+                 <Bar
+                    ref={gradeDistChartRef}
+                    options={gradeChartOptions(handleGradeChartClick)}
+                    data={gradeDistData}
+                 />
+            </div>
+         ) : (!gradeDistLoading && !gradeDistError && (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#888' }}>No grade data available for the selected period.</div>
+         ))}
       </Card>
 
       {/* Feedback Details Modal */}
@@ -427,6 +630,45 @@ const PilotOverview = () => {
           />
         ) : (
           <Text>No specific sentiment details found for this category on this day.</Text>
+        )}
+      </Modal>
+
+      {/* Grade Submissions Details Modal */}
+      <Modal
+        title={`Submissions for ${selectedGradeTask} - Grade ${selectedGradeCategory}`}
+        open={gradeSubmissionsModalVisible}
+        onCancel={() => setGradeSubmissionsModalVisible(false)}
+        footer={null}
+        width={900} // Wider modal
+      >
+        {gradeSubmissionsLoading ? (
+          <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>
+        ) : gradeSubmissionsError ? (
+          <Alert message="Error Loading Submissions" description={gradeSubmissionsError} type="error" showIcon />
+        ) : gradeSubmissions.length > 0 ? (
+          <List
+            itemLayout="vertical"
+            dataSource={gradeSubmissions}
+            renderItem={item => (
+              <List.Item key={item.user_id + item.grading_timestamp?.value}> {/* Use a likely unique key */}
+                <List.Item.Meta
+                  title={<Text strong>{item.user_name || `User ID: ${item.user_id}`}</Text>}
+                  description={<pre style={{ whiteSpace: 'pre-wrap', background: '#f0f0f0', padding: '10px', borderRadius: '4px', maxHeight: '150px', overflowY: 'auto' }}>{item.response_content || 'No content available'}</pre>}
+                />
+                <Space direction="vertical" size="small">
+                   <Text>Score: {
+                       !isNaN(parseFloat(item.scores)) 
+                       ? parseFloat(item.scores).toFixed(2) 
+                       : item.scores ?? 'N/A' // Display original string if not a valid number
+                   }</Text>
+                   <Text>Feedback: {item.feedback || 'N/A'}</Text>
+                   <Text type="secondary">Graded: {item.grading_timestamp?.value ? dayjs(item.grading_timestamp.value).format('YYYY-MM-DD HH:mm') : 'N/A'}</Text>
+                </Space>
+              </List.Item>
+            )}
+          />
+        ) : (
+          <Text>No submissions found for this grade and task.</Text>
         )}
       </Modal>
 

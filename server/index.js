@@ -471,6 +471,123 @@ app.get('/api/sentiment/details', async (req, res) => {
   }
 });
 
+// --- API Endpoint for Grade Distribution per Task ---
+app.get('/api/grades/distribution', async (req, res) => {
+  const startDate = req.query.startDate || '2000-01-01';
+  const endDate = req.query.endDate || '2100-12-31';
+
+  const query = `
+    SELECT
+      t.id as task_id,
+      t.task_title,
+      CAST(tr.scores AS FLOAT64) as score,
+      cd.day_date as task_date
+    FROM \`${PROJECT_ID}.${DATASET}.task_responses\` tr
+    JOIN \`${PROJECT_ID}.${DATASET}.tasks\` t ON CAST(tr.task_id AS STRING) = CAST(t.id AS STRING)
+    LEFT JOIN \`${PROJECT_ID}.${DATASET}.time_blocks\` tb ON t.block_id = tb.id
+    LEFT JOIN \`${PROJECT_ID}.${DATASET}.curriculum_days\` cd ON tb.day_id = cd.id
+    WHERE tr.grading_timestamp BETWEEN TIMESTAMP(@startDate) AND TIMESTAMP(@endDate)
+      AND tr.scores IS NOT NULL
+    -- ORDER BY cd.day_date, t.task_title -- Optional ordering by date then title
+  `;
+
+  const options = {
+    query: query,
+    params: { startDate: startDate, endDate: endDate },
+    location: 'us-central1',
+  };
+
+  try {
+    logger.info('Fetching grade distribution data', { params: options.params });
+    const [rows] = await bigquery.query(options);
+    logger.info('Successfully fetched grade distribution data', { rowCount: rows.length });
+    res.json(rows);
+  } catch (error) {
+    logger.error('Error fetching grade distribution data', { error: error.message, stack: error.stack });
+    res.status(500).json({ error: 'Failed to fetch grade distribution data' });
+  }
+});
+
+// --- API Endpoint for Specific Grade Submissions by Task, Date, and Grade ---
+app.get('/api/grades/submissions', async (req, res) => {
+  const { task_title, task_date, grade } = req.query;
+
+  if (!task_title || !task_date || !grade) {
+    return res.status(400).json({ error: 'Missing required query parameters: task_title, task_date, and grade' });
+  }
+
+  // Map grades to score ranges (adjust ranges as per your getLetterGrade logic)
+  const gradeScoreRanges = {
+    'A+': { min: 0.9, max: 1.0 },
+    'A': { min: 0.8, max: 0.9 },
+    'A-': { min: 0.75, max: 0.8 },
+    'B+': { min: 0.7, max: 0.75 },
+    'B': { min: 0.6, max: 0.7 },
+    'B-': { min: 0.55, max: 0.6 },
+    'C+': { min: 0.5, max: 0.55 },
+    'C': { min: 0.0, max: 0.5 }, // Assuming C is the minimum passing, adjust lower bound if needed
+    'F': { min: -1.0, max: 0.0 } // Assuming F is below C's lower bound
+  };
+
+  const range = gradeScoreRanges[grade];
+  if (!range) {
+    return res.status(400).json({ error: 'Invalid grade parameter' });
+  }
+
+  const query = `
+    WITH TaskInfo AS (
+      -- Find the task_id based on title and date
+      SELECT
+        t.id
+      FROM \`${PROJECT_ID}.${DATASET}.tasks\` t
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.time_blocks\` tb ON t.block_id = tb.id
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.curriculum_days\` cd ON tb.day_id = cd.id
+      WHERE t.task_title = @task_title AND DATE(cd.day_date) = DATE(@task_date)
+      LIMIT 1 -- Assume title + date is unique enough for this context
+    )
+    SELECT
+      tr.user_id,
+      tr.scores,
+      tr.feedback,
+      tr.response_content, -- Include submission content if needed
+      tr.grading_timestamp,
+      CONCAT(u.first_name, ' ', u.last_name) as user_name
+    FROM \`${PROJECT_ID}.${DATASET}.task_responses\` tr
+    JOIN TaskInfo ON CAST(tr.task_id AS STRING) = CAST(TaskInfo.id AS STRING)
+    LEFT JOIN \`${PROJECT_ID}.${DATASET}.users\` u ON tr.user_id = u.user_id
+    WHERE tr.scores IS NOT NULL
+      -- Filter based on score range for the given grade
+      -- Note: Ranges are inclusive of min, exclusive of max (except for A+ and F)
+      AND CAST(tr.scores AS FLOAT64) >= @min_score
+      AND CAST(tr.scores AS FLOAT64) < @max_score
+      ${grade === 'A+' ? 'OR CAST(tr.scores AS FLOAT64) = 1.0' : ''} -- Include exact 1.0 for A+
+      ${grade === 'F' ? '' : ''} -- F includes scores exactly at min bound (e.g. 0)
+    ORDER BY tr.user_id
+  `;
+
+  const options = {
+    query: query,
+    params: {
+      task_title: task_title,
+      task_date: task_date,
+      grade: grade, // Pass grade for logging/debug if needed
+      min_score: range.min,
+      max_score: range.max
+    },
+    location: 'us-central1',
+  };
+
+  try {
+    logger.info('Fetching grade submission details', { params: options.params });
+    const [rows] = await bigquery.query(options);
+    logger.info('Successfully fetched grade submission details', { rowCount: rows.length });
+    res.json(rows);
+  } catch (error) {
+    logger.error('Error fetching grade submission details', { error: error.message, stack: error.stack });
+    res.status(500).json({ error: 'Failed to fetch grade submission details' });
+  }
+});
+
 // Only start the server if this file is run directly
 if (require.main === module) {
   app.listen(port, () => {

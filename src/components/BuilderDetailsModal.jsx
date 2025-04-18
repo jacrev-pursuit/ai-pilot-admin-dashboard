@@ -2,39 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Table, Typography, Card, Space, Tag, Spin } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
 
 const { Title, Text } = Typography;
-
-// Helper function to convert numeric score to letter grade
-const getLetterGrade = (score) => {
-  if (score === null || score === undefined) return 'F';
-  
-  const numScore = parseFloat(score);
-  if (isNaN(numScore)) return 'F';
-  
-  // Any valid submission gets at least a C
-  if (numScore >= 0.9) return 'A+';
-  if (numScore >= 0.8) return 'A';
-  if (numScore >= 0.75) return 'A-';
-  if (numScore >= 0.7) return 'B+';
-  if (numScore >= 0.6) return 'B';
-  if (numScore >= 0.55) return 'B-';
-  if (numScore >= 0.5) return 'C+';
-  return 'C'; // Minimum grade for any submission
-};
-
-// Helper function to get color for letter grade
-const getGradeColor = (grade) => {
-  if (grade === 'N/A') return 'default';
-  
-  const firstChar = grade.charAt(0);
-  if (firstChar === 'A') return 'green';
-  if (firstChar === 'B') return 'cyan';
-  if (firstChar === 'C') return 'orange';
-  if (firstChar === 'D' || firstChar === 'F') return 'red';
-  
-  return 'default';
-};
 
 const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder }) => {
   console.log('BuilderDetailsModal rendering:', { visible, type, dataLength: data?.length });

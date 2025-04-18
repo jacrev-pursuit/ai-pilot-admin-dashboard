@@ -2,43 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Table, DatePicker, Space, Card, Button, Typography, message, Spin, Tag, Select } from 'antd';
 import { ExpandOutlined, ArrowUpOutlined, ArrowDownOutlined, DownOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { Link } from 'react-router-dom';
 import { fetchBuilderData, fetchBuilderDetails } from '../services/builderService';
 import BuilderDetailsModal from './BuilderDetailsModal';
+import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
-
-// Helper function to convert numeric score to letter grade
-const getLetterGrade = (score) => {
-  if (score === null || score === undefined) return 'F';
-  
-  const numScore = parseFloat(score);
-  if (isNaN(numScore)) return 'F';
-  
-  // Any valid submission gets at least a C
-  if (numScore >= 0.9) return 'A+';
-  if (numScore >= 0.8) return 'A';
-  if (numScore >= 0.75) return 'A-';
-  if (numScore >= 0.7) return 'B+';
-  if (numScore >= 0.6) return 'B';
-  if (numScore >= 0.55) return 'B-';
-  if (numScore >= 0.5) return 'C+';
-  return 'C'; // Minimum grade for any submission
-};
-
-// Helper function to get color for letter grade
-const getGradeColor = (grade) => {
-  if (grade === 'N/A') return 'default';
-  
-  const firstChar = grade.charAt(0);
-  if (firstChar === 'A') return 'green';
-  if (firstChar === 'B') return 'cyan';
-  if (firstChar === 'C') return 'orange';
-  if (firstChar === 'D' || firstChar === 'F') return 'red';
-  
-  return 'default';
-};
 
 const BuilderView = () => {
   const [dateRange, setDateRange] = useState(null);
@@ -101,7 +72,11 @@ const BuilderView = () => {
       dataIndex: 'name',
       key: 'name',
       width: '20%',
-      render: (text) => text.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' '),
+      render: (text, record) => (
+        <Link to={`/builders/${record.user_id}`}>
+          {text.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
+        </Link>
+      ),
     },
     {
       title: (
