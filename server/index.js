@@ -316,11 +316,13 @@ app.get('/api/trends/sentiment', async (req, res) => {
   const query = `
     SELECT
       DATE(date) as date,
-      AVG(sentiment_score) as sentiment_score
+      sentiment_category,
+      COUNT(*) as count
     FROM \`${PROJECT_ID}.${DATASET}.sentiment_results\`
-    WHERE date BETWEEN DATE(@startDate) AND DATE(@endDate)
-    GROUP BY date
-    ORDER BY date ASC
+    WHERE DATE(date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+      AND sentiment_category IS NOT NULL
+    GROUP BY date, sentiment_category
+    ORDER BY date ASC, sentiment_category ASC
   `;
 
   const options = {
@@ -422,6 +424,53 @@ app.get('/api/feedback/details', async (req, res) => {
   }
 });
 
+// --- API Endpoint for Specific Daily Sentiment Details by Date and Category ---
+app.get('/api/sentiment/details', async (req, res) => {
+  const { date, category } = req.query;
+
+  if (!date || !category) {
+    return res.status(400).json({ error: 'Missing required query parameters: date and category' });
+  }
+
+  // Optional: Validate category
+  const validCategories = ['Positive', 'Neutral', 'Negative']; // Categories used in this chart's processing
+  if (!validCategories.includes(category)) {
+    return res.status(400).json({ error: 'Invalid category parameter for daily sentiment' });
+  }
+
+  const query = `
+    SELECT
+      sr.user_id,
+      sr.sentiment_score,
+      sr.sentiment_category,
+      sr.sentiment_reason,
+      sr.message_count,
+      sr.date,
+      CONCAT(u.first_name, ' ', u.last_name) as user_name
+    FROM \`${PROJECT_ID}.${DATASET}.sentiment_results\` sr
+    LEFT JOIN \`${PROJECT_ID}.${DATASET}.users\` u ON sr.user_id = u.user_id
+    WHERE DATE(sr.date) = DATE(@date)
+      AND sr.sentiment_category = @category
+    ORDER BY sr.user_id
+  `;
+
+  const options = {
+    query: query,
+    params: { date: date, category: category },
+    location: 'us-central1',
+  };
+
+  try {
+    logger.info('Fetching daily sentiment details', { params: options.params });
+    const [rows] = await bigquery.query(options);
+    logger.info('Successfully fetched daily sentiment details', { rowCount: rows.length, date, category });
+    res.json(rows);
+  } catch (error) {
+    logger.error('Error fetching daily sentiment details', { error: error.message, stack: error.stack, date, category });
+    res.status(500).json({ error: 'Failed to fetch daily sentiment details' });
+  }
+});
+
 // Only start the server if this file is run directly
 if (require.main === module) {
   app.listen(port, () => {
@@ -433,4 +482,4 @@ if (require.main === module) {
 }
 
 // Export the app for testing
-module.exports = app; 
+module.exports = app;

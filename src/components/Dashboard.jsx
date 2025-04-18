@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, DatePicker, Spin, Alert, Typography, Modal, List, Space } from 'antd';
+import { Card, Row, Col, DatePicker, Spin, Alert, Typography, Modal, List, Space, Tag } from 'antd';
 import { Line, Bar } from 'react-chartjs-2';
 import { getElementAtEvent, getDatasetAtEvent } from 'react-chartjs-2';
 import dayjs from 'dayjs';
@@ -69,37 +69,10 @@ const sentimentCategoryColors = {
   'Very Negative': 'rgba(255, 99, 132, 0.6)'     // Reddish
 };
 
-// Function to process raw GENERAL sentiment data (uses average score)
-const processGeneralSentimentForBarChart = (rawData) => {
-  const processedSentiment = rawData.reduce((acc, item) => {
-    const dateStr = dayjs(item.date?.value || item.date).format('YYYY-MM-DD');
-    const category = getSentimentCategory(item.sentiment_score);
-    if (!acc[dateStr]) {
-      acc[dateStr] = { Positive: 0, Neutral: 0, Negative: 0 };
-    }
-    acc[dateStr][category]++;
-    return acc;
-  }, {});
-
-  const labels = Object.keys(processedSentiment).sort();
-  const positiveCounts = labels.map(date => processedSentiment[date].Positive);
-  const neutralCounts = labels.map(date => processedSentiment[date].Neutral);
-  const negativeCounts = labels.map(date => processedSentiment[date].Negative);
-
-  return {
-    labels: labels.map(date => dayjs(date).format('MMM D')),
-    datasets: [
-      { label: 'Positive', data: positiveCounts, backgroundColor: 'rgba(75, 192, 192, 0.6)' },
-      { label: 'Neutral', data: neutralCounts, backgroundColor: 'rgba(201, 203, 207, 0.6)' },
-      { label: 'Negative', data: negativeCounts, backgroundColor: 'rgba(255, 99, 132, 0.6)' }
-    ]
-  };
-};
-
-// Function to process raw PEER FEEDBACK sentiment data (uses counts per category)
-const processPeerFeedbackSentimentForBarChart = (rawData) => {
-  console.log('[Debug] Raw Peer Feedback Data:', rawData);
-  // Possible categories from the database
+// Renamed function to process sentiment data with category counts
+const processSentimentCountsForBarChart = (rawData) => {
+  console.log('[Debug] Raw Sentiment Count Data:', rawData);
+  // Possible categories from the database (expanded to include all 5)
   const possibleCategories = Object.keys(sentimentCategoryColors);
 
   // Group counts by date and category
@@ -158,6 +131,15 @@ const PilotOverview = () => {
   const [selectedFeedbackCategory, setSelectedFeedbackCategory] = useState('');
   const peerFeedbackChartRef = React.useRef(); // Ref for the peer feedback chart
 
+  // State for daily sentiment details modal
+  const [dailySentModalVisible, setDailySentModalVisible] = useState(false);
+  const [dailySentDetails, setDailySentDetails] = useState([]);
+  const [dailySentDetailsLoading, setDailySentDetailsLoading] = useState(false);
+  const [dailySentDetailsError, setDailySentDetailsError] = useState(null);
+  const [selectedDailySentDate, setSelectedDailySentDate] = useState('');
+  const [selectedDailySentCategory, setSelectedDailySentCategory] = useState('');
+  const dailySentimentChartRef = React.useRef(); // Ref for the daily sentiment chart
+
   useEffect(() => {
     const fetchTrends = async () => {
       if (!trendDateRange || trendDateRange.length !== 2) return;
@@ -194,11 +176,11 @@ const PilotOverview = () => {
           }]
         });
 
-        // Process general sentiment data for stacked bar chart
-        setSentimentTrendData(processGeneralSentimentForBarChart(rawSentimentData));
+        // Process general sentiment data using the counts processor
+        setSentimentTrendData(processSentimentCountsForBarChart(rawSentimentData));
 
-        // Process peer feedback sentiment data for stacked bar chart
-        const processedPeerData = processPeerFeedbackSentimentForBarChart(rawPeerFeedbackData);
+        // Process peer feedback sentiment data using the counts processor
+        const processedPeerData = processSentimentCountsForBarChart(rawPeerFeedbackData);
         console.log('[Debug] Setting Peer Feedback State:', processedPeerData);
         setPeerFeedbackTrendData(processedPeerData);
 
@@ -213,7 +195,48 @@ const PilotOverview = () => {
     fetchTrends();
   }, [trendDateRange]);
 
-  // --- Click Handler for Peer Feedback Chart --- //
+  // --- Click Handlers for Charts --- //
+  const handleDailySentimentChartClick = async (event, elements) => {
+    console.log('[Debug] Daily sentiment chart clicked!', event);
+    const chart = dailySentimentChartRef.current;
+    if (!chart || !elements || elements.length === 0) {
+      console.log('[Debug] No daily sentiment chart element found');
+      return;
+    }
+
+    const { datasetIndex, index } = elements[0];
+    const clickedDataset = chart.data.datasets[datasetIndex];
+    const clickedLabel = chart.data.labels[index]; // Date in 'MMM D' format
+    const clickedCategory = clickedDataset.label; // Sentiment category (Positive/Neutral/Negative)
+
+    const year = trendDateRange[1].year();
+    const dateForAPI = dayjs(`${clickedLabel} ${year}`, 'MMM D YYYY').format('YYYY-MM-DD');
+
+    console.log(`[Debug] Daily Sent Click: Date=${dateForAPI}, Category=${clickedCategory}`);
+
+    setDailySentDetailsLoading(true);
+    setDailySentDetailsError(null);
+    setSelectedDailySentDate(clickedLabel);
+    setSelectedDailySentCategory(clickedCategory);
+    setDailySentModalVisible(true);
+    setDailySentDetails([]);
+
+    try {
+      const response = await fetch(`${API_URL}/api/sentiment/details?date=${dateForAPI}&category=${clickedCategory}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error fetching daily sentiment details: ${response.status}`);
+      }
+      const data = await response.json();
+      setDailySentDetails(data);
+    } catch (error) {
+      console.error("Failed to fetch daily sentiment details:", error);
+      setDailySentDetailsError(error.message);
+    } finally {
+      setDailySentDetailsLoading(false);
+    }
+  };
+
   const handlePeerFeedbackChartClick = async (event, elements) => {
     console.log('[Debug] Peer feedback chart clicked!', event);
     console.log('[Debug] Elements from handler:', elements);
@@ -306,7 +329,11 @@ const PilotOverview = () => {
             <Col xs={24} md={12} lg={12}>
                <div style={{ ...chartContainer, height: '400px' }}>
                 {sentimentTrendData && sentimentTrendData.labels.length > 0 ? (
-                  <Bar options={sentimentBarOptions('Daily Sentiment Distribution')} data={sentimentTrendData} />
+                  <Bar
+                    ref={dailySentimentChartRef}
+                    options={sentimentBarOptions('Daily Sentiment Distribution', handleDailySentimentChartClick)}
+                    data={sentimentTrendData}
+                  />
                 ) : (
                   <div style={{ textAlign: 'center', paddingTop: '50px', color: '#888' }}>No sentiment data</div>
                 )}
@@ -363,6 +390,43 @@ const PilotOverview = () => {
           />
         ) : (
           <Text>No specific feedback found for this category on this day.</Text>
+        )}
+      </Modal>
+
+      {/* Daily Sentiment Details Modal */}
+      <Modal
+        title={`Daily Sentiment Details - ${selectedDailySentCategory} on ${selectedDailySentDate}`}
+        open={dailySentModalVisible}
+        onCancel={() => setDailySentModalVisible(false)}
+        footer={null}
+        width={800}
+      >
+        {dailySentDetailsLoading ? (
+          <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>
+        ) : dailySentDetailsError ? (
+          <Alert message="Error Loading Details" description={dailySentDetailsError} type="error" showIcon />
+        ) : dailySentDetails.length > 0 ? (
+          <List
+            itemLayout="vertical"
+            dataSource={dailySentDetails}
+            renderItem={item => (
+              <List.Item
+                key={item.user_id + item.date?.value}
+              >
+                <List.Item.Meta
+                  title={<Text strong>{item.user_name || `User ID: ${item.user_id}`}</Text>}
+                  description={item.sentiment_reason || 'No reason provided.'}
+                />
+                <Space size="large">
+                   <Text>Score: {item.sentiment_score?.toFixed(2) ?? 'N/A'}</Text>
+                   <Text>Messages: {item.message_count ?? 'N/A'}</Text>
+                   <Text>Category: <Tag>{item.sentiment_category || 'N/A'}</Tag></Text>
+                </Space>
+              </List.Item>
+            )}
+          />
+        ) : (
+          <Text>No specific sentiment details found for this category on this day.</Text>
         )}
       </Modal>
 
