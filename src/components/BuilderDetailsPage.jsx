@@ -338,9 +338,9 @@ const BuilderDetailsPage = () => {
 
   const peerFeedbackColumns = [
     { title: 'Reviewer Name', dataIndex: 'reviewer_name', key: 'reviewer_name' },
-    { title: 'Feedback', dataIndex: 'feedback', key: 'feedback' },
-    { title: 'Sentiment Score', dataIndex: 'sentiment_score', key: 'sentiment_score' },
-    { title: 'Sentiment Label', dataIndex: 'sentiment_label', key: 'sentiment_label' },
+    { title: 'Feedback', dataIndex: 'feedback', key: 'feedback', render: (text) => <Text>{text || '-'}</Text>, width: '40%' },
+    { title: 'Summary', dataIndex: 'summary', key: 'summary', render: (text) => <Text style={{ whiteSpace: 'pre-wrap' }}>{text || '-'}</Text>, width: '30%' },
+    { title: 'Sentiment', dataIndex: 'sentiment_label', key: 'sentiment_label' },
     { title: 'Timestamp', dataIndex: 'timestamp', key: 'timestamp', render: (ts) => ts ? dayjs(ts?.value || ts).format('YYYY-MM-DD HH:mm') : 'N/A' },
   ];
   
