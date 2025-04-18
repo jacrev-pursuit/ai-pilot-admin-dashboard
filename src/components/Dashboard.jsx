@@ -10,7 +10,20 @@ import { getLetterGrade, getGradeColor } from '../utils/gradingUtils'; // Import
 
 const { RangePicker } = DatePicker;
 const { Text, Title } = Typography;
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'; // Use Vite env var
+
+// Utility to fetch data
+const fetchData = async (endpoint, params) => {
+  const queryString = new URLSearchParams(params).toString();
+  // Use relative path for fetch
+  const response = await fetch(`/api/${endpoint}?${queryString}`);
+  if (!response.ok) {
+    console.error(`HTTP error! status: ${response.status}, url: ${response.url}`)
+    const errorBody = await response.text();
+    console.error('Error body:', errorBody);
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+};
 
 // Options for Sentiment Stacked Bar Charts
 const sentimentBarOptions = (title, onClickHandler) => ({
@@ -180,36 +193,33 @@ const PilotOverview = () => {
 
       try {
         // Fetch prompts data
-        const promptsResponse = await fetch(`${API_URL}/api/trends/prompts?startDate=${startDate}&endDate=${endDate}`);
-        if (!promptsResponse.ok) throw new Error(`HTTP error fetching prompts: ${promptsResponse.status}`);
-        const promptsData = await promptsResponse.json();
+        const promptsResponse = await fetchData('trends/prompts', { startDate, endDate });
+        if (!promptsResponse) throw new Error('No data returned from prompts fetch');
 
         // Fetch general sentiment data
-        const sentimentResponse = await fetch(`${API_URL}/api/trends/sentiment?startDate=${startDate}&endDate=${endDate}`);
-        if (!sentimentResponse.ok) throw new Error(`HTTP error fetching sentiment: ${sentimentResponse.status}`);
-        const rawSentimentData = await sentimentResponse.json();
+        const sentimentResponse = await fetchData('trends/sentiment', { startDate, endDate });
+        if (!sentimentResponse) throw new Error('No data returned from sentiment fetch');
 
         // Fetch peer feedback sentiment data
-        const peerFeedbackResponse = await fetch(`${API_URL}/api/trends/peer-feedback?startDate=${startDate}&endDate=${endDate}`);
-        if (!peerFeedbackResponse.ok) throw new Error(`HTTP error fetching peer feedback: ${peerFeedbackResponse.status}`);
-        const rawPeerFeedbackData = await peerFeedbackResponse.json();
+        const peerFeedbackResponse = await fetchData('trends/peer-feedback', { startDate, endDate });
+        if (!peerFeedbackResponse) throw new Error('No data returned from peer feedback fetch');
 
         // Process prompts data for line chart
         setPromptTrendData({
-          labels: promptsData.map(d => dayjs(d.date?.value || d.date).format('MMM D')),
+          labels: promptsResponse.map(d => dayjs(d.date?.value || d.date).format('MMM D')),
           datasets: [{
             label: 'Prompts Sent',
-            data: promptsData.map(d => d.prompt_count),
+            data: promptsResponse.map(d => d.prompt_count),
             borderColor: 'rgb(75, 192, 192)',
             tension: 0.1
           }]
         });
 
         // Process general sentiment data using the counts processor
-        setSentimentTrendData(processSentimentCountsForBarChart(rawSentimentData));
+        setSentimentTrendData(processSentimentCountsForBarChart(sentimentResponse));
 
         // Process peer feedback sentiment data using the counts processor
-        const processedPeerData = processSentimentCountsForBarChart(rawPeerFeedbackData);
+        const processedPeerData = processSentimentCountsForBarChart(peerFeedbackResponse);
         console.log('[Debug] Setting Peer Feedback State:', processedPeerData);
         setPeerFeedbackTrendData(processedPeerData);
 
@@ -235,16 +245,12 @@ const PilotOverview = () => {
       const endDate = trendDateRange[1].format('YYYY-MM-DD');
 
       try {
-        const response = await fetch(`${API_URL}/api/grades/distribution?startDate=${startDate}&endDate=${endDate}`);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `HTTP error fetching grade distribution: ${response.status}`);
-        }
-        const rawData = await response.json();
-        console.log("[Debug] Raw Grade Dist Data:", rawData);
+        const response = await fetchData('grades/distribution', { startDate, endDate });
+        if (!response) throw new Error('No data returned from grade distribution fetch');
+        console.log("[Debug] Raw Grade Dist Data:", response);
 
         // Process data for grouped bar chart
-        const gradesByTask = rawData.reduce((acc, item) => {
+        const gradesByTask = response.reduce((acc, item) => {
           const taskDate = item.task_date?.value ? dayjs(item.task_date.value).format('MMM D') : 'No Date';
           const taskTitle = `${item.task_title || 'Unknown Task'} (${taskDate})`; // Combine title and date
           const grade = getLetterGrade(item.score);
@@ -357,13 +363,9 @@ const PilotOverview = () => {
     setDailySentDetails([]);
 
     try {
-      const response = await fetch(`${API_URL}/api/sentiment/details?date=${dateForAPI}&category=${clickedCategory}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error fetching daily sentiment details: ${response.status}`);
-      }
-      const data = await response.json();
-      setDailySentDetails(data);
+      const response = await fetchData('sentiment/details', { date: dateForAPI, category: clickedCategory });
+      if (!response) throw new Error('No data returned from daily sentiment details fetch');
+      setDailySentDetails(response);
     } catch (error) {
       console.error("Failed to fetch daily sentiment details:", error);
       setDailySentDetailsError(error.message);
@@ -410,13 +412,9 @@ const PilotOverview = () => {
     setFeedbackDetails([]); // Clear previous details
 
     try {
-      const response = await fetch(`${API_URL}/api/feedback/details?date=${dateForAPI}&category=${clickedCategory}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error fetching feedback details: ${response.status}`);
-      }
-      const data = await response.json();
-      setFeedbackDetails(data);
+      const response = await fetchData('feedback/details', { date: dateForAPI, category: clickedCategory });
+      if (!response) throw new Error('No data returned from feedback details fetch');
+      setFeedbackDetails(response);
     } catch (error) {
       console.error("Failed to fetch feedback details:", error);
       setFeedbackDetailsError(error.message);
@@ -460,13 +458,9 @@ const PilotOverview = () => {
     setGradeSubmissions([]);
 
     try {
-      const response = await fetch(`${API_URL}/api/grades/submissions?task_title=${encodeURIComponent(taskTitle)}&task_date=${dateForAPI}&grade=${clickedGrade}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error fetching grade submissions: ${response.status}`);
-      }
-      const data = await response.json();
-      setGradeSubmissions(data);
+      const response = await fetchData('grades/submissions', { task_title: encodeURIComponent(taskTitle), task_date: dateForAPI, grade: clickedGrade });
+      if (!response) throw new Error('No data returned from grade submissions fetch');
+      setGradeSubmissions(response);
     } catch (error) {
       console.error("Failed to fetch grade submission details:", error);
       setGradeSubmissionsError(error.message);
