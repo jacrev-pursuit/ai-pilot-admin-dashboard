@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, DatePicker, Spin, Alert, Typography } from 'antd';
+import { Card, Row, Col, DatePicker, Spin, Alert, Typography, Modal, List, Space } from 'antd';
 import { Line, Bar } from 'react-chartjs-2';
+import { getElementAtEvent, getDatasetAtEvent } from 'react-chartjs-2';
 import dayjs from 'dayjs';
 import BuilderMetricsTable from './BuilderMetricsTable';
 // Import chart styles
 import { chartContainer, baseChartOptions } from './ChartStyles';
 
 const { RangePicker } = DatePicker;
+const { Text, Title } = Typography;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'; // Use Vite env var
 
 // Options for Sentiment Stacked Bar Charts
-const sentimentBarOptions = (title) => ({
+const sentimentBarOptions = (title, onClickHandler) => ({
   responsive: true,
   maintainAspectRatio: false,
+  onClick: onClickHandler,
   plugins: {
     legend: {
       position: 'right',
@@ -142,9 +145,18 @@ const PilotOverview = () => {
   ]);
   const [promptTrendData, setPromptTrendData] = useState(null);
   const [sentimentTrendData, setSentimentTrendData] = useState(null);
-  const [peerFeedbackTrendData, setPeerFeedbackTrendData] = useState(null); // State for peer feedback
+  const [peerFeedbackTrendData, setPeerFeedbackTrendData] = useState(null);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendsError, setTrendsError] = useState(null);
+
+  // State for feedback details modal
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [feedbackDetails, setFeedbackDetails] = useState([]);
+  const [feedbackDetailsLoading, setFeedbackDetailsLoading] = useState(false);
+  const [feedbackDetailsError, setFeedbackDetailsError] = useState(null);
+  const [selectedFeedbackDate, setSelectedFeedbackDate] = useState('');
+  const [selectedFeedbackCategory, setSelectedFeedbackCategory] = useState('');
+  const peerFeedbackChartRef = React.useRef(); // Ref for the peer feedback chart
 
   useEffect(() => {
     const fetchTrends = async () => {
@@ -201,6 +213,60 @@ const PilotOverview = () => {
     fetchTrends();
   }, [trendDateRange]);
 
+  // --- Click Handler for Peer Feedback Chart --- //
+  const handlePeerFeedbackChartClick = async (event, elements) => {
+    console.log('[Debug] Peer feedback chart clicked!', event);
+    console.log('[Debug] Elements from handler:', elements);
+    const chart = peerFeedbackChartRef.current; // Still need the ref for chart data
+
+    if (!chart) {
+      console.log('[Debug] Chart ref not found');
+      return;
+    }
+
+    if (!elements || elements.length === 0) { // Check the passed elements array
+        console.log('[Debug] No chart element clicked');
+        return; // No element clicked
+    }
+
+    const { datasetIndex, index } = elements[0];
+    const clickedDataset = chart.data.datasets[datasetIndex];
+    const clickedLabel = chart.data.labels[index]; // Date in 'MMM D' format
+    const clickedCategory = clickedDataset.label; // Sentiment category
+    console.log(`[Debug] Click Details: datasetIndex=${datasetIndex}, index=${index}, label=${clickedLabel}, category=${clickedCategory}`);
+
+    // Convert 'MMM D' back to 'YYYY-MM-DD' - requires knowing the year
+    // Assuming the year is the current year or from the date range
+    const year = trendDateRange[1].year(); // Get year from end date of range picker
+    const dateForAPI = dayjs(`${clickedLabel} ${year}`, 'MMM D YYYY').format('YYYY-MM-DD');
+
+    console.log(`Clicked: Date=${dateForAPI}, Category=${clickedCategory}`);
+
+    // Fetch details
+    console.log('[Debug] Setting modal state and fetching details...');
+    setFeedbackDetailsLoading(true);
+    setFeedbackDetailsError(null);
+    setSelectedFeedbackDate(clickedLabel); // Store display date
+    setSelectedFeedbackCategory(clickedCategory);
+    setFeedbackModalVisible(true);
+    setFeedbackDetails([]); // Clear previous details
+
+    try {
+      const response = await fetch(`${API_URL}/api/feedback/details?date=${dateForAPI}&category=${clickedCategory}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error fetching feedback details: ${response.status}`);
+      }
+      const data = await response.json();
+      setFeedbackDetails(data);
+    } catch (error) {
+      console.error("Failed to fetch feedback details:", error);
+      setFeedbackDetailsError(error.message);
+    } finally {
+      setFeedbackDetailsLoading(false);
+    }
+  };
+
   return (
     <div>
       <div style={{
@@ -250,7 +316,11 @@ const PilotOverview = () => {
             <Col xs={24} md={12} lg={12}>
                <div style={{ ...chartContainer, height: '400px' }}>
                 {peerFeedbackTrendData && peerFeedbackTrendData.labels.length > 0 ? (
-                  <Bar options={sentimentBarOptions('Peer Feedback Sentiment Distribution')} data={peerFeedbackTrendData} />
+                  <Bar
+                    ref={peerFeedbackChartRef}
+                    options={sentimentBarOptions('Peer Feedback Sentiment Distribution', handlePeerFeedbackChartClick)}
+                    data={peerFeedbackTrendData}
+                  />
                 ) : (
                   <div style={{ textAlign: 'center', paddingTop: '50px', color: '#888' }}>No peer feedback data</div>
                 )}
@@ -260,8 +330,41 @@ const PilotOverview = () => {
         )}
       </Card>
 
-      {/* Existing Builder Metrics Table */}
-      <BuilderMetricsTable />
+      {/* Feedback Details Modal */}
+      <Modal
+        title={`Peer Feedback Details - ${selectedFeedbackCategory} on ${selectedFeedbackDate}`}
+        open={feedbackModalVisible}
+        onCancel={() => setFeedbackModalVisible(false)}
+        footer={null} // No OK/Cancel buttons
+        width={800}
+      >
+        {feedbackDetailsLoading ? (
+          <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>
+        ) : feedbackDetailsError ? (
+          <Alert message="Error Loading Details" description={feedbackDetailsError} type="error" showIcon />
+        ) : feedbackDetails.length > 0 ? (
+          <List
+            itemLayout="horizontal"
+            dataSource={feedbackDetails}
+            renderItem={item => (
+              <List.Item>
+                <List.Item.Meta
+                  title={
+                    <Space size="middle">
+                       <Text>From: <Text strong>{item.reviewer_name || 'Anonymous'}</Text></Text>
+                       <Text>To: <Text strong>{item.recipient_name || 'Unknown'}</Text></Text>
+                    </Space>
+                  }
+                  description={item.feedback_text}
+                />
+                <Text type="secondary">{dayjs(item.created_at?.value || item.created_at).format('MMMM D')}</Text>
+              </List.Item>
+            )}
+          />
+        ) : (
+          <Text>No specific feedback found for this category on this day.</Text>
+        )}
+      </Modal>
 
       {/* Placeholder for Outliers Section */}
       {/* <Card style={{ marginTop: '24px' }}> */}

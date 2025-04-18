@@ -374,6 +374,54 @@ app.get('/api/trends/peer-feedback', async (req, res) => {
   }
 });
 
+// --- API Endpoint for Specific Feedback Details by Date and Category ---
+app.get('/api/feedback/details', async (req, res) => {
+  const { date, category } = req.query;
+
+  if (!date || !category) {
+    return res.status(400).json({ error: 'Missing required query parameters: date and category' });
+  }
+
+  // Validate category if needed (e.g., ensure it's one of the expected values)
+  const validCategories = ['Very Positive', 'Positive', 'Neutral', 'Negative', 'Very Negative'];
+  if (!validCategories.includes(category)) {
+    return res.status(400).json({ error: 'Invalid category parameter' });
+  }
+
+  const query = `
+    SELECT
+      pf.id as feedback_id,
+      pf.feedback_text,
+      pf.created_at,
+      fsa.sentiment_category,
+      CONCAT(u_from.first_name, ' ', u_from.last_name) as reviewer_name,
+      CONCAT(u_to.first_name, ' ', u_to.last_name) as recipient_name
+    FROM \`${PROJECT_ID}.${DATASET}.peer_feedback\` pf
+    JOIN \`${PROJECT_ID}.${DATASET}.feedback_sentiment_analysis\` fsa ON CAST(pf.id AS STRING) = CAST(fsa.id AS STRING)
+    LEFT JOIN \`${PROJECT_ID}.${DATASET}.users\` u_from ON pf.from_user_id = u_from.user_id
+    LEFT JOIN \`${PROJECT_ID}.${DATASET}.users\` u_to ON pf.to_user_id = u_to.user_id
+    WHERE DATE(pf.created_at) = DATE(@date)
+      AND fsa.sentiment_category = @category
+    ORDER BY pf.created_at DESC
+  `;
+
+  const options = {
+    query: query,
+    params: { date: date, category: category },
+    location: 'us-central1',
+  };
+
+  try {
+    logger.info('Fetching feedback details', { params: options.params });
+    const [rows] = await bigquery.query(options);
+    logger.info('Successfully fetched feedback details', { rowCount: rows.length, date, category });
+    res.json(rows);
+  } catch (error) {
+    logger.error('Error fetching feedback details', { error: error.message, stack: error.stack, date, category });
+    res.status(500).json({ error: 'Failed to fetch feedback details' });
+  }
+});
+
 // Only start the server if this file is run directly
 if (require.main === module) {
   app.listen(port, () => {
