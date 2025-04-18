@@ -12,14 +12,14 @@ import {
 import { chartColors, baseChartOptions, chartContainer } from './ChartStyles';
 
 // Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
+// ChartJS.register(
+//   CategoryScale,
+//   LinearScale,
+//   BarElement,
+//   Title,
+//   Tooltip,
+//   Legend
+// );
 
 const UserPromptsChart = ({ timeRange, data }) => {
   const [chartData, setChartData] = useState({

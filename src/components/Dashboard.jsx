@@ -3,39 +3,11 @@ import { Card, Row, Col, DatePicker, Spin, Alert, Typography } from 'antd';
 import { Line, Bar } from 'react-chartjs-2';
 import dayjs from 'dayjs';
 import BuilderMetricsTable from './BuilderMetricsTable';
+// Import chart styles
+import { chartContainer, baseChartOptions } from './ChartStyles';
 
 const { RangePicker } = DatePicker;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'; // Use Vite env var
-
-// Basic chart options
-const lineChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'top',
-    },
-    title: {
-      display: true,
-      text: 'Tool Usage (Prompts/Day)'
-    }
-  },
-  scales: {
-    x: {
-      ticks: {
-        maxTicksLimit: 10,
-        autoSkip: true,
-      }
-    },
-    y: {
-      beginAtZero: true,
-      title: {
-        display: true,
-        text: 'Prompts Sent'
-      }
-    }
-  }
-};
 
 // Options for Sentiment Stacked Bar Charts
 const sentimentBarOptions = (title) => ({
@@ -43,7 +15,7 @@ const sentimentBarOptions = (title) => ({
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      position: 'top',
+      position: 'right',
     },
     tooltip: {
       mode: 'index',
@@ -230,30 +202,24 @@ const PilotOverview = () => {
   }, [trendDateRange]);
 
   return (
-    <div style={{
-      padding: '20px',
-      background: '#242424',
-      minHeight: '100vh',
-      color: 'white'
-    }}>
+    <div>
       <div style={{
         marginBottom: '20px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <Typography.Title level={2} style={{ color: 'white', margin: 0 }}>Pilot Overview</Typography.Title>
+        <Typography.Title level={2} style={{ margin: 0 }}>Pilot Overview</Typography.Title>
       </div>
 
       {/* Trend Charts Section */}
-      <Card style={{ marginBottom: '24px', background: '#333', border: 'none' }}>
+      <Card style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <Typography.Title level={4} style={{ color: 'white', margin: 0 }}>Overall Trends</Typography.Title>
+          <Typography.Title level={4} style={{ margin: 0 }}>Overall Trends</Typography.Title>
           <RangePicker
             value={trendDateRange}
             onChange={setTrendDateRange}
             allowClear={false}
-            style={{ background: '#444', border: '1px solid #555' }}
           />
         </div>
         {trendsLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
@@ -262,9 +228,9 @@ const PilotOverview = () => {
           <Row gutter={[16, 16]}>
             {/* Prompt Trend Chart */}
             <Col xs={24} md={12} lg={12}>
-              <div style={{ height: '300px', background: '#444', padding: '10px', borderRadius: '8px' }}>
+              <div style={{ ...chartContainer, height: '400px' }}>
                 {promptTrendData ? (
-                  <Line options={lineChartOptions} data={promptTrendData} />
+                  <Line options={baseChartOptions} data={promptTrendData} />
                 ) : (
                   <div style={{ textAlign: 'center', paddingTop: '50px', color: '#888' }}>No prompt data</div>
                 )}
@@ -272,7 +238,7 @@ const PilotOverview = () => {
             </Col>
             {/* General Sentiment Chart */}
             <Col xs={24} md={12} lg={12}>
-               <div style={{ height: '300px', background: '#444', padding: '10px', borderRadius: '8px' }}>
+               <div style={{ ...chartContainer, height: '400px' }}>
                 {sentimentTrendData && sentimentTrendData.labels.length > 0 ? (
                   <Bar options={sentimentBarOptions('Daily Sentiment Distribution')} data={sentimentTrendData} />
                 ) : (
@@ -282,7 +248,7 @@ const PilotOverview = () => {
             </Col>
             {/* Peer Feedback Sentiment Chart */}
             <Col xs={24} md={12} lg={12}>
-               <div style={{ height: '300px', background: '#444', padding: '10px', borderRadius: '8px' }}>
+               <div style={{ ...chartContainer, height: '400px' }}>
                 {peerFeedbackTrendData && peerFeedbackTrendData.labels.length > 0 ? (
                   <Bar options={sentimentBarOptions('Peer Feedback Sentiment Distribution')} data={peerFeedbackTrendData} />
                 ) : (
@@ -298,9 +264,9 @@ const PilotOverview = () => {
       <BuilderMetricsTable />
 
       {/* Placeholder for Outliers Section */}
-      {/* <Card style={{ marginTop: '24px', background: '#333', border: 'none' }}> */}
-      {/*   <Typography.Title level={4} style={{ color: 'white', margin: 0 }}>Outliers</Typography.Title> */}
-      {/*   <p style={{ color: '#ccc', marginTop: '10px' }}>Outlier detection coming soon...</p> */}
+      {/* <Card style={{ marginTop: '24px' }}> */}
+      {/*   <Typography.Title level={4} style={{ margin: 0 }}>Outliers</Typography.Title> */}
+      {/*   <p style={{ color: '#6c757d', marginTop: '10px' }}>Outlier detection coming soon...</p> */}
       {/* </Card> */}
     </div>
   );

@@ -3,6 +3,38 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 
+// --- Chart.js Setup ---
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ScatterController,
+  TimeScale,
+  TimeSeriesScale
+} from 'chart.js';
+import 'chartjs-adapter-dayjs';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ScatterController,
+  TimeScale,
+  TimeSeriesScale
+);
+// --- End Chart.js Setup ---
+
 console.log('Starting React application...');
 
 const root = document.getElementById('root');

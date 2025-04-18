@@ -1,6 +1,10 @@
 @import 'antd/dist/reset.css';
 
 /* Base styles */
+html { /* Add base background to HTML element */
+  background-color: #f8f9fa;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -8,22 +12,22 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #242424;
-  color: #fff;
+  background-color: #f8f9fa; /* Light grey background */
+  color: #212529; /* Dark text */
 }
 
 #root {
   min-height: 100vh;
-  background-color: #242424;
+  background-color: #f8f9fa;
 }
 
 .ant-layout {
   min-height: 100vh;
-  background-color: #242424;
+  background-color: #f8f9fa; /* Ensure layout background is light */
 }
 
 .ant-layout-content {
-  background-color: #242424;
+  background-color: #f8f9fa; /* Ensure content background is light */
 }
 
 /* Builder View Container */
@@ -38,25 +42,32 @@ body {
 }
 
 .builder-view-header h2 {
-  color: #fff;
+  color: #212529; /* Dark text for header */
   margin: 0;
   font-size: 24px;
   font-weight: 600;
 }
 
-.builder-view-content {
-  background-color: #333;
+/* Content areas like Cards */
+.builder-view-content,
+.filter-card,
+.builder-table,
+.error-card,
+.ant-card { /* Target Ant Design cards globally */
+  background-color: #ffffff; /* White background for content blocks */
+  border: 1px solid #dee2e6; /* Light border */
   border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Softer shadow */
 }
 
-/* Filter Card */
 .filter-card {
-  background-color: #333;
-  border: none;
   margin-bottom: 24px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 24px; /* Ensure padding if Ant Card is not used directly */
+}
+
+.error-card {
+   border-color: #dc3545; /* Standard error color */
+   margin-bottom: 24px;
 }
 
 .filter-space {
@@ -66,87 +77,76 @@ body {
 }
 
 /* Date Range Picker */
-.date-range-picker {
-  background-color: #444;
-  border: 1px solid #555;
+.date-range-picker,
+.ant-picker { /* Target Ant Design DatePicker */
+  background-color: #ffffff;
+  border: 1px solid #ced4da; /* Standard input border */
   border-radius: 6px;
 }
 
-.date-range-picker:hover {
-  border-color: #4f46e5;
+.date-range-picker:hover,
+.ant-picker:hover {
+  border-color: #4f46e5; /* Accent color on hover */
 }
 
-.date-range-picker .ant-picker-input > input {
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
+.ant-picker-input > input {
+  color: #212529; /* Dark text */
 }
 
-.date-range-picker .ant-picker-separator {
-  color: #aaa;
+.ant-picker-separator,
+.ant-picker-suffix,
+.ant-picker-clear {
+  color: #6c757d; /* Secondary text color */
 }
 
-.date-range-picker .ant-picker-suffix {
-  color: #aaa;
+.ant-picker-clear:hover {
+  color: #212529;
 }
 
-.date-range-picker .ant-picker-clear {
-  color: #aaa;
-}
-
-.date-range-picker .ant-picker-clear:hover {
-  color: #fff;
-}
-
-.date-range-picker .ant-picker-focused {
+.ant-picker-focused {
   border-color: #4f46e5;
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
 }
 
-/* Builder Select */
-.builder-select {
-  background-color: #444;
-  border: 1px solid #555;
-  border-radius: 6px;
+/* Select Dropdown */
+.builder-select .ant-select-selector,
+.ant-select-selector { /* Target Ant Design Select */
+  background-color: #ffffff !important;
+  border: 1px solid #ced4da !important;
 }
 
-.builder-select .ant-select-selector {
-  background-color: #444 !important;
-  border: 1px solid #555 !important;
-}
-
-.builder-select .ant-select-selection-item {
-  color: #fff;
+.builder-select .ant-select-selection-item,
+.ant-select-selection-item {
+  color: #212529;
 }
 
 /* Table Styles */
 .builder-table {
-  background-color: #333;
-  border-radius: 8px;
-  overflow: hidden;
+  border: 1px solid #dee2e6; /* Add border to table container */
+  overflow: hidden; /* Keep rounded corners */
 }
 
 .builder-table .ant-table {
-  background-color: #333;
+  background-color: #ffffff; /* White table background */
 }
 
 .builder-table .ant-table-thead > tr > th {
-  background-color: #444;
-  color: #fff;
+  background-color: #f8f9fa; /* Light grey header */
+  color: #495057; /* Slightly muted header text */
   font-weight: 600;
   padding: 16px;
-  border-bottom: 1px solid #555;
+  border-bottom: 1px solid #dee2e6; /* Light border */
 }
 
 .builder-table .ant-table-tbody > tr > td {
-  background-color: #333;
-  color: #fff;
+  background-color: #ffffff; /* White cell background */
+  color: #212529; /* Dark text */
   padding: 16px;
-  border-bottom: 1px solid #555;
+  border-bottom: 1px solid #e9ecef; /* Lighter border for rows */
 }
 
 .builder-table .ant-table-tbody > tr:hover > td {
-  background-color: #444;
+  background-color: #f1f3f5; /* Light hover background */
 }
 
 .builder-table .ant-table-row {
@@ -156,30 +156,59 @@ body {
 /* Pagination */
 .builder-table .ant-pagination {
   margin-top: 24px;
+  padding: 0 16px; /* Add some padding */
 }
 
-.builder-table .ant-pagination-item {
-  background-color: #444;
-  border-color: #555;
+.builder-table .ant-pagination-item,
+.ant-pagination-item {
+  background-color: #ffffff;
+  border-color: #dee2e6;
 }
 
-.builder-table .ant-pagination-item a {
-  color: #fff;
+.builder-table .ant-pagination-item a,
+.ant-pagination-item a {
+  color: #4f46e5; /* Accent color for links */
+}
+.builder-table .ant-pagination-item:hover,
+.ant-pagination-item:hover {
+  border-color: #4f46e5;
+}
+.builder-table .ant-pagination-item:hover a,
+.ant-pagination-item:hover a {
+  color: #4f46e5;
 }
 
-.builder-table .ant-pagination-item-active {
+.builder-table .ant-pagination-item-active,
+.ant-pagination-item-active {
   background-color: #4f46e5;
   border-color: #4f46e5;
 }
-
-.builder-table .ant-pagination-prev button,
-.builder-table .ant-pagination-next button {
-  background-color: #444;
-  border-color: #555;
-  color: #fff;
+.builder-table .ant-pagination-item-active a,
+.ant-pagination-item-active a {
+  color: #ffffff; /* White text on active */
+}
+.builder-table .ant-pagination-item-active:hover a,
+.ant-pagination-item-active:hover a {
+  color: #ffffff; /* Keep text white on hover */
 }
 
-/* Tags */
+.builder-table .ant-pagination-prev button,
+.builder-table .ant-pagination-next button,
+.ant-pagination-prev .ant-btn,
+.ant-pagination-next .ant-btn {
+  background-color: #ffffff;
+  border-color: #dee2e6;
+  color: #4f46e5;
+}
+.builder-table .ant-pagination-prev button:hover,
+.builder-table .ant-pagination-next button:hover,
+.ant-pagination-prev .ant-btn:hover,
+.ant-pagination-next .ant-btn:hover {
+    color: #3c33b8;
+    border-color: #3c33b8;
+}
+
+/* Tags - Ant Design defaults are usually okay for light themes */
 .ant-tag {
   border-radius: 4px;
   padding: 4px 8px;
@@ -193,15 +222,8 @@ body {
 }
 
 .ant-btn-link:hover {
-  color: #6366f1;
-  background-color: rgba(79, 70, 229, 0.1);
-}
-
-/* Error Card */
-.error-card {
-  background-color: #333;
-  border: 1px solid #ff4d4f;
-  margin-bottom: 24px;
+  color: #3c33b8; /* Darker accent on hover */
+  background-color: rgba(79, 70, 229, 0.05); /* Lighter background */
 }
 
 /* Responsive Adjustments */
@@ -209,13 +231,75 @@ body {
   .builder-view-container {
     padding: 16px;
   }
-  
+
   .filter-space {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .builder-table {
     overflow-x: auto;
   }
+}
+
+/* Ensure Sider theme from App.jsx is respected or override here */
+.ant-layout-sider {
+  /* Default Ant Design light theme is usually fine,
+     but you can override background/text if needed */
+  /* background: #ffffff !important; */
+  /* border-right: 1px solid #dee2e6 !important; */
+
+  /* Hide scrollbar */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.ant-layout-sider::-webkit-scrollbar {
+  display: none;
+}
+
+.ant-menu-light {
+ /* Ensure menu items have good contrast */
+ /* color: #495057; */
+}
+
+.ant-menu-item-selected {
+  /* background-color: #e8e6fc !important; /* Lighter accent background */ 
+   /* color: #4f46e5 !important; */
+}
+
+/* --- Customizations --- */
+
+/* Fixed Sidebar */
+.ant-layout-sider {
+  position: fixed !important; /* Force fixed position */
+  height: 100vh; /* Full viewport height */
+  left: 0;
+  top: 0;
+  bottom: 0;
+  overflow: auto; /* Allow scrolling within the sider if content overflows */
+  z-index: 10; /* Keep sider above content */
+}
+
+/* Add padding to the main layout to offset the fixed sider */
+.ant-layout {
+  padding-left: 200px; /* Match the Sider width (default is 200px) */
+}
+
+/* Ensure the Sider itself doesn't get the padding */
+.ant-layout-sider ~ .ant-layout {
+  padding-left: 0; /* Reset padding for the layout *containing* the sider */
+}
+
+/* Ensure the layout containing the Content gets the padding */
+.ant-layout-has-sider {
+  /* This might be needed depending on exact structure, but the general .ant-layout rule might suffice */
+  /* padding-left: 200px !important; */
+}
+
+/* Adjust content margin/padding if necessary */
+.ant-layout-content {
+  /* The padding-left might not be needed here if applied to the parent Layout */
+  /* padding-left: 200px; */ 
 }

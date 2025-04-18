@@ -8,13 +8,14 @@ import {
   SettingOutlined,
   UserOutlined
 } from '@ant-design/icons';
+import PilotOverview from './components/Dashboard';
 import BuilderView from './components/BuilderView';
 import BuilderDetailsPage from './components/BuilderDetailsPage';
 
 const { Header, Sider, Content } = Layout;
 
 // Placeholder components for other pages
-const Dashboard = () => <div>Dashboard Page</div>;
+// const Dashboard = () => <div>Dashboard Page</div>; // Can remove or keep as reference
 const Metrics = () => <div>Metrics Page</div>;
 const Settings = () => <div>Settings Page</div>;
 
@@ -32,7 +33,7 @@ const Navigation = () => {
         style={{ height: '100%', borderRight: 0 }}
       >
         <Menu.Item key="/" icon={<DashboardOutlined />}>
-          <Link to="/">Dashboard</Link>
+          <Link to="/">Pilot Overview</Link>
         </Menu.Item>
         <Menu.Item key="/builders" icon={<TeamOutlined />}>
           <Link to="/builders">Builders</Link>
@@ -48,12 +49,12 @@ const Navigation = () => {
 function App() {
   return (
     <Router>
-      <Layout style={{ minHeight: '100vh', background: '#242424' }}>
+      <Layout style={{ minHeight: '100vh' }}>
         <Navigation />
-        <Layout style={{ background: '#242424' }}>
-          <Content style={{ margin: '24px 16px', padding: 24, background: '#242424', minHeight: 280 }}>
+        <Layout>
+          <Content style={{ margin: '24px 16px', padding: 24, minHeight: 280 }}>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<PilotOverview />} />
               <Route path="/builders" element={<BuilderView />} />
               <Route path="/builders/:builderId" element={<BuilderDetailsPage />} />
               <Route path="/builder-details" element={<BuilderDetailsPage />} />
