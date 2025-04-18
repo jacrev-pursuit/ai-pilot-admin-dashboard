@@ -1,7 +1,5 @@
 // Removed API_URL constant: const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-console.log(`Using API URL: ${API_URL}`);
-
 export const fetchBuilderData = async (startDate, endDate) => {
   const effectiveStartDate = startDate || '2000-01-01';
   const effectiveEndDate = endDate || '2100-12-31';
