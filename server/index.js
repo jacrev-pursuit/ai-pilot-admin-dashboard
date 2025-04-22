@@ -6,7 +6,7 @@ const { BigQuery } = require('@google-cloud/bigquery');
 const logger = require('./logger');
 
 const app = express();
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 3001;
 
 // Enable CORS for the frontend
 app.use(cors());
@@ -18,12 +18,15 @@ app.use(express.static(frontendDistPath));
 logger.info(`Serving static files from: ${frontendDistPath}`);
 
 // Create a BigQuery client
-console.log('--- Initializing BigQuery client WITHOUT explicit credentials (using ADC) ---');
-// When running on Cloud Run with correct service account permissions,
-// the library automatically uses Application Default Credentials.
+console.log('--- Initializing BigQuery client WITH explicit credentials from .env (for local testing) ---');
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID
-  // Removed explicit credentials object
+  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  // Re-adding explicit credentials for local testing
+  credentials: {
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+    // Ensure newline characters in the key are handled correctly
+    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+  }
 });
 
 // Dataset name
@@ -509,13 +512,19 @@ app.get('/api/grades/distribution', async (req, res) => {
   };
 
   try {
-    logger.info('Fetching grade distribution data', { params: options.params });
+    logger.info('[Grades Dist] Attempting BigQuery query...', { params: options.params });
     const [rows] = await bigquery.query(options);
+    logger.info('[Grades Dist] Query successful. Rows received: ' + rows.length);
     logger.info('Successfully fetched grade distribution data', { rowCount: rows.length });
     res.json(rows);
   } catch (error) {
-    console.log('--- ERROR in /api/grades/distribution ---', error);
-    logger.error('Error fetching grade distribution data', { error: error.message, stack: error.stack });
+    console.log('--- ERROR in /api/grades/distribution --- ', error);
+    logger.error('[Grades Dist] Error executing BigQuery query', {
+        error: error.message,
+        code: error.code,
+        stack: error.stack,
+        fullError: error
+    });
     res.status(500).json({ error: 'Failed to fetch grade distribution data' });
   }
 });
