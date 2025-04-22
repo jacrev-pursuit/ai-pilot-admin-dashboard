@@ -1,0 +1,100 @@
+[
+  {
+    "id": 681,
+    "from_user_id": 13,
+    "to_user_id": 55,
+    "feedback_text": "Started extremely silent, but has grown and socializes so much because of the environment you guys have created. Maurice is extremely supportive and works hard to learn and understand whats in front him fully before moving on.    ",
+    "sentiment_score": 0.7,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Adapted well to the environment and became more social. Benefited from the supportive environment created by Maurice. Shows dedication by fully understanding tasks before proceeding.",
+    "created_at": {
+      "value": "2025-04-21T23:13:50.762629000Z"
+    },
+    "processed_at": "2025-04-22T13:02:11.908Z"
+  },
+  {
+    "id": 680,
+    "from_user_id": 64,
+    "to_user_id": 49,
+    "feedback_text": "Assisted me in checking how my MVP looks like",
+    "sentiment_score": 0.4,
+    "sentiment_magnitude": 0.5,
+    "sentiment_category": "Neutral",
+    "summary": "Strengths: Providing assistance in checking the MVP.",
+    "created_at": {
+      "value": "2025-04-21T14:35:18.191425000Z"
+    },
+    "processed_at": "2025-04-22T13:02:13.217Z"
+  },
+  {
+    "id": 676,
+    "from_user_id": 100,
+    "to_user_id": 41,
+    "feedback_text": "Insightful and clever in builds, tons of wit. Quick, seems easy for her. Can adapt to any environment. ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Insightful and clever in builds. Quick and adaptable to any environment.\n\nAdditional Comments: Tons of wit and ease in her work.",
+    "created_at": {
+      "value": "2025-04-21T06:06:54.619224000Z"
+    },
+    "processed_at": "2025-04-22T13:02:14.665Z"
+  },
+  {
+    "id": 677,
+    "from_user_id": 100,
+    "to_user_id": 35,
+    "feedback_text": "Quiet but very persistent. She works through problems until the end and offers tips and assistance whenever possible. Always revising and looking to improve current outputs. Very committed to her projects reaching expansion past mvp. ",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Persistent in problem-solving. Offers tips and assistance to others. Committed to project success and expansion.",
+    "created_at": {
+      "value": "2025-04-21T06:06:54.619224000Z"
+    },
+    "processed_at": "2025-04-22T13:02:16.689Z"
+  },
+  {
+    "id": 678,
+    "from_user_id": 100,
+    "to_user_id": 95,
+    "feedback_text": "Not clear what he is really building. Seems to avoid topic abit. Very focused on his personal workflow.",
+    "sentiment_score": -0.3,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Negative",
+    "summary": "Opportunities: Improve clarity in communicating what he is building. Address the perception of avoiding topics. Consider balancing focus on personal workflow with broader project goals.",
+    "created_at": {
+      "value": "2025-04-21T06:06:54.619224000Z"
+    },
+    "processed_at": "2025-04-22T13:02:18.008Z"
+  },
+  {
+    "id": 679,
+    "from_user_id": 100,
+    "to_user_id": 45,
+    "feedback_text": "Hilarious and extremely helpful in term of explaining key components to build into platforms: both front end and back end. He has explained to me importance of setting up acessibility features and parameters, Priority matrix mapping, and I have seen him add this same value to others giving them insightful, unique information I have not heard other peers have the knowledge base to even consider or use the tech language. He is very intelligent. We joke around allot, but I truly respect his knowledge. I do not think his brilliance is showing in his work yet. His ideas are solid and with some more development can be really innovative. ",
+    "sentiment_score": 0.7,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Hilarious and extremely helpful in explaining key components for platform development. Shares importance of accessibility features, parameters, and priority matrix mapping. Provides insightful and unique information to others.\n\nOpportunities: Brilliance not fully reflected in current work. Ideas have potential for innovation with further development.\n\nAdditional Comments: Respect for his knowledge and intelligence shines through the feedback. Encouragement for continued growth and showcasing brilliance in work.",
+    "created_at": {
+      "value": "2025-04-21T06:06:54.619224000Z"
+    },
+    "processed_at": "2025-04-22T13:02:19.918Z"
+  },
+  {
+    "id": 675,
+    "from_user_id": 87,
+    "to_user_id": 92,
+    "feedback_text": "I was happy to come into class and see Sam had settled in on his MVP and had got to working on it. Sam is definitely talented and the MVP he showcased was essentially built within a day. I was really happy that he had a chance to showcase his talent in front of all the builders as well as the pursuit staff! The MVP shows just a small part of what he's capable of building.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Talent in building MVPs. Quick turnaround time in creating MVPs.\n\nAdditional Comments: Impressed by Sam's ability to showcase his talent in a short period of time.",
+    "created_at": {
+      "value": "2025-04-21T03:32:17.136563000Z"
+    },
+    "processed_at": "2025-04-22T13:02:21.177Z"
+  }
+]

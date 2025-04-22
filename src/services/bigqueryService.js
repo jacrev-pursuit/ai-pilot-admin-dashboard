@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3001';
+// const API_URL = 'http://localhost:3001'; // Comment out or remove the hardcoded URL
 
 export const executeQuery = async () => {
   try {
@@ -7,7 +7,8 @@ export const executeQuery = async () => {
     const endDate = new Date().toISOString().split('T')[0];
     const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    const response = await fetch(`${API_URL}/api/builders?startDate=${startDate}&endDate=${endDate}`);
+    // Use a relative path for the fetch URL
+    const response = await fetch(`/api/builders?startDate=${startDate}&endDate=${endDate}`);
     
     if (!response.ok) {
       const errorData = await response.json();

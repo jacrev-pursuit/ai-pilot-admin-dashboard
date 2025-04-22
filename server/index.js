@@ -6,20 +6,24 @@ const { BigQuery } = require('@google-cloud/bigquery');
 const logger = require('./logger');
 
 const app = express();
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 8080;
 
 // Enable CORS for the frontend
 app.use(cors());
 app.use(express.json());
 
+// Serve Static Frontend Files
+const frontendDistPath = path.resolve(__dirname, '..', 'dist');
+app.use(express.static(frontendDistPath));
+logger.info(`Serving static files from: ${frontendDistPath}`);
+
 // Create a BigQuery client
+console.log('--- Initializing BigQuery client WITHOUT explicit credentials (using ADC) ---');
+// When running on Cloud Run with correct service account permissions,
+// the library automatically uses Application Default Credentials.
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-  credentials: {
-    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY,
-    private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-  },
+  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID
+  // Removed explicit credentials object
 });
 
 // Dataset name
@@ -28,6 +32,7 @@ const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID;
 
 // API endpoint to fetch builder data
 app.get('/api/builders', async (req, res) => {
+  console.log('--- ENTERING /api/builders ---');
   // Use query parameters or default if not provided
   const startDate = req.query.startDate || '2000-01-01';
   const endDate = req.query.endDate || '2100-12-31';
@@ -92,6 +97,7 @@ app.get('/api/builders', async (req, res) => {
     logger.info('Successfully retrieved builder data', { rowCount: rows.length });
     res.json(rows);
   } catch (error) {
+    console.log('--- ERROR in /api/builders ---', error);
     logger.error('Error executing BigQuery query', {
       error: error.message,
       code: error.code,
@@ -176,7 +182,8 @@ app.get('/api/builders/:userId/details', async (req, res) => {
           pf.created_at as timestamp, 
           pf.from_user_id,
           fsa.sentiment_score,
-          fsa.sentiment_category
+          fsa.sentiment_category,
+          fsa.summary
         FROM \`${peerFeedbackTable}\` pf 
         LEFT JOIN \`${sentimentTable}\` fsa 
           ON CAST(pf.id AS STRING) = CAST(fsa.id AS STRING)
@@ -188,6 +195,7 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         fd.feedback,
         fd.sentiment_score,
         fd.sentiment_category as sentiment_label,
+        fd.summary,
         fd.timestamp,
         CONCAT(u.first_name, ' ', u.last_name) as reviewer_name
       FROM feedback_data fd
@@ -270,6 +278,7 @@ app.get('/api/builders/:userId/details', async (req, res) => {
 
 // API endpoint for daily prompt trends
 app.get('/api/trends/prompts', async (req, res) => {
+  console.log('--- ENTERING /api/trends/prompts ---');
   const startDate = req.query.startDate || '2000-01-01';
   const endDate = req.query.endDate || '2100-12-31';
 
@@ -299,6 +308,7 @@ app.get('/api/trends/prompts', async (req, res) => {
     logger.info('Successfully retrieved prompt trends', { rowCount: rows.length });
     res.json(rows);
   } catch (error) {
+    console.log('--- ERROR in /api/trends/prompts ---', error);
     logger.error('Error executing BigQuery prompt trends query', {
       error: error.message,
       code: error.code,
@@ -473,6 +483,7 @@ app.get('/api/sentiment/details', async (req, res) => {
 
 // --- API Endpoint for Grade Distribution per Task ---
 app.get('/api/grades/distribution', async (req, res) => {
+  console.log('--- ENTERING /api/grades/distribution ---');
   const startDate = req.query.startDate || '2000-01-01';
   const endDate = req.query.endDate || '2100-12-31';
 
@@ -503,6 +514,7 @@ app.get('/api/grades/distribution', async (req, res) => {
     logger.info('Successfully fetched grade distribution data', { rowCount: rows.length });
     res.json(rows);
   } catch (error) {
+    console.log('--- ERROR in /api/grades/distribution ---', error);
     logger.error('Error fetching grade distribution data', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Failed to fetch grade distribution data' });
   }
@@ -586,6 +598,17 @@ app.get('/api/grades/submissions', async (req, res) => {
     logger.error('Error fetching grade submission details', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Failed to fetch grade submission details' });
   }
+});
+
+// --- Fallback for Client-Side Routing --- //
+// Serve index.html for any route not handled by API or static files
+app.get('*', (req, res) => {
+  res.sendFile(path.resolve(frontendDistPath, 'index.html'), (err) => {
+    if (err) {
+      logger.error('Error sending index.html:', { error: err.message, path: req.path });
+      res.status(500).send('Internal server error loading application.');
+    }
+  });
 });
 
 // Only start the server if this file is run directly

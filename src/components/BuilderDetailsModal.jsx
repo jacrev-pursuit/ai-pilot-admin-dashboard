@@ -118,6 +118,16 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       ),
     },
     {
+      title: 'Summary',
+      dataIndex: 'summary',
+      key: 'summary',
+      render: (text) => (
+        <Text style={{ whiteSpace: 'pre-wrap' }}> 
+          {text || 'No summary available'}
+        </Text>
+      ),
+    },
+    {
       title: 'Sentiment',
       dataIndex: 'sentiment_label',
       key: 'sentiment_label',

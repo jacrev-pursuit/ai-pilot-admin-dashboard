@@ -123,6 +123,9 @@ async function processFeedbackSentiment(dateFilter = null, limit = null, isFullA
     } else if (isFullAnalysis) {
       // For full analysis, exclude dates that are already processed (April 15th and after)
       query += ` AND DATE(created_at) < DATE('2025-04-15')`;
+    } else {
+      // Default case: Process feedback from April 16th, 2024 onwards
+      query += ` AND DATE(created_at) >= DATE('2024-04-17')`;
     }
 
     // Add limit if provided
