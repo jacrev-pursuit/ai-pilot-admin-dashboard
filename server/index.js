@@ -219,21 +219,34 @@ app.get('/api/builders/:userId/details', async (req, res) => {
       ORDER BY created_at DESC
     `;
   } else if (type === 'sentiment') {
+    const resultsTable = `${PROJECT_ID}.${DATASET}.sentiment_results`;
+    const outliersTable = `${PROJECT_ID}.${DATASET}.sentiment_sentence_outliers`;
     query = `
+      WITH DailyOutliers AS (
+        SELECT
+          user_id,
+          date,
+          STRING_AGG(sentence_text, '; ') AS daily_sentiment_reasons -- Aggregate sentences
+        FROM \`${outliersTable}\`
+        WHERE user_id = CAST(@userId AS INT64)
+          AND date BETWEEN DATE(@startDate) AND DATE(@endDate)
+        GROUP BY user_id, date
+      )
       SELECT 
-        date,
-        sentiment_score, 
-        sentiment_category, 
-        sentiment_reason, 
-        message_count
-      FROM \`${PROJECT_ID}.${DATASET}.sentiment_results\`
-      WHERE user_id = CAST(@userId AS INT64)
-        AND date BETWEEN DATE(@startDate) AND DATE(@endDate)
-      ORDER BY date DESC
+        sr.date,
+        sr.sentiment_score, 
+        sr.sentiment_category, 
+        sr.message_count,
+        do.daily_sentiment_reasons AS sentiment_reason -- Select aggregated reasons
+      FROM \`${resultsTable}\` sr
+      LEFT JOIN DailyOutliers do
+        ON sr.user_id = do.user_id
+        AND sr.date = do.date
+      WHERE sr.user_id = CAST(@userId AS INT64)
+        AND sr.date BETWEEN DATE(@startDate) AND DATE(@endDate)
+      ORDER BY sr.date DESC
     `;
-  } else {
-    return res.status(400).json({ error: 'Invalid type parameter' });
-  }
+  } 
 
   const options = {
     query: query,
@@ -456,7 +469,6 @@ app.get('/api/sentiment/details', async (req, res) => {
       sr.user_id,
       sr.sentiment_score,
       sr.sentiment_category,
-      sr.sentiment_reason,
       sr.message_count,
       sr.date,
       CONCAT(u.first_name, ' ', u.last_name) as user_name
