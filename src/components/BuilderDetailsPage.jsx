@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, Typography, DatePicker, Table, Tabs, Spin, message, Button, Select, Space, Row, Col, Tag, Modal } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -15,9 +15,10 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import annotationPlugin from 'chartjs-plugin-annotation'; // Import the plugin
 import { baseChartOptions, chartContainer, chartColors } from './ChartStyles';
 
-// Register Chart.js components
+// Register Chart.js components AND the plugin
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -25,7 +26,8 @@ ChartJS.register(
   LineElement,
   ChartTitle,
   Tooltip,
-  Legend
+  Legend,
+  annotationPlugin // Register the plugin
 );
 
 const { Title, Text } = Typography;
@@ -82,8 +84,8 @@ const processLineChartData = (data, dateField, valueField, label) => {
       {
         label: label,
         data: values,
-        borderColor: chartColors.primary,
-        backgroundColor: chartColors.primaryLight,
+        borderColor: '#000000',
+        backgroundColor: 'rgba(0, 0, 0, 0.1)',
         tension: 0.1,
         fill: false,
       },
@@ -116,8 +118,8 @@ const processPromptCountData = (data) => {
       {
         label: 'Prompts Sent',
         data: values,
-        borderColor: chartColors.tertiary,
-        backgroundColor: chartColors.tertiaryLight,
+        borderColor: '#000000',
+        backgroundColor: 'rgba(0, 0, 0, 0.1)',
         tension: 0.1,
         fill: false,
       },
@@ -129,13 +131,129 @@ const processPromptCountData = (data) => {
 
 const SentimentChart = ({ data }) => {
   const chartData = processLineChartData(data, 'date', 'sentiment_score', 'Daily Sentiment Score');
-  const options = { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, title: { display: true, text: 'Daily Sentiment Score Over Time', color: chartColors.text } } };
+  const options = { 
+    ...baseChartOptions, 
+    scales: { // Ensure y-axis limits cover the -1 to 1 range + padding
+        ...baseChartOptions.scales,
+        y: {
+            ...baseChartOptions.scales.y,
+            min: -1.1,
+            max: 1.1
+        }
+    },
+    plugins: { 
+      ...baseChartOptions.plugins, 
+      title: { display: true, text: 'Daily Sentiment Score Over Time', color: chartColors.text },
+      annotation: { // Add annotation configuration
+        annotations: {
+          veryPositive: {
+            type: 'box',
+            yMin: 0.6,
+            yMax: 1.1, 
+            backgroundColor: chartColors.veryPositiveBg,
+            borderColor: chartColors.grid,
+            borderWidth: 1
+          },
+          positive: {
+            type: 'box',
+            yMin: 0.2,
+            yMax: 0.6,
+            backgroundColor: chartColors.positiveBg,
+            borderColor: chartColors.grid,
+            borderWidth: 1
+          },
+          neutral: {
+            type: 'box',
+            yMin: -0.2,
+            yMax: 0.2,
+            backgroundColor: chartColors.neutralBg,
+            borderColor: chartColors.grid,
+            borderWidth: 1
+          },
+          negative: {
+            type: 'box',
+            yMin: -0.6,
+            yMax: -0.2,
+            backgroundColor: chartColors.negativeBg,
+            borderColor: chartColors.grid,
+            borderWidth: 1
+          },
+          veryNegative: {
+            type: 'box',
+            yMin: -1.1, 
+            yMax: -0.6,
+            backgroundColor: chartColors.veryNegativeBg,
+            borderColor: chartColors.grid,
+            borderWidth: 1
+          }
+        }
+      }
+    } 
+  };
   return <div style={chartContainer}><Line options={options} data={chartData} /></div>;
 };
 
 const PeerFeedbackChart = ({ data }) => {
   const chartData = processLineChartData(data, 'timestamp', 'sentiment_score', 'Peer Feedback Sentiment');
-  const options = { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, title: { display: true, text: 'Peer Feedback Sentiment Over Time', color: chartColors.text } } };
+  const options = { 
+    ...baseChartOptions, 
+    scales: { // Ensure y-axis limits cover the -1 to 1 range + padding
+        ...baseChartOptions.scales,
+        y: {
+            ...baseChartOptions.scales.y,
+            min: -1.1,
+            max: 1.1
+        }
+    },
+    plugins: { 
+      ...baseChartOptions.plugins, 
+      title: { display: true, text: 'Peer Feedback Sentiment Over Time', color: chartColors.text },
+       annotation: { // Add annotation configuration (same as above)
+        annotations: {
+          veryPositive: {
+            type: 'box',
+            yMin: 0.6,
+            yMax: 1.1, 
+            backgroundColor: chartColors.veryPositiveBg,
+            borderColor: chartColors.grid,
+            borderWidth: 1
+          },
+          positive: {
+            type: 'box',
+            yMin: 0.2,
+            yMax: 0.6,
+            backgroundColor: chartColors.positiveBg,
+            borderColor: chartColors.grid,
+            borderWidth: 1
+          },
+          neutral: {
+            type: 'box',
+            yMin: -0.2,
+            yMax: 0.2,
+            backgroundColor: chartColors.neutralBg,
+            borderColor: chartColors.grid,
+            borderWidth: 1
+          },
+          negative: {
+            type: 'box',
+            yMin: -0.6,
+            yMax: -0.2,
+            backgroundColor: chartColors.negativeBg,
+            borderColor: chartColors.grid,
+            borderWidth: 1
+          },
+          veryNegative: {
+            type: 'box',
+            yMin: -1.1, 
+            yMax: -0.6,
+            backgroundColor: chartColors.veryNegativeBg,
+            borderColor: chartColors.grid,
+            borderWidth: 1
+          }
+        }
+      }
+    } 
+  };
   return <div style={chartContainer}><Line options={options} data={chartData} /></div>;
 };
 
@@ -388,27 +506,94 @@ const BuilderDetailsPage = () => {
   ];
 
   const peerFeedbackColumns = [
-    { title: 'Reviewer Name', dataIndex: 'reviewer_name', key: 'reviewer_name' },
-    { title: 'Feedback', dataIndex: 'feedback', key: 'feedback', render: (text) => <Text>{text || '-'}</Text>, width: '40%' },
-    { title: 'Summary', dataIndex: 'summary', key: 'summary', render: (text) => <Text style={{ whiteSpace: 'pre-wrap' }}>{text || '-'}</Text>, width: '30%' },
-    { title: 'Sentiment', dataIndex: 'sentiment_label', key: 'sentiment_label' },
-    { title: 'Timestamp', dataIndex: 'timestamp', key: 'timestamp', render: (ts) => ts ? dayjs(ts?.value || ts).format('YYYY-MM-DD HH:mm') : 'N/A' },
+    { 
+      title: 'Date', 
+      dataIndex: 'timestamp', 
+      key: 'timestamp', 
+      render: (ts) => ts ? dayjs(ts?.value || ts).format('MMMM D') : 'N/A', // Format date
+      width: '15%',
+      sorter: (a, b) => dayjs(a.timestamp?.value || a.timestamp).unix() - dayjs(b.timestamp?.value || b.timestamp).unix(), // Add sorter
+      sortDirections: ['descend', 'ascend']
+    },
+    { 
+      title: 'Reviewer Name', 
+      dataIndex: 'reviewer_name', 
+      key: 'reviewer_name', 
+      width: '15%', 
+      render: (text, record) => (
+         record.from_user_id ? (
+             <Link to={`/builders/${record.from_user_id}`}>{text || 'Unknown'}</Link>
+         ) : (
+             text || 'Unknown' // Fallback if no ID
+         )
+      ) 
+    },
+    { title: 'Feedback', dataIndex: 'feedback', key: 'feedback', render: (text) => <Text>{text || '-'}</Text>, width: '30%' },
+    { title: 'Summary', dataIndex: 'summary', key: 'summary', render: (text) => <Text style={{ whiteSpace: 'pre-wrap' }}>{text || '-'}</Text>, width: '25%' },
+    { 
+      title: 'Sentiment', 
+      dataIndex: 'sentiment_label', 
+      key: 'sentiment_label', 
+      width: '15%', 
+      sorter: (a, b) => (a.sentiment_label || '').localeCompare(b.sentiment_label || ''), // Add sorter
+      sortDirections: ['descend', 'ascend'],
+      render: (label) => { // Use existing color logic
+        if (!label) return 'N/A';
+        const sentimentMap = {
+          'Very Positive': 'green',
+          'Positive': 'cyan',
+          'Neutral': 'default',
+          'Negative': 'orange',
+          'Very Negative': 'red'
+        };
+        return (
+          <Tag color={sentimentMap[label] || 'default'}>
+            {label}
+          </Tag>
+        );
+      }
+    },
   ];
   
   const sentimentColumns = [
-      { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => d ? dayjs(d?.value || d).format('YYYY-MM-DD') : 'N/A' },
       { 
-        title: 'Sentiment Score', 
-        dataIndex: 'sentiment_score', 
-        key: 'sentiment_score', 
-        render: (score) => {
-          const numScore = parseFloat(score);
-          return isNaN(numScore) ? 'N/A' : numScore.toFixed(1);
+        title: 'Date', 
+        dataIndex: 'date', 
+        key: 'date', 
+        render: (d) => d ? dayjs(d?.value || d).format('MMMM D') : 'N/A', 
+        width: '25%',
+        sorter: (a, b) => dayjs(a.date?.value || a.date).unix() - dayjs(b.date?.value || b.date).unix(),
+        sortDirections: ['descend', 'ascend']
+      },
+      { 
+        title: 'Sentiment Category', 
+        dataIndex: 'sentiment_category', 
+        key: 'sentiment_category', 
+        width: '25%',
+        sorter: (a, b) => (a.sentiment_category || '').localeCompare(b.sentiment_category || ''),
+        sortDirections: ['descend', 'ascend'],
+        render: (category) => {
+          if (!category) return 'N/A';
+          const sentimentMap = {
+            'Very Positive': 'green',
+            'Positive': 'cyan',
+            'Neutral': 'default',
+            'Negative': 'orange',
+            'Very Negative': 'red'
+          };
+          return (
+            <Tag color={sentimentMap[category] || 'default'}>
+              {category}
+            </Tag>
+          )
         }
       },
-      { title: 'Sentiment Category', dataIndex: 'sentiment_category', key: 'sentiment_category' },
-      { title: 'Sentiment Reason', dataIndex: 'sentiment_reason', key: 'sentiment_reason' },
-      { title: 'Message Count', dataIndex: 'message_count', key: 'message_count' },
+      { 
+        title: 'Sentiment Reason', 
+        dataIndex: 'sentiment_reason', 
+        key: 'sentiment_reason', 
+        width: '50%'
+      },
   ];
 
   // Function to show modal
@@ -479,7 +664,7 @@ const BuilderDetailsPage = () => {
                 {/* Row 1: Sentiment - Single Card */}
                 <Row gutter={[16, 16]}>
                   <Col span={24}> {/* Full width column for the single card */}
-                    <Card title="Sentiment Trend & Details">
+                    <Card title="Sentiment Trend & Details" bordered={true}>
                       <Row gutter={[16, 16]}> {/* Inner row for side-by-side layout */}
                         <Col xs={24} md={12}> {/* Left column for chart */}
                           <SentimentChart data={sentimentData} /> 
@@ -495,7 +680,7 @@ const BuilderDetailsPage = () => {
                 {/* Row 2: Peer Feedback - Single Card */}
                 <Row gutter={[16, 16]}>
                    <Col span={24}> {/* Full width column */}
-                     <Card title="Peer Feedback Trend & Details">
+                     <Card title="Peer Feedback Trend & Details" bordered={true}>
                       <Row gutter={[16, 16]}> {/* Inner row */}
                         <Col xs={24} md={12}> {/* Left column */}
                           <PeerFeedbackChart data={peerFeedbackData} /> 
@@ -511,7 +696,7 @@ const BuilderDetailsPage = () => {
                 {/* Row 3: Work Product - Single Card */}
                  <Row gutter={[16, 16]}>
                    <Col span={24}> {/* Full width column */}
-                     <Card title="Work Product Trend & Details">
+                     <Card title="Work Product Trend & Details" bordered={true}>
                       <Row gutter={[16, 16]}> {/* Inner row */}
                         <Col xs={24} md={12}> {/* Left column */}
                           <WorkProductChart data={workProductData} /> 
@@ -527,7 +712,7 @@ const BuilderDetailsPage = () => {
                 {/* Row 4: Prompts & Comprehension - Single Card */}
                 <Row gutter={[16, 16]}>
                   <Col span={24}> {/* Full width column */}
-                    <Card title="Prompts Trend & Comprehension Details">
+                    <Card title="Prompts Trend & Comprehension Details" bordered={true}>
                      <Row gutter={[16, 16]}> {/* Inner row */}
                         <Col xs={24} md={12}> {/* Left column */}
                           <PromptsChart data={promptsData} /> 

@@ -8,7 +8,13 @@ export const chartColors = {
   text: '#495057',
   grid: 'rgba(0, 0, 0, 0.1)',
   background: '#ffffff',
-  tooltipText: '#212529'
+  tooltipText: '#212529',
+  // Sentiment band colors (use light transparency)
+  veryPositiveBg: 'rgba(34, 139, 34, 0.1)',  // Light green (based on 'green' tag)
+  positiveBg: 'rgba(0, 191, 255, 0.1)',     // Light cyan (based on 'cyan' tag)
+  neutralBg: 'rgba(108, 117, 125, 0.08)', // Light grey (based on 'default' tag)
+  negativeBg: 'rgba(255, 165, 0, 0.1)',    // Light orange (based on 'orange' tag)
+  veryNegativeBg: 'rgba(220, 53, 69, 0.1)'   // Light red (based on 'red' tag)
 };
 
 export const baseChartOptions = {
