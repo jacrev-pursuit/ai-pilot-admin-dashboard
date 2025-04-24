@@ -59,5 +59,6 @@ export const chartContainer = {
   padding: '20px',
   borderRadius: '8px',
   border: '1px solid #dee2e6',
-  marginBottom: '20px'
+  marginBottom: '20px',
+  height: '300px'
 }; 

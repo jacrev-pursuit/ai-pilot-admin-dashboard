@@ -71,7 +71,7 @@ const BuilderView = () => {
       ),
       dataIndex: 'name',
       key: 'name',
-      width: '20%',
+      width: '40%',
       render: (text, record) => (
         <Link to={`/builders/${record.user_id}`}>
           {text.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
@@ -86,7 +86,7 @@ const BuilderView = () => {
       ),
       dataIndex: 'tasks_completed_percentage',
       key: 'tasks_completed_percentage',
-      width: '15%',
+      width: '30%',
       render: (text) => text === null ? '-' : `${text}%`,
     },
     {
@@ -120,13 +120,17 @@ const BuilderView = () => {
       key: 'peer_feedback_sentiment',
       width: '18%',
       render: (text, record) => (
-        <Button 
-          type="link" 
-          icon={<ExpandOutlined />}
-          onClick={() => handleExpand('peer_feedback', record)}
-        >
-          {renderPeerFeedbackSentiment(text, record)}
-        </Button>
+        text !== null && text !== undefined ? (
+          <Button 
+            type="link" 
+            icon={<ExpandOutlined />}
+            onClick={(e) => { e.stopPropagation(); handleExpand('peer_feedback', record); }}
+          >
+            {renderPeerFeedbackSentiment(text, record)} 
+          </Button>
+        ) : (
+          <span>-</span>
+        )
       ),
     },
     {
@@ -139,14 +143,16 @@ const BuilderView = () => {
       key: 'work_product_score',
       width: '15%',
       render: (text, record) => {
-        return (
+        return text !== null && text !== undefined ? (
           <Button 
             type="link" 
             icon={<ExpandOutlined />}
-            onClick={() => handleExpand('workProduct', record)}
+            onClick={(e) => { e.stopPropagation(); handleExpand('workProduct', record); }}
           >
-            {renderWorkProductScore(text)}
+            {renderWorkProductScore(text)} 
           </Button>
+        ) : (
+          <span>-</span>
         );
       },
     },
@@ -160,15 +166,17 @@ const BuilderView = () => {
       key: 'comprehension_score',
       width: '15%',
       render: (text, record) => {
-        const grade = getLetterGrade(text);
-        return (
+        const grade = text !== null && text !== undefined ? getLetterGrade(text) : 'N/A';
+        return text !== null && text !== undefined ? (
           <Button 
             type="link" 
             icon={<ExpandOutlined />}
-            onClick={() => handleExpand('comprehension', record)}
+            onClick={(e) => { e.stopPropagation(); handleExpand('comprehension', record); }}
           >
             <Tag color={getGradeColor(grade)}>{grade}</Tag>
           </Button>
+        ) : (
+           <span>-</span>
         );
       },
     },
@@ -249,12 +257,12 @@ const BuilderView = () => {
   };
 
   const renderPeerFeedbackSentiment = (sentiment, record) => {
-    if (!sentiment || sentiment === 'null' || sentiment === 'undefined' || sentiment === '') return <span>No data</span>;
+    if (sentiment === null || sentiment === undefined || sentiment === '') return <span>-</span>;
     
     const sentimentMap = {
       'Very Positive': { color: 'green', text: 'Very Positive' },
-      'Positive': { color: 'green', text: 'Positive' },
-      'Neutral': { color: 'blue', text: 'Neutral' },
+      'Positive': { color: 'cyan', text: 'Positive' },
+      'Neutral': { color: 'default', text: 'Neutral' },
       'Negative': { color: 'orange', text: 'Negative' },
       'Very Negative': { color: 'red', text: 'Very Negative' }
     };

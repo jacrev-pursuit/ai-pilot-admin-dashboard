@@ -173,6 +173,52 @@ const BuilderDetailsPage = () => {
   const [workProductModalVisible, setWorkProductModalVisible] = useState(false);
   const [selectedWorkProduct, setSelectedWorkProduct] = useState(null);
 
+  // --- Data Fetching Logic ---
+  const fetchTabData = async (dataType) => {
+    if (!selectedBuilderId || !dateRange) return;
+
+    // Determine if data already exists for this type
+    let dataExists = false;
+    switch (dataType) {
+      case 'workProduct': dataExists = workProductData.length > 0; break;
+      case 'comprehension': dataExists = comprehensionData.length > 0; break;
+      case 'peer_feedback': dataExists = peerFeedbackData.length > 0; break;
+      case 'prompts': dataExists = promptsData.length > 0; break;
+      case 'sentiment': dataExists = sentimentData.length > 0; break;
+      default: return; // Unknown type
+    }
+
+    // Don't re-fetch if data already exists for the current builder/date range
+    if (dataExists) {
+        console.log(`Data for ${dataType} already loaded.`);
+        return; 
+    }
+
+    console.log(`Fetching data for tab: ${dataType}`);
+    setLoading(true); // Show spinner when fetching tab data
+    const startDate = dateRange[0].format('YYYY-MM-DD');
+    const endDate = dateRange[1].format('YYYY-MM-DD');
+
+    try {
+      const data = await fetchBuilderDetails(selectedBuilderId, dataType, startDate, endDate);
+      switch (dataType) {
+        case 'workProduct': setWorkProductData(data); break;
+        case 'comprehension': setComprehensionData(data); break;
+        case 'peer_feedback': setPeerFeedbackData(data); break;
+        case 'prompts': setPromptsData(data); break; // Assuming you add a prompts tab/table
+        case 'sentiment': setSentimentData(data); break;
+        default: break;
+      }
+    } catch (error) {
+      message.error(`Failed to load ${dataType} details`);
+      console.error(`Error fetching ${dataType} details:`, error);
+      // Optionally clear the specific state on error
+      // switch (dataType) { ... clear state ... }
+    } finally {
+      setLoading(false); // Hide spinner after fetch completes or fails
+    }
+  };
+
   // Fetch all builders for the filter dropdown
   useEffect(() => {
     const loadAllBuilders = async () => {
@@ -201,47 +247,50 @@ const BuilderDetailsPage = () => {
     loadAllBuilders();
   }, []); // Run only once on mount
 
-  // Fetch details when builder, tab, or date range changes
+  // Fetch all data when builder or date range changes
   useEffect(() => {
-    const loadBuilderDetails = async (dataType) => {
+    const loadAllDataSequentially = async () => {
       if (!selectedBuilderId || !dateRange) return;
 
+      console.log('Builder or Date Range changed. Clearing old data and fetching all data sequentially.');
       setLoading(true);
+      // Clear all data first
+      setWorkProductData([]); 
+      setComprehensionData([]);
+      setPeerFeedbackData([]);
+      setPromptsData([]);
+      setSentimentData([]);
+      
       const startDate = dateRange[0].format('YYYY-MM-DD');
       const endDate = dateRange[1].format('YYYY-MM-DD');
 
       try {
-        // Fetch all data types needed for charts regardless of active tab
-        const [wpData, compData, pfData, pData, sentData] = await Promise.all([
-           fetchBuilderDetails(selectedBuilderId, 'workProduct', startDate, endDate).catch(e => { console.error('WP fetch error:', e); return []; }),
-           fetchBuilderDetails(selectedBuilderId, 'comprehension', startDate, endDate).catch(e => { console.error('Comp fetch error:', e); return []; }),
-           fetchBuilderDetails(selectedBuilderId, 'peer_feedback', startDate, endDate).catch(e => { console.error('PF fetch error:', e); return []; }),
-           fetchBuilderDetails(selectedBuilderId, 'prompts', startDate, endDate).catch(e => { console.error('Prompts fetch error:', e); return []; }),
-           fetchBuilderDetails(selectedBuilderId, 'sentiment', startDate, endDate).catch(e => { console.error('Sent fetch error:', e); return []; })
-        ]);
-        
+        // Fetch all data types sequentially
+        const wpData = await fetchBuilderDetails(selectedBuilderId, 'workProduct', startDate, endDate).catch(e => { console.error('WP fetch error:', e); return []; });
         setWorkProductData(wpData);
+
+        const compData = await fetchBuilderDetails(selectedBuilderId, 'comprehension', startDate, endDate).catch(e => { console.error('Comp fetch error:', e); return []; });
         setComprehensionData(compData);
+
+        const pfData = await fetchBuilderDetails(selectedBuilderId, 'peer_feedback', startDate, endDate).catch(e => { console.error('PF fetch error:', e); return []; });
         setPeerFeedbackData(pfData);
+
+        const pData = await fetchBuilderDetails(selectedBuilderId, 'prompts', startDate, endDate).catch(e => { console.error('Prompts fetch error:', e); return []; });
         setPromptsData(pData);
+
+        const sentData = await fetchBuilderDetails(selectedBuilderId, 'sentiment', startDate, endDate).catch(e => { console.error('Sent fetch error:', e); return []; });
         setSentimentData(sentData);
 
       } catch (error) {
-        message.error(`Failed to load builder details`);
-        console.error(`Error fetching details:`, error);
-        // Clear all data on general error
-        setWorkProductData([]); 
-        setComprehensionData([]); 
-        setPeerFeedbackData([]); 
-        setPromptsData([]); 
-        setSentimentData([]); 
+        message.error(`Failed to load some builder details`);
+        console.error(`Error fetching details sequentially:`, error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadBuilderDetails();
-    // Note: Removing activeTab from dependency array as we now fetch all data for charts
+    loadAllDataSequentially();
+    // Dependency array remains the same, triggers on builder/date change
   }, [selectedBuilderId, dateRange]); 
   
   // Update selected builder name when ID changes
@@ -280,8 +329,10 @@ const BuilderDetailsPage = () => {
   };
   
   const handleTabChange = (key) => {
+    console.log('Tab changed to:', key);
     setActiveTab(key);
-    // Data for the selected tab should already be fetched by the main useEffect
+    // Fetch data for the new tab if it hasn't been loaded yet
+    fetchTabData(key);
   };
 
   // Define columns for each table
@@ -420,42 +471,75 @@ const BuilderDetailsPage = () => {
               <Text>Please select a builder to view details.</Text>
           ) : (
             <Spin spinning={loading}>
-             {/* Chart Section */}
-             <Card title="Metrics Over Time" style={{ marginBottom: '20px' }}>
-                {/* Use Row and Col for layout */}
-                <Row gutter={[16, 16]}> 
-                  <Col xs={24} md={12}>
-                    {sentimentData.length > 0 && <SentimentChart data={sentimentData} />}
-                  </Col>
-                  <Col xs={24} md={12}>
-                    {peerFeedbackData.length > 0 && <PeerFeedbackChart data={peerFeedbackData} />}
-                  </Col>
-                  <Col xs={24} md={12}>
-                    {workProductData.length > 0 && <WorkProductChart data={workProductData} />}
-                  </Col>
-                  <Col xs={24} md={12}>
-                    {promptsData.length > 0 && <PromptsChart data={promptsData} />}
+             {/* Remove the single Chart Section Card */}
+             {/* <Card title="Metrics Over Time" style={{ marginBottom: '20px' }}> ... </Card> */}
+             
+              {/* Details Section - Restructured into Chart/Table Pairs */}
+              <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                {/* Row 1: Sentiment - Single Card */}
+                <Row gutter={[16, 16]}>
+                  <Col span={24}> {/* Full width column for the single card */}
+                    <Card title="Sentiment Trend & Details">
+                      <Row gutter={[16, 16]}> {/* Inner row for side-by-side layout */}
+                        <Col xs={24} md={12}> {/* Left column for chart */}
+                          <SentimentChart data={sentimentData} /> 
+                        </Col>
+                        <Col xs={24} md={12}> {/* Right column for table */}
+                          <Table dataSource={sentimentData} columns={sentimentColumns} rowKey="date" size="small" scroll={{ y: 240 }} />
+                        </Col>
+                      </Row>
+                    </Card>
                   </Col>
                 </Row>
-             </Card>
-             
-              {/* Details Section */}
-              <Card>
-                  <Tabs activeKey={activeTab} onChange={handleTabChange}>
-                    <TabPane tab="Work Product" key="workProduct">
-                      <Table dataSource={workProductData} columns={workProductColumns} rowKey="task_id" size="small" />
-                    </TabPane>
-                    <TabPane tab="Comprehension" key="comprehension">
-                      <Table dataSource={comprehensionData} columns={comprehensionColumns} rowKey="task_id" size="small" />
-                    </TabPane>
-                    <TabPane tab="Peer Feedback" key="peer_feedback">
-                      <Table dataSource={peerFeedbackData} columns={peerFeedbackColumns} rowKey="feedback_id" size="small" />
-                    </TabPane>
-                    <TabPane tab="Sentiment" key="sentiment">
-                        <Table dataSource={sentimentData} columns={sentimentColumns} rowKey="date" size="small" />
-                    </TabPane>
-                  </Tabs>
-              </Card>
+
+                {/* Row 2: Peer Feedback - Single Card */}
+                <Row gutter={[16, 16]}>
+                   <Col span={24}> {/* Full width column */}
+                     <Card title="Peer Feedback Trend & Details">
+                      <Row gutter={[16, 16]}> {/* Inner row */}
+                        <Col xs={24} md={12}> {/* Left column */}
+                          <PeerFeedbackChart data={peerFeedbackData} /> 
+                        </Col>
+                        <Col xs={24} md={12}> {/* Right column */}
+                          <Table dataSource={peerFeedbackData} columns={peerFeedbackColumns} rowKey="feedback_id" size="small" scroll={{ y: 240 }} />
+                        </Col>
+                       </Row>
+                     </Card>
+                  </Col>
+                </Row>
+
+                {/* Row 3: Work Product - Single Card */}
+                 <Row gutter={[16, 16]}>
+                   <Col span={24}> {/* Full width column */}
+                     <Card title="Work Product Trend & Details">
+                      <Row gutter={[16, 16]}> {/* Inner row */}
+                        <Col xs={24} md={12}> {/* Left column */}
+                          <WorkProductChart data={workProductData} /> 
+                        </Col>
+                        <Col xs={24} md={12}> {/* Right column */}
+                           <Table dataSource={workProductData} columns={workProductColumns} rowKey="task_id" size="small" scroll={{ y: 240 }} />
+                        </Col>
+                       </Row>
+                     </Card>
+                  </Col>
+                </Row>
+                
+                {/* Row 4: Prompts & Comprehension - Single Card */}
+                <Row gutter={[16, 16]}>
+                  <Col span={24}> {/* Full width column */}
+                    <Card title="Prompts Trend & Comprehension Details">
+                     <Row gutter={[16, 16]}> {/* Inner row */}
+                        <Col xs={24} md={12}> {/* Left column */}
+                          <PromptsChart data={promptsData} /> 
+                        </Col>
+                        <Col xs={24} md={12}> {/* Right column */}
+                          <Table dataSource={comprehensionData} columns={comprehensionColumns} rowKey="task_id" size="small" scroll={{ y: 240 }}/>
+                        </Col>
+                      </Row>
+                    </Card>
+                  </Col>
+                </Row>
+              </Space>
             </Spin>
           )}
       </Space>
