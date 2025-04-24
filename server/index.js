@@ -200,7 +200,8 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         fd.sentiment_category as sentiment_label,
         fd.summary,
         fd.timestamp,
-        CONCAT(u.first_name, ' ', u.last_name) as reviewer_name
+        CONCAT(u.first_name, ' ', u.last_name) as reviewer_name,
+        fd.from_user_id
       FROM feedback_data fd
       LEFT JOIN \`${usersTable}\` u 
         ON fd.from_user_id = u.user_id

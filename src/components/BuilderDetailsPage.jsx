@@ -4,7 +4,7 @@ import { Card, Typography, DatePicker, Table, Tabs, Spin, message, Button, Selec
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { fetchBuilderData, fetchBuilderDetails } from '../services/builderService';
-import { Line } from 'react-chartjs-2';
+import { Line, getElementAtEvent } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -17,6 +17,27 @@ import {
 } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation'; // Import the plugin
 import { baseChartOptions, chartContainer, chartColors } from './ChartStyles';
+
+// Add/Update CSS for highlighting - More specific selector
+const styleSheet = document.styleSheets[0];
+// Remove previous rule if it exists to avoid duplicates
+try {
+  for (let i = styleSheet.cssRules.length - 1; i >= 0; i--) {
+    if (styleSheet.cssRules[i].selectorText === '.ant-table-row.highlighted-row > td') {
+      styleSheet.deleteRule(i);
+      break;
+    }
+  }
+} catch (e) {
+  console.warn("Could not remove previous highlight CSS rule:", e);
+}
+// Insert the new, more specific rule
+styleSheet.insertRule(`
+  .ant-table-row.highlighted-row > td {
+    background-color: #fff1b8 !important; /* Slightly darker yellow */
+    transition: background-color 0.3s ease-in-out !important;
+  }
+`, styleSheet.cssRules.length);
 
 // Register Chart.js components AND the plugin
 ChartJS.register(
@@ -63,20 +84,23 @@ const getGradeColor = (grade) => {
 // --- Data Processing Functions for Charts ---
 
 // Generic function for simple line charts (Score over Time)
-const processLineChartData = (data, dateField, valueField, label) => {
+// Returns labels, datasets, and the sorted keys corresponding to the data points
+const processLineChartData = (data, dateField, valueField, keyField, label) => {
   if (!data || data.length === 0) {
-    return { labels: [], datasets: [] };
+    return { labels: [], datasets: [], sortedKeys: [] }; // Return empty keys array
   }
   
   // Sort data by date
-  const sortedData = [...data].sort((a, b) => dayjs(a[dateField]?.value || a[dateField]).diff(dayjs(b[dateField]?.value || b[dateField])));
+  const sortedData = [...data].sort((a, b) => 
+      dayjs(a[dateField]?.value || a[dateField]).diff(dayjs(b[dateField]?.value || b[dateField]))
+  );
   
   const labels = sortedData.map(item => dayjs(item[dateField]?.value || item[dateField]).format('YYYY-MM-DD'));
   const values = sortedData.map(item => {
-      // Attempt to parse score if it's a string representing a number
       const score = parseFloat(item[valueField]);
       return isNaN(score) ? null : score;
   });
+  const sortedKeys = sortedData.map(item => item[keyField]); // Extract keys
 
   return {
     labels,
@@ -90,6 +114,7 @@ const processLineChartData = (data, dateField, valueField, label) => {
         fill: false,
       },
     ],
+    sortedKeys // Return the sorted keys
   };
 };
 
@@ -129,11 +154,57 @@ const processPromptCountData = (data) => {
 
 // --- Chart Components ---
 
-const SentimentChart = ({ data }) => {
-  const chartData = processLineChartData(data, 'date', 'sentiment_score', 'Daily Sentiment Score');
+const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType }) => {
+  const chartRef = React.useRef();
+  const { labels, datasets: originalDatasets, sortedKeys } = processLineChartData(
+      data, 
+      'date',
+      'sentiment_score',
+      'date', // Key for sentiment is the date itself
+      'Daily Sentiment Score'
+  );
+
+  // Calculate highlighted index
+  let highlightedIndex = -1;
+  if (highlightedRowType === 'sentiment' && highlightedRowKey) {
+    // For date keys, need to compare the primitive value
+    const keyToFind = highlightedRowKey?.value || highlightedRowKey?.toString();
+    highlightedIndex = sortedKeys.findIndex(key => (key?.value || key?.toString()) === keyToFind);
+  }
+
+  // Generate dynamic point styles
+  const pointRadius = labels.map((_, index) => index === highlightedIndex ? 8 : 3);
+  const pointBorderWidth = labels.map((_, index) => index === highlightedIndex ? 3 : 1);
+  const pointBorderColor = labels.map((_, index) => index === highlightedIndex ? '#e65100' : '#000000'); // Orange border for highlight
+  const pointBackgroundColor = labels.map((_, index) => index === highlightedIndex ? '#ffb74d' : 'rgba(0, 0, 0, 0.1)'); // Lighter orange fill
+
+  // Create the final dataset with dynamic styles
+  const datasets = originalDatasets.map(dataset => ({
+    ...dataset,
+    pointRadius,
+    pointBorderWidth,
+    pointBorderColor,
+    pointBackgroundColor
+  }));
+
+  const chartData = { labels, datasets };
+
+  const handleChartClick = (event) => {
+      const elements = getElementAtEvent(chartRef.current, event);
+      if (elements.length > 0) {
+          const firstElement = elements[0];
+          const index = firstElement.index;
+          const key = sortedKeys[index];
+          if (key && onPointClick) {
+              onPointClick(key, 'sentiment');
+              event.stopPropagation(); // Prevent click from bubbling up
+          }
+      }
+  };
+
   const options = { 
     ...baseChartOptions, 
-    scales: { // Ensure y-axis limits cover the -1 to 1 range + padding
+    scales: {
         ...baseChartOptions.scales,
         y: {
             ...baseChartOptions.scales.y,
@@ -144,30 +215,31 @@ const SentimentChart = ({ data }) => {
     plugins: { 
       ...baseChartOptions.plugins, 
       title: { display: true, text: 'Daily Sentiment Score Over Time', color: chartColors.text },
-      annotation: { // Add annotation configuration
+      legend: { display: false },
+      annotation: {
         annotations: {
           veryPositive: {
             type: 'box',
-            yMin: 0.6,
+            yMin: 0.8,
             yMax: 1.1, 
             backgroundColor: chartColors.veryPositiveBg,
-            borderColor: chartColors.grid,
+            borderColor: 'rgba(0, 0, 0, 0)',
             borderWidth: 1
           },
           positive: {
             type: 'box',
-            yMin: 0.2,
-            yMax: 0.6,
+            yMin: 0.4,
+            yMax: 0.8,
             backgroundColor: chartColors.positiveBg,
-            borderColor: chartColors.grid,
+            borderColor: 'rgba(0, 0, 0, 0)',
             borderWidth: 1
           },
           neutral: {
             type: 'box',
             yMin: -0.2,
-            yMax: 0.2,
+            yMax: 0.4,
             backgroundColor: chartColors.neutralBg,
-            borderColor: chartColors.grid,
+            borderColor: 'rgba(0, 0, 0, 0)',
             borderWidth: 1
           },
           negative: {
@@ -175,7 +247,7 @@ const SentimentChart = ({ data }) => {
             yMin: -0.6,
             yMax: -0.2,
             backgroundColor: chartColors.negativeBg,
-            borderColor: chartColors.grid,
+            borderColor: 'rgba(0, 0, 0, 0)',
             borderWidth: 1
           },
           veryNegative: {
@@ -183,21 +255,65 @@ const SentimentChart = ({ data }) => {
             yMin: -1.1, 
             yMax: -0.6,
             backgroundColor: chartColors.veryNegativeBg,
-            borderColor: chartColors.grid,
+            borderColor: 'rgba(0, 0, 0, 0)',
             borderWidth: 1
           }
         }
       }
     } 
   };
-  return <div style={chartContainer}><Line options={options} data={chartData} /></div>;
+  return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
 };
 
-const PeerFeedbackChart = ({ data }) => {
-  const chartData = processLineChartData(data, 'timestamp', 'sentiment_score', 'Peer Feedback Sentiment');
+const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType }) => {
+  const chartRef = React.useRef();
+  const { labels, datasets: originalDatasets, sortedKeys } = processLineChartData(
+      data, 
+      'timestamp',
+      'sentiment_score',
+      'feedback_id', // Key is feedback_id
+      'Peer Feedback Sentiment'
+  );
+
+  // Calculate highlighted index
+  let highlightedIndex = -1;
+  if (highlightedRowType === 'peerFeedback' && highlightedRowKey) {
+    highlightedIndex = sortedKeys.indexOf(highlightedRowKey);
+  }
+
+  // Generate dynamic point styles
+  const pointRadius = labels.map((_, index) => index === highlightedIndex ? 8 : 3);
+  const pointBorderWidth = labels.map((_, index) => index === highlightedIndex ? 3 : 1);
+  const pointBorderColor = labels.map((_, index) => index === highlightedIndex ? '#e65100' : '#000000'); // Orange border for highlight
+  const pointBackgroundColor = labels.map((_, index) => index === highlightedIndex ? '#ffb74d' : 'rgba(0, 0, 0, 0.1)'); // Lighter orange fill
+
+  // Create the final dataset with dynamic styles
+  const datasets = originalDatasets.map(dataset => ({
+    ...dataset,
+    pointRadius,
+    pointBorderWidth,
+    pointBorderColor,
+    pointBackgroundColor
+  }));
+
+  const chartData = { labels, datasets };
+
+  const handleChartClick = (event) => {
+      const elements = getElementAtEvent(chartRef.current, event);
+      if (elements.length > 0) {
+          const firstElement = elements[0];
+          const index = firstElement.index;
+          const key = sortedKeys[index];
+          if (key && onPointClick) {
+              onPointClick(key, 'peerFeedback');
+              event.stopPropagation(); // Prevent click from bubbling up
+          }
+      }
+  };
+
   const options = { 
     ...baseChartOptions, 
-    scales: { // Ensure y-axis limits cover the -1 to 1 range + padding
+    scales: {
         ...baseChartOptions.scales,
         y: {
             ...baseChartOptions.scales.y,
@@ -208,30 +324,31 @@ const PeerFeedbackChart = ({ data }) => {
     plugins: { 
       ...baseChartOptions.plugins, 
       title: { display: true, text: 'Peer Feedback Sentiment Over Time', color: chartColors.text },
-       annotation: { // Add annotation configuration (same as above)
+      legend: { display: false },
+       annotation: {
         annotations: {
           veryPositive: {
             type: 'box',
-            yMin: 0.6,
+            yMin: 0.8,
             yMax: 1.1, 
             backgroundColor: chartColors.veryPositiveBg,
-            borderColor: chartColors.grid,
+            borderColor: 'rgba(0, 0, 0, 0)',
             borderWidth: 1
           },
           positive: {
             type: 'box',
-            yMin: 0.2,
-            yMax: 0.6,
+            yMin: 0.4,
+            yMax: 0.8,
             backgroundColor: chartColors.positiveBg,
-            borderColor: chartColors.grid,
+            borderColor: 'rgba(0, 0, 0, 0)',
             borderWidth: 1
           },
           neutral: {
             type: 'box',
             yMin: -0.2,
-            yMax: 0.2,
+            yMax: 0.4,
             backgroundColor: chartColors.neutralBg,
-            borderColor: chartColors.grid,
+            borderColor: 'rgba(0, 0, 0, 0)',
             borderWidth: 1
           },
           negative: {
@@ -239,7 +356,7 @@ const PeerFeedbackChart = ({ data }) => {
             yMin: -0.6,
             yMax: -0.2,
             backgroundColor: chartColors.negativeBg,
-            borderColor: chartColors.grid,
+            borderColor: 'rgba(0, 0, 0, 0)',
             borderWidth: 1
           },
           veryNegative: {
@@ -247,26 +364,97 @@ const PeerFeedbackChart = ({ data }) => {
             yMin: -1.1, 
             yMax: -0.6,
             backgroundColor: chartColors.veryNegativeBg,
-            borderColor: chartColors.grid,
+            borderColor: 'rgba(0, 0, 0, 0)',
             borderWidth: 1
           }
         }
       }
     } 
   };
-  return <div style={chartContainer}><Line options={options} data={chartData} /></div>;
+  return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
 };
 
-const WorkProductChart = ({ data }) => {
-  const chartData = processLineChartData(data, 'grading_timestamp', 'scores', 'Work Product Score');
-  const options = { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, title: { display: true, text: 'Work Product Score Over Time', color: chartColors.text } } };
-  return <div style={chartContainer}><Line options={options} data={chartData} /></div>;
+const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType }) => {
+  const chartRef = React.useRef();
+  const { labels, datasets: originalDatasets, sortedKeys } = processLineChartData(
+      data, 
+      'grading_timestamp',
+      'scores',
+      'task_id', // Key is task_id (ensure it's unique per point)
+      'Work Product Score'
+  );
+
+  // Calculate highlighted index
+  let highlightedIndex = -1;
+  if (highlightedRowType === 'workProduct' && highlightedRowKey) {
+    // Ensure comparison uses strings if keys are potentially numbers
+    highlightedIndex = sortedKeys.findIndex(key => key?.toString() === highlightedRowKey?.toString());
+  }
+
+  // Generate dynamic point styles
+  const pointRadius = labels.map((_, index) => index === highlightedIndex ? 8 : 3);
+  const pointBorderWidth = labels.map((_, index) => index === highlightedIndex ? 3 : 1);
+  const pointBorderColor = labels.map((_, index) => index === highlightedIndex ? '#e65100' : '#000000'); // Orange border for highlight
+  const pointBackgroundColor = labels.map((_, index) => index === highlightedIndex ? '#ffb74d' : 'rgba(0, 0, 0, 0.1)'); // Lighter orange fill
+
+  // Create the final dataset with dynamic styles
+  const datasets = originalDatasets.map(dataset => ({
+    ...dataset,
+    pointRadius,
+    pointBorderWidth,
+    pointBorderColor,
+    pointBackgroundColor
+  }));
+
+  const chartData = { labels, datasets };
+
+  const handleChartClick = (event) => {
+      const elements = getElementAtEvent(chartRef.current, event);
+      if (elements.length > 0) {
+          const firstElement = elements[0];
+          const index = firstElement.index;
+          const key = sortedKeys[index];
+          if (key && onPointClick) {
+              onPointClick(key, 'workProduct');
+              event.stopPropagation(); // Prevent click from bubbling up
+          }
+      }
+  };
+
+  const options = { 
+    ...baseChartOptions, 
+    plugins: { 
+        ...baseChartOptions.plugins, 
+        title: { display: true, text: 'Work Product Score Over Time', color: chartColors.text },
+        legend: { display: false }
+      }
+  };
+  return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
 };
 
 const PromptsChart = ({ data }) => {
   const chartData = processPromptCountData(data);
-  const options = { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, title: { display: true, text: 'Prompts Sent Over Time (Daily)', color: chartColors.text } } };
+  const options = { 
+    ...baseChartOptions, 
+    plugins: { 
+        ...baseChartOptions.plugins, 
+        title: { display: true, text: 'Prompts Sent Over Time (Daily)', color: chartColors.text },
+        legend: { display: false }
+      } 
+  };
   return <div style={chartContainer}><Line options={options} data={chartData} /></div>;
+};
+
+const mapScoreToCategoryAndColor = (score) => {
+  if (score === null || score === undefined) return { label: 'N/A', color: 'default' };
+  const numScore = parseFloat(score);
+  if (isNaN(numScore)) return { label: 'N/A', color: 'default' };
+
+  if (numScore >= 0.8) return { label: 'Very Positive', color: 'green' };
+  if (numScore >= 0.4) return { label: 'Positive', color: 'cyan' };
+  if (numScore >= -0.2) return { label: 'Neutral', color: 'default' };
+  if (numScore >= -0.6) return { label: 'Negative', color: 'orange' };
+  return { label: 'Very Negative', color: 'red' };
 };
 
 const BuilderDetailsPage = () => {
@@ -290,6 +478,9 @@ const BuilderDetailsPage = () => {
   // Need state for the modal
   const [workProductModalVisible, setWorkProductModalVisible] = useState(false);
   const [selectedWorkProduct, setSelectedWorkProduct] = useState(null);
+
+  const [highlightedRowKey, setHighlightedRowKey] = useState(null);
+  const [highlightedRowType, setHighlightedRowType] = useState(null);
 
   // --- Data Fetching Logic ---
   const fetchTabData = async (dataType) => {
@@ -453,6 +644,40 @@ const BuilderDetailsPage = () => {
     fetchTabData(key);
   };
 
+  // Function to handle clicks from charts
+  const handlePointClick = (key, type) => {
+    console.log(`Chart point clicked: Key=${key}, Type=${type}`);
+    // console.log(`Current highlighted key (before update): ${highlightedRowKey}`); // Keep logs if needed
+    setHighlightedRowKey(key);
+    setHighlightedRowType(type);
+    // console.log(`New highlighted key (after update): ${key}`); // Keep logs if needed
+
+    // REMOVED SetTimeout
+    // setTimeout(() => {
+    //   setHighlightedRowKey(null);
+    //   setHighlightedRowType(null);
+    // }, 3000); 
+  };
+
+  // Effect to handle clicks outside to clear highlight
+  useEffect(() => {
+    const handleClickOutside = () => {
+      // Only clear if something is highlighted
+      if (highlightedRowKey !== null) {
+         console.log('Click outside detected, clearing highlight.');
+         setHighlightedRowKey(null);
+         setHighlightedRowType(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+
+    // Cleanup listener on component unmount
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [highlightedRowKey]); // Dependency array includes highlightedRowKey to ensure the check inside works correctly
+
   // Define columns for each table
   const workProductColumns = [
     { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '15%' },
@@ -483,7 +708,7 @@ const BuilderDetailsPage = () => {
         </Button>
       ),
     },
-  ];
+  ].map(col => ({ ...col, className: 'work-product-col' }));
 
   const comprehensionColumns = [
     { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '25%' },
@@ -503,7 +728,7 @@ const BuilderDetailsPage = () => {
       },
       width: '60%'
     },
-  ];
+  ].map(col => ({ ...col, className: 'comprehension-col' }));
 
   const peerFeedbackColumns = [
     { 
@@ -532,28 +757,21 @@ const BuilderDetailsPage = () => {
     { title: 'Summary', dataIndex: 'summary', key: 'summary', render: (text) => <Text style={{ whiteSpace: 'pre-wrap' }}>{text || '-'}</Text>, width: '25%' },
     { 
       title: 'Sentiment', 
-      dataIndex: 'sentiment_label', 
-      key: 'sentiment_label', 
+      dataIndex: 'sentiment_score',
+      key: 'sentiment_score', 
       width: '15%', 
-      sorter: (a, b) => (a.sentiment_label || '').localeCompare(b.sentiment_label || ''), // Add sorter
+      sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
       sortDirections: ['descend', 'ascend'],
-      render: (label) => { // Use existing color logic
-        if (!label) return 'N/A';
-        const sentimentMap = {
-          'Very Positive': 'green',
-          'Positive': 'cyan',
-          'Neutral': 'default',
-          'Negative': 'orange',
-          'Very Negative': 'red'
-        };
+      render: (score) => {
+        const { label, color } = mapScoreToCategoryAndColor(score);
         return (
-          <Tag color={sentimentMap[label] || 'default'}>
+          <Tag color={color}>
             {label}
           </Tag>
         );
       }
     },
-  ];
+  ].map(col => ({ ...col, className: 'peer-feedback-col' }));
   
   const sentimentColumns = [
       { 
@@ -567,25 +785,18 @@ const BuilderDetailsPage = () => {
       },
       { 
         title: 'Sentiment Category', 
-        dataIndex: 'sentiment_category', 
-        key: 'sentiment_category', 
+        dataIndex: 'sentiment_score',
+        key: 'sentiment_score', 
         width: '25%',
-        sorter: (a, b) => (a.sentiment_category || '').localeCompare(b.sentiment_category || ''),
+        sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
         sortDirections: ['descend', 'ascend'],
-        render: (category) => {
-          if (!category) return 'N/A';
-          const sentimentMap = {
-            'Very Positive': 'green',
-            'Positive': 'cyan',
-            'Neutral': 'default',
-            'Negative': 'orange',
-            'Very Negative': 'red'
-          };
-          return (
-            <Tag color={sentimentMap[category] || 'default'}>
-              {category}
-            </Tag>
-          )
+        render: (score) => {
+           const { label, color } = mapScoreToCategoryAndColor(score);
+           return (
+             <Tag color={color}>
+               {label}
+             </Tag>
+           );
         }
       },
       { 
@@ -594,7 +805,7 @@ const BuilderDetailsPage = () => {
         key: 'sentiment_reason', 
         width: '50%'
       },
-  ];
+  ].map(col => ({ ...col, className: 'sentiment-col' }));
 
   // Function to show modal
   const showWorkProductDetails = (record) => {
@@ -667,10 +878,31 @@ const BuilderDetailsPage = () => {
                     <Card title="Sentiment Trend & Details" bordered={true}>
                       <Row gutter={[16, 16]}> {/* Inner row for side-by-side layout */}
                         <Col xs={24} md={12}> {/* Left column for chart */}
-                          <SentimentChart data={sentimentData} /> 
+                          <SentimentChart 
+                            data={sentimentData} 
+                            onPointClick={handlePointClick} 
+                            highlightedRowKey={highlightedRowKey} 
+                            highlightedRowType={highlightedRowType}
+                          /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column for table */}
-                          <Table dataSource={sentimentData} columns={sentimentColumns} rowKey="date" size="small" scroll={{ y: 240 }} />
+                          <Table 
+                            dataSource={
+                              // Apply filter when highlighted
+                              highlightedRowType === 'sentiment' && highlightedRowKey
+                                ? sentimentData.filter(record => (record.date?.value || record.date.toString()) === (highlightedRowKey?.value || highlightedRowKey?.toString()))
+                                : sentimentData
+                            }
+                            columns={sentimentColumns} 
+                            rowKey={(record) => record.date?.value || record.date.toString()} // Extract primitive key
+                            size="small" 
+                            scroll={{ y: 240 }} 
+                            rowClassName={(record) => 
+                              highlightedRowType === 'sentiment' && record.date === highlightedRowKey 
+                                ? 'highlighted-row' 
+                                : ''
+                            }
+                          />
                         </Col>
                       </Row>
                     </Card>
@@ -683,10 +915,33 @@ const BuilderDetailsPage = () => {
                      <Card title="Peer Feedback Trend & Details" bordered={true}>
                       <Row gutter={[16, 16]}> {/* Inner row */}
                         <Col xs={24} md={12}> {/* Left column */}
-                          <PeerFeedbackChart data={peerFeedbackData} /> 
+                          <PeerFeedbackChart 
+                            data={peerFeedbackData} 
+                            onPointClick={handlePointClick} 
+                            highlightedRowKey={highlightedRowKey} 
+                            highlightedRowType={highlightedRowType}
+                          /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column */}
-                          <Table dataSource={peerFeedbackData} columns={peerFeedbackColumns} rowKey="feedback_id" size="small" scroll={{ y: 240 }} />
+                          <Table 
+                            dataSource={
+                              // Apply filter when highlighted
+                              highlightedRowType === 'peerFeedback' && highlightedRowKey
+                                ? peerFeedbackData.filter(record => record.feedback_id === highlightedRowKey)
+                                : peerFeedbackData
+                            } 
+                            columns={peerFeedbackColumns} 
+                            rowKey="feedback_id"
+                            size="small" 
+                            scroll={{ y: 240 }} 
+                            rowClassName={(record) => {
+                              const shouldHighlight = highlightedRowType === 'peerFeedback' && record.feedback_id === highlightedRowKey;
+                              if (highlightedRowKey && highlightedRowType === 'peerFeedback') {
+                                console.log(`Checking Peer Feedback Row: Record Key=${record.feedback_id}, Highlight Key=${highlightedRowKey}, Match=${shouldHighlight}`);
+                              }
+                              return shouldHighlight ? 'highlighted-row' : '';
+                            }}
+                          />
                         </Col>
                        </Row>
                      </Card>
@@ -699,10 +954,36 @@ const BuilderDetailsPage = () => {
                      <Card title="Work Product Trend & Details" bordered={true}>
                       <Row gutter={[16, 16]}> {/* Inner row */}
                         <Col xs={24} md={12}> {/* Left column */}
-                          <WorkProductChart data={workProductData} /> 
+                          <WorkProductChart 
+                            data={workProductData} 
+                            onPointClick={handlePointClick} 
+                            highlightedRowKey={highlightedRowKey} 
+                            highlightedRowType={highlightedRowType}
+                          /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column */}
-                           <Table dataSource={workProductData} columns={workProductColumns} rowKey="task_id" size="small" scroll={{ y: 240 }} />
+                           <Table 
+                              dataSource={
+                                // Apply filter when highlighted
+                                highlightedRowType === 'workProduct' && highlightedRowKey
+                                  ? workProductData.filter(record => record.task_id?.toString() === highlightedRowKey?.toString())
+                                  : workProductData
+                              } 
+                              columns={workProductColumns} 
+                              rowKey={(record) => record.task_id?.toString()} // Ensure primitive key
+                              size="small" 
+                              scroll={{ y: 240 }} 
+                              rowClassName={(record) => {
+                                const recordKey = record.task_id?.toString();
+                                const highlightKey = highlightedRowKey?.toString();
+                                const shouldHighlight = highlightedRowType === 'workProduct' && recordKey === highlightKey;
+                                // Optional Log:
+                                // if (highlightKey && highlightedRowType === 'workProduct') {
+                                //   console.log(`Checking WP Row: Record Key=${recordKey}, Highlight Key=${highlightKey}, Match=${shouldHighlight}`);
+                                // }
+                                return shouldHighlight ? 'highlighted-row' : '';
+                              }}
+                           />
                         </Col>
                        </Row>
                      </Card>
@@ -718,7 +999,28 @@ const BuilderDetailsPage = () => {
                           <PromptsChart data={promptsData} /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column */}
-                          <Table dataSource={comprehensionData} columns={comprehensionColumns} rowKey="task_id" size="small" scroll={{ y: 240 }}/>
+                          <Table 
+                            dataSource={
+                              // Apply filter when highlighted
+                              highlightedRowType === 'comprehension' && highlightedRowKey
+                                ? comprehensionData.filter(record => record.task_id?.toString() === highlightedRowKey?.toString())
+                                : comprehensionData
+                            } 
+                            columns={comprehensionColumns} 
+                            rowKey={(record) => record.task_id?.toString()} // Ensure primitive key
+                            size="small" 
+                            scroll={{ y: 240 }}
+                            rowClassName={(record) => {
+                              const recordKey = record.task_id?.toString();
+                              const highlightKey = highlightedRowKey?.toString();
+                              const shouldHighlight = highlightedRowType === 'comprehension' && recordKey === highlightKey;
+                              // Optional Log:
+                              // if (highlightKey && highlightedRowType === 'comprehension') {
+                              //   console.log(`Checking Comp Row: Record Key=${recordKey}, Highlight Key=${highlightKey}, Match=${shouldHighlight}`);
+                              // }
+                              return shouldHighlight ? 'highlighted-row' : '';
+                            }}
+                          />
                         </Col>
                       </Row>
                     </Card>
