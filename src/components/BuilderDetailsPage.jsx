@@ -95,18 +95,19 @@ const mapScoreToLabel = (score) => {
   return 'Very Negative';
 };
 
-// Helper function to map score to just a color based on fixed ranges
+// Helper function to map score to just a color name for Ant Design Tags
 const mapScoreToColor = (score) => {
-  if (score === null || score === undefined) return chartColors.default; // Default color for null/undefined
+  if (score === null || score === undefined) return 'default'; // Default Antd color
 
   const numScore = parseFloat(score);
-  if (isNaN(numScore)) return chartColors.default; // Default color for NaN
+  if (isNaN(numScore)) return 'default'; // Default Antd color
 
-  if (numScore >= 0.6) return chartColors.veryPositive; // Use point colors
-  if (numScore >= 0.2) return chartColors.positive;
-  if (numScore > -0.2) return chartColors.neutral;
-  if (numScore >= -0.6) return chartColors.negative;
-  return chartColors.veryNegative;
+  // Use Ant Design Tag color names
+  if (numScore >= 0.6) return 'green'; // Very Positive
+  if (numScore >= 0.2) return 'cyan';  // Positive
+  if (numScore > -0.2) return 'default'; // Neutral
+  if (numScore >= -0.6) return 'orange';// Negative
+  return 'red';   // Very Negative
 };
 
 // --- Data Processing Functions for Charts ---
@@ -675,12 +676,12 @@ const PromptsChart = ({ data, dateRange }) => {
 };
 
 const BuilderDetailsPage = () => {
-  const { builderId: urlBuilderId } = useParams();
+  const { builderId } = useParams();
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(false);
   const [allBuilders, setAllBuilders] = useState([]);
-  const [selectedBuilderId, setSelectedBuilderId] = useState(urlBuilderId || null);
+  const [selectedBuilderId, setSelectedBuilderId] = useState(builderId || null);
   const [selectedBuilderName, setSelectedBuilderName] = useState('');
   
   const [dateRange, setDateRange] = useState([dayjs().subtract(30, 'day'), dayjs()]);
@@ -700,6 +701,15 @@ const BuilderDetailsPage = () => {
   const [highlightedRowType, setHighlightedRowType] = useState(null);
   const [hoveredPointIndex, setHoveredPointIndex] = useState(null);
   const [hoveredChartType, setHoveredChartType] = useState(null);
+
+  // Chart Refs
+  const sentimentChartRef = useRef(null);
+  const peerFeedbackChartRef = useRef(null);
+  const workProductChartRef = useRef(null);
+  // ADD Table Refs
+  const sentimentTableRef = useRef(null);
+  const peerFeedbackTableRef = useRef(null);
+  const workProductTableRef = useRef(null);
 
   // Prepare data for charts using the updated functions
   const sentimentChartData = useMemo(() => processScoreBasedLineChartData(
@@ -864,7 +874,7 @@ const BuilderDetailsPage = () => {
           const builder = allBuilders.find(b => b.user_id.toString() === selectedBuilderId);
           setSelectedBuilderName(builder ? builder.name : 'Unknown Builder');
           // Update URL if changed via dropdown, not just initial load
-          if(urlBuilderId !== selectedBuilderId) {
+          if(builderId !== selectedBuilderId) {
               navigate(`/builders/${selectedBuilderId}`);
           }
       } else {
@@ -872,7 +882,7 @@ const BuilderDetailsPage = () => {
           // Optionally navigate back to base page if builder is deselected
           // navigate('/builder-details');
       }
-  }, [selectedBuilderId, allBuilders, navigate, urlBuilderId]);
+  }, [selectedBuilderId, allBuilders, navigate, builderId]);
 
   const handleBuilderChange = (value) => {
     setSelectedBuilderId(value);
@@ -923,25 +933,33 @@ const BuilderDetailsPage = () => {
     setHoveredChartType(type);
   };
 
-  // Effect to handle clicks outside to clear highlight
+  // Effect for handling clicks outside interactive elements
   useEffect(() => {
-    const handleClickOutside = () => {
-      console.log('handleClickOutside fired'); // Add log here
-      // Only clear if something is highlighted
-      if (highlightedRowKey !== null) {
-         console.log('Click outside detected, clearing highlight.');
-         setHighlightedRowKey(null);
-         setHighlightedRowType(null);
+    const handleClickOutside = (event) => { // Receive event object
+      // Check if the click is outside ALL chart refs and ALL table refs
+      const isOutsideCharts = ![sentimentChartRef, peerFeedbackChartRef, workProductChartRef].some(
+        ref => ref.current && ref.current.contains(event.target)
+      );
+      const isOutsideTables = ![sentimentTableRef, peerFeedbackTableRef, workProductTableRef].some(
+        ref => ref.current && ref.current.contains(event.target)
+      );
+
+      if (isOutsideCharts && isOutsideTables && (highlightedRowKey !== null || highlightedRowType !== null)) {
+        // Reset highlight state only if click is outside both charts and tables
+        setHighlightedRowKey(null);
+        setHighlightedRowType(null);
+        // Also reset chart hover state if needed
+        setHoveredPointIndex(null);
+        setHoveredChartType(null);
       }
     };
 
-    document.addEventListener('click', handleClickOutside);
-
-    // Cleanup listener on component unmount
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [highlightedRowKey]); // Restore highlightedRowKey dependency
+    // Add table refs to dependency array
+  }, [highlightedRowKey, highlightedRowType, sentimentChartRef, peerFeedbackChartRef, workProductChartRef, sentimentTableRef, peerFeedbackTableRef, workProductTableRef]);
 
   // Define columns for each table
   const workProductColumns = [
@@ -1006,17 +1024,22 @@ const BuilderDetailsPage = () => {
       sortDirections: ['descend', 'ascend']
     },
     { 
-      title: 'Reviewer Name', 
-      dataIndex: 'reviewer_name', 
-      key: 'reviewer_name', 
-      width: '15%', 
-      render: (text, record) => (
-         record.from_user_id ? (
-             <Link to={`/builders/${record.from_user_id}`}>{text || 'Unknown'}</Link>
-         ) : (
-             text || 'Unknown' // Fallback if no ID
-         )
-      ) 
+      title: 'Reviewer Name',
+      dataIndex: 'reviewer_name',
+      key: 'reviewer_name',
+      width: '15%',
+      render: (text, record) => {
+        // Revert to plain Link without any wrapper or onClick
+        return record.from_user_id ? (
+          <Link 
+            to={`/builders/${record.from_user_id}`} 
+          >
+            {text || 'Unknown'}
+          </Link>
+        ) : (
+          text || 'Unknown' // Fallback if no ID
+        );
+      }
     },
     { title: 'Feedback', dataIndex: 'feedback', key: 'feedback', render: (text) => <Text>{text || '-'}</Text>, width: '30%' },
     { title: 'Summary', dataIndex: 'summary', key: 'summary', render: (text) => <Text style={{ whiteSpace: 'pre-wrap' }}>{text || '-'}</Text>, width: '25%' },
@@ -1139,13 +1162,14 @@ const BuilderDetailsPage = () => {
              
               {/* Details Section - Restructured into Chart/Table Pairs */}
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                {/* Row 1: Sentiment - Single Card */}
+                {/* Row 1: Sentiment */}
                 <Row gutter={[16, 16]}>
-                  <Col span={24}> {/* Full width column for the single card */}
+                  <Col span={24}> 
                     <Card title="Sentiment Trend & Details" bordered={true}>
-                      <Row gutter={[16, 16]}> {/* Inner row for side-by-side layout */}
-                        <Col xs={24} md={12}> {/* Left column for chart */}
+                      <Row gutter={[16, 16]}> 
+                        <Col xs={24} md={12}> 
                           <SentimentChart 
+                            ref={sentimentChartRef}
                             data={sentimentData} 
                             onPointClick={handlePointClick} 
                             highlightedRowKey={highlightedRowKey} 
@@ -1156,8 +1180,8 @@ const BuilderDetailsPage = () => {
                             dateRange={dateRange}
                           /> 
                         </Col>
-                        <Col xs={24} md={12}> {/* Right column for table */}
-                          <div style={{ height: '290px', overflow: 'hidden' }}> {/* Wrapper Div with fixed height */}
+                        <Col xs={24} md={12}> 
+                          <div ref={sentimentTableRef} style={{ height: '290px', overflow: 'hidden' }}>
                             <Table 
                               dataSource={
                                 // Apply filter when highlighted
@@ -1177,20 +1201,21 @@ const BuilderDetailsPage = () => {
                                 return shouldHighlight ? 'highlighted-row' : '';
                               }}
                             />
-                          </div> {/* End Wrapper Div */}
+                          </div>
                         </Col>
                       </Row>
                     </Card>
                   </Col>
                 </Row>
 
-                {/* Row 2: Peer Feedback - Single Card */}
+                {/* Row 2: Peer Feedback */}
                 <Row gutter={[16, 16]}>
-                   <Col span={24}> {/* Full width column */}
+                   <Col span={24}> 
                      <Card title="Peer Feedback Trend & Details" bordered={true}>
-                      <Row gutter={[16, 16]}> {/* Inner row */}
-                        <Col xs={24} md={12}> {/* Left column */}
+                      <Row gutter={[16, 16]}> 
+                        <Col xs={24} md={12}> 
                           <PeerFeedbackChart 
+                            ref={peerFeedbackChartRef}
                             data={peerFeedbackData} 
                             onPointClick={handlePointClick} 
                             highlightedRowKey={highlightedRowKey} 
@@ -1201,8 +1226,8 @@ const BuilderDetailsPage = () => {
                             dateRange={dateRange}
                           /> 
                         </Col>
-                        <Col xs={24} md={12}> {/* Right column */}
-                          <div style={{ height: '290px', overflow: 'hidden' }}> {/* Wrapper Div with fixed height */}
+                        <Col xs={24} md={12}> 
+                          <div ref={peerFeedbackTableRef} style={{ height: '290px', overflow: 'hidden' }}>
                             <Table
                               dataSource={
                                 // Apply filter when highlighted
@@ -1223,20 +1248,21 @@ const BuilderDetailsPage = () => {
                                 return shouldHighlight ? 'highlighted-row' : '';
                               }}
                             />
-                          </div> {/* End Wrapper Div */}
+                          </div>
                         </Col>
                        </Row>
                      </Card>
                   </Col>
                 </Row>
 
-                {/* Row 3: Work Product - Single Card */}
+                {/* Row 3: Work Product */}
                  <Row gutter={[16, 16]}>
-                   <Col span={24}> {/* Full width column */}
+                   <Col span={24}> 
                      <Card title="Work Product Trend & Details" bordered={true}>
-                      <Row gutter={[16, 16]}> {/* Inner row */}
-                        <Col xs={24} md={12}> {/* Left column */}
+                      <Row gutter={[16, 16]}> 
+                        <Col xs={24} md={12}> 
                           <WorkProductChart 
+                            ref={workProductChartRef}
                             data={workProductData} 
                             onPointClick={handlePointClick} 
                             highlightedRowKey={highlightedRowKey} 
@@ -1247,8 +1273,8 @@ const BuilderDetailsPage = () => {
                             dateRange={dateRange}
                           /> 
                         </Col>
-                        <Col xs={24} md={12}> {/* Right column */}
-                           <div style={{ height: '290px', overflow: 'hidden' }}> {/* Wrapper Div with fixed height */}
+                        <Col xs={24} md={12}> 
+                           <div ref={workProductTableRef} style={{ height: '290px', overflow: 'hidden' }}>
                              <Table 
                                 dataSource={
                                   // Apply filter when highlighted
@@ -1267,50 +1293,34 @@ const BuilderDetailsPage = () => {
                                   return shouldHighlight ? 'highlighted-row' : '';
                                 }}
                              />
-                           </div> {/* End Wrapper Div */}
+                           </div>
                         </Col>
                        </Row>
                      </Card>
                   </Col>
                 </Row>
                 
-                {/* Row 4: Prompts & Comprehension - Single Card */}
+                {/* Row 4: Prompts - Assuming no interaction needed for outside click */}
                 <Row gutter={[16, 16]}>
-                  <Col span={24}> {/* Full width column */}
-                    <Card title="Prompts Trend & Comprehension Details" bordered={true}>
-                     <Row gutter={[16, 16]}> {/* Inner row */}
-                        <Col xs={24} md={12}> {/* Left column */}
-                          <PromptsChart 
-                            data={promptsData}
-                            dateRange={dateRange}
-                          /> 
-                        </Col>
-                        <Col xs={24} md={12}> {/* Right column */}
-                          <div style={{ height: '290px', overflow: 'hidden' }}> {/* Wrapper Div with fixed height */}
-                            <Table 
-                              dataSource={
-                                // Apply filter when highlighted
-                                highlightedRowType === 'comprehension' && highlightedRowKey
-                                  ? comprehensionData.filter(record => record.task_id?.toString() === highlightedRowKey?.toString())
-                                  : comprehensionData
-                              } 
-                              columns={comprehensionColumns} 
-                              rowKey={(record) => record.task_id?.toString()} // Ensure primitive key
-                              size="small" 
-                              scroll={{ y: 240 }}
-                              rowClassName={(record) => {
-                                const recordKey = record.task_id?.toString();
-                                const highlightKey = highlightedRowKey?.toString();
-                                const shouldHighlight = highlightedRowType === 'comprehension' && recordKey === highlightKey;
-                                return shouldHighlight ? 'highlighted-row' : '';
-                              }}
-                            />
-                          </div> {/* End Wrapper Div */}
-                        </Col>
-                      </Row>
-                    </Card>
-                  </Col>
-                </Row>
+                  <Col span={24}> 
+                    <Card title="Prompts Sent Over Time (Daily)" bordered={true}>
+                      <Row gutter={[16, 16]}> 
+                         <Col xs={24} md={12}> 
+                           <PromptsChart 
+                             data={promptsData}
+                             dateRange={dateRange} 
+                           /> 
+                         </Col>
+                         <Col xs={24} md={12}> 
+                           {/* Maybe add prompt details table here later? */}
+                           <div style={{ height: '290px', display: 'flex', alignItems:'center', justifyContent:'center' }}>
+                             <Text type="secondary">(Prompt details table placeholder)</Text>
+                           </div>
+                         </Col>
+                       </Row>
+                     </Card>
+                   </Col>
+                 </Row>
               </Space>
             </Spin>
           )}
