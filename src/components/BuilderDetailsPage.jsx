@@ -154,7 +154,7 @@ const processPromptCountData = (data) => {
 
 // --- Chart Components ---
 
-const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType }) => {
+const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType }) => {
   const chartRef = React.useRef();
   const { labels, datasets: originalDatasets, sortedKeys } = processLineChartData(
       data, 
@@ -172,11 +172,25 @@ const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowT
     highlightedIndex = sortedKeys.findIndex(key => (key?.value || key?.toString()) === keyToFind);
   }
 
-  // Generate dynamic point styles
-  const pointRadius = labels.map((_, index) => index === highlightedIndex ? 8 : 3);
-  const pointBorderWidth = labels.map((_, index) => index === highlightedIndex ? 3 : 1);
-  const pointBorderColor = labels.map((_, index) => index === highlightedIndex ? '#e65100' : '#000000'); // Orange border for highlight
-  const pointBackgroundColor = labels.map((_, index) => index === highlightedIndex ? '#ffb74d' : 'rgba(0, 0, 0, 0.1)'); // Lighter orange fill
+  // Generate dynamic point styles based on hover AND highlight
+  const pointRadius = labels.map((_, index) => {
+    if (index === highlightedIndex) return 8; // Highlighted takes precedence
+    if (index === hoveredPointIndex && hoveredChartType === 'sentiment') return 10; // Hovered (Set to 10)
+    return 3; // Default
+  });
+  const pointBorderWidth = labels.map((_, index) => {
+    if (index === highlightedIndex) return 3;
+    return 1; // Default border width
+  });
+  const pointBorderColor = labels.map((_, index) => {
+    if (index === highlightedIndex) return '#e65100'; // Highlight color
+    return '#000000'; // Default border color
+  });
+  const pointBackgroundColor = labels.map((_, index) => {
+    if (index === highlightedIndex) return '#ffb74d'; // Highlight fill
+    if (index === hoveredPointIndex && hoveredChartType === 'sentiment') return '#bbdefb'; // Hover fill (light blue)
+    return 'rgba(0, 0, 0, 0.1)'; // Default
+  });
 
   // Create the final dataset with dynamic styles
   const datasets = originalDatasets.map(dataset => ({
@@ -184,7 +198,11 @@ const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowT
     pointRadius,
     pointBorderWidth,
     pointBorderColor,
-    pointBackgroundColor
+    pointBackgroundColor,
+    hoverRadius: pointRadius, // Use pointRadius (no change on hover)
+    hoverBorderWidth: pointBorderWidth, // Use pointBorderWidth (no change on hover)
+    hoverBorderColor: pointBorderColor, // Use pointBorderColor (no change on hover)
+    hoverBackgroundColor: pointBackgroundColor // Use dynamic background color
   }));
 
   const chartData = { labels, datasets };
@@ -216,6 +234,7 @@ const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowT
       ...baseChartOptions.plugins, 
       title: { display: true, text: 'Daily Sentiment Score Over Time', color: chartColors.text },
       legend: { display: false },
+      tooltip: { enabled: false }, // Disable default tooltip
       annotation: {
         annotations: {
           veryPositive: {
@@ -259,14 +278,29 @@ const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowT
             borderWidth: 1
           }
         }
+      },
+    },
+    onHover: (event, chartElement, chart) => {
+      console.log('SentimentChart onHover fired', chartElement); // Added log
+      const canvas = chart.canvas;
+      if (chartElement.length > 0) {
+        canvas.style.cursor = 'pointer';
+        onPointHover(chartElement[0].index, 'sentiment');
+      } else {
+        canvas.style.cursor = 'default';
+        onPointHover(null, null);
       }
-    } 
+    }
   };
   return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
 };
 
-const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType }) => {
+const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType }) => {
   const chartRef = React.useRef();
+  
+  // Log received hover props
+  console.log('PeerFeedbackChart received hover state:', { hoveredPointIndex, hoveredChartType });
+
   const { labels, datasets: originalDatasets, sortedKeys } = processLineChartData(
       data, 
       'timestamp',
@@ -281,11 +315,25 @@ const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedR
     highlightedIndex = sortedKeys.indexOf(highlightedRowKey);
   }
 
-  // Generate dynamic point styles
-  const pointRadius = labels.map((_, index) => index === highlightedIndex ? 8 : 3);
-  const pointBorderWidth = labels.map((_, index) => index === highlightedIndex ? 3 : 1);
-  const pointBorderColor = labels.map((_, index) => index === highlightedIndex ? '#e65100' : '#000000'); // Orange border for highlight
-  const pointBackgroundColor = labels.map((_, index) => index === highlightedIndex ? '#ffb74d' : 'rgba(0, 0, 0, 0.1)'); // Lighter orange fill
+  // Generate dynamic point styles based on hover AND highlight
+  const pointRadius = labels.map((_, index) => {
+    if (index === highlightedIndex) return 8; // Highlighted takes precedence
+    if (index === hoveredPointIndex && hoveredChartType === 'peerFeedback') return 10; // Hovered (Set to 10)
+    return 3; // Default
+  });
+  const pointBorderWidth = labels.map((_, index) => {
+    if (index === highlightedIndex) return 3;
+    return 1; // Default border width
+  });
+  const pointBorderColor = labels.map((_, index) => {
+    if (index === highlightedIndex) return '#e65100'; // Highlight color
+    return '#000000'; // Default border color
+  });
+  const pointBackgroundColor = labels.map((_, index) => {
+    if (index === highlightedIndex) return '#ffb74d'; // Highlight fill
+    if (index === hoveredPointIndex && hoveredChartType === 'peerFeedback') return '#bbdefb'; // Hover fill (light blue)
+    return 'rgba(0, 0, 0, 0.1)'; // Default
+  });
 
   // Create the final dataset with dynamic styles
   const datasets = originalDatasets.map(dataset => ({
@@ -293,7 +341,11 @@ const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedR
     pointRadius,
     pointBorderWidth,
     pointBorderColor,
-    pointBackgroundColor
+    pointBackgroundColor,
+    hoverRadius: pointRadius, // Use pointRadius (no change on hover)
+    hoverBorderWidth: pointBorderWidth, // Use pointBorderWidth (no change on hover)
+    hoverBorderColor: pointBorderColor, // Use pointBorderColor (no change on hover)
+    hoverBackgroundColor: pointBackgroundColor // Use dynamic background color
   }));
 
   const chartData = { labels, datasets };
@@ -325,7 +377,8 @@ const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedR
       ...baseChartOptions.plugins, 
       title: { display: true, text: 'Peer Feedback Sentiment Over Time', color: chartColors.text },
       legend: { display: false },
-       annotation: {
+      tooltip: { enabled: false }, // Disable default tooltip
+      annotation: {
         annotations: {
           veryPositive: {
             type: 'box',
@@ -368,13 +421,24 @@ const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedR
             borderWidth: 1
           }
         }
+      },
+    },
+    onHover: (event, chartElement, chart) => {
+      console.log('PeerFeedbackChart onHover fired', chartElement); // Added log
+      const canvas = chart.canvas;
+      if (chartElement.length > 0) {
+        canvas.style.cursor = 'pointer';
+        onPointHover(chartElement[0].index, 'peerFeedback');
+      } else {
+        canvas.style.cursor = 'default';
+        onPointHover(null, null);
       }
-    } 
+    }
   };
   return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
 };
 
-const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType }) => {
+const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType }) => {
   const chartRef = React.useRef();
   const { labels, datasets: originalDatasets, sortedKeys } = processLineChartData(
       data, 
@@ -391,11 +455,25 @@ const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRo
     highlightedIndex = sortedKeys.findIndex(key => key?.toString() === highlightedRowKey?.toString());
   }
 
-  // Generate dynamic point styles
-  const pointRadius = labels.map((_, index) => index === highlightedIndex ? 8 : 3);
-  const pointBorderWidth = labels.map((_, index) => index === highlightedIndex ? 3 : 1);
-  const pointBorderColor = labels.map((_, index) => index === highlightedIndex ? '#e65100' : '#000000'); // Orange border for highlight
-  const pointBackgroundColor = labels.map((_, index) => index === highlightedIndex ? '#ffb74d' : 'rgba(0, 0, 0, 0.1)'); // Lighter orange fill
+  // Generate dynamic point styles based on hover AND highlight
+  const pointRadius = labels.map((_, index) => {
+    if (index === highlightedIndex) return 8; // Highlighted takes precedence
+    if (index === hoveredPointIndex && hoveredChartType === 'workProduct') return 10; // Hovered (Set to 10)
+    return 3; // Default
+  });
+  const pointBorderWidth = labels.map((_, index) => {
+    if (index === highlightedIndex) return 3;
+    return 1; // Default border width
+  });
+  const pointBorderColor = labels.map((_, index) => {
+    if (index === highlightedIndex) return '#e65100'; // Highlight color
+    return '#000000'; // Default border color
+  });
+  const pointBackgroundColor = labels.map((_, index) => {
+    if (index === highlightedIndex) return '#ffb74d'; // Highlight fill
+    if (index === hoveredPointIndex && hoveredChartType === 'workProduct') return '#bbdefb'; // Hover fill (light blue)
+    return 'rgba(0, 0, 0, 0.1)'; // Default
+  });
 
   // Create the final dataset with dynamic styles
   const datasets = originalDatasets.map(dataset => ({
@@ -403,7 +481,11 @@ const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRo
     pointRadius,
     pointBorderWidth,
     pointBorderColor,
-    pointBackgroundColor
+    pointBackgroundColor,
+    hoverRadius: pointRadius, // Use pointRadius (no change on hover)
+    hoverBorderWidth: pointBorderWidth, // Use pointBorderWidth (no change on hover)
+    hoverBorderColor: pointBorderColor, // Use pointBorderColor (no change on hover)
+    hoverBackgroundColor: pointBackgroundColor // Use dynamic background color
   }));
 
   const chartData = { labels, datasets };
@@ -426,7 +508,18 @@ const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRo
     plugins: { 
         ...baseChartOptions.plugins, 
         title: { display: true, text: 'Work Product Score Over Time', color: chartColors.text },
-        legend: { display: false }
+        legend: { display: false },
+        tooltip: { enabled: false } // Disable default tooltip
+      },
+      onHover: (event, chartElement, chart) => {
+        const canvas = chart.canvas;
+        if (chartElement.length > 0) {
+          canvas.style.cursor = 'pointer';
+          onPointHover(chartElement[0].index, 'workProduct');
+        } else {
+          canvas.style.cursor = 'default';
+          onPointHover(null, null);
+        }
       }
   };
   return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
@@ -481,6 +574,8 @@ const BuilderDetailsPage = () => {
 
   const [highlightedRowKey, setHighlightedRowKey] = useState(null);
   const [highlightedRowType, setHighlightedRowType] = useState(null);
+  const [hoveredPointIndex, setHoveredPointIndex] = useState(null);
+  const [hoveredChartType, setHoveredChartType] = useState(null);
 
   // --- Data Fetching Logic ---
   const fetchTabData = async (dataType) => {
@@ -659,9 +754,18 @@ const BuilderDetailsPage = () => {
     // }, 3000); 
   };
 
+  // Function to handle hovers from charts
+  const handlePointHover = (index, type) => {
+    // Log state update attempts
+    console.log(`Setting hover state: index=${index}, type=${type}`);
+    setHoveredPointIndex(index);
+    setHoveredChartType(type);
+  };
+
   // Effect to handle clicks outside to clear highlight
   useEffect(() => {
     const handleClickOutside = () => {
+      console.log('handleClickOutside fired'); // Add log here
       // Only clear if something is highlighted
       if (highlightedRowKey !== null) {
          console.log('Click outside detected, clearing highlight.');
@@ -676,7 +780,7 @@ const BuilderDetailsPage = () => {
     return () => {
       document.removeEventListener('click', handleClickOutside);
     };
-  }, [highlightedRowKey]); // Dependency array includes highlightedRowKey to ensure the check inside works correctly
+  }, [highlightedRowKey]); // Restore highlightedRowKey dependency
 
   // Define columns for each table
   const workProductColumns = [
@@ -883,26 +987,33 @@ const BuilderDetailsPage = () => {
                             onPointClick={handlePointClick} 
                             highlightedRowKey={highlightedRowKey} 
                             highlightedRowType={highlightedRowType}
+                            onPointHover={handlePointHover}
+                            hoveredPointIndex={hoveredPointIndex}
+                            hoveredChartType={hoveredChartType}
                           /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column for table */}
-                          <Table 
-                            dataSource={
-                              // Apply filter when highlighted
-                              highlightedRowType === 'sentiment' && highlightedRowKey
-                                ? sentimentData.filter(record => (record.date?.value || record.date.toString()) === (highlightedRowKey?.value || highlightedRowKey?.toString()))
-                                : sentimentData
-                            }
-                            columns={sentimentColumns} 
-                            rowKey={(record) => record.date?.value || record.date.toString()} // Extract primitive key
-                            size="small" 
-                            scroll={{ y: 240 }} 
-                            rowClassName={(record) => 
-                              highlightedRowType === 'sentiment' && record.date === highlightedRowKey 
-                                ? 'highlighted-row' 
-                                : ''
-                            }
-                          />
+                          <div style={{ height: '290px', overflow: 'hidden' }}> {/* Wrapper Div with fixed height */}
+                            <Table 
+                              dataSource={
+                                // Apply filter when highlighted
+                                highlightedRowType === 'sentiment' && highlightedRowKey
+                                  ? sentimentData.filter(record => (record.date?.value || record.date.toString()) === (highlightedRowKey?.value || highlightedRowKey?.toString()))
+                                  : sentimentData
+                              }
+                              columns={sentimentColumns} 
+                              rowKey={(record) => record.date?.value || record.date.toString()} // Extract primitive key
+                              size="small" 
+                              scroll={{ y: 240 }} 
+                              rowClassName={(record) => {
+                                // Ensure consistent key comparison (primitive vs primitive)
+                                const recordKey = record.date?.value || record.date.toString();
+                                const highlightKey = highlightedRowKey?.value || highlightedRowKey?.toString(); 
+                                const shouldHighlight = highlightedRowType === 'sentiment' && recordKey === highlightKey;
+                                return shouldHighlight ? 'highlighted-row' : '';
+                              }}
+                            />
+                          </div> {/* End Wrapper Div */}
                         </Col>
                       </Row>
                     </Card>
@@ -920,28 +1031,34 @@ const BuilderDetailsPage = () => {
                             onPointClick={handlePointClick} 
                             highlightedRowKey={highlightedRowKey} 
                             highlightedRowType={highlightedRowType}
+                            onPointHover={handlePointHover}
+                            hoveredPointIndex={hoveredPointIndex}
+                            hoveredChartType={hoveredChartType}
                           /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column */}
-                          <Table 
-                            dataSource={
-                              // Apply filter when highlighted
-                              highlightedRowType === 'peerFeedback' && highlightedRowKey
-                                ? peerFeedbackData.filter(record => record.feedback_id === highlightedRowKey)
-                                : peerFeedbackData
-                            } 
-                            columns={peerFeedbackColumns} 
-                            rowKey="feedback_id"
-                            size="small" 
-                            scroll={{ y: 240 }} 
-                            rowClassName={(record) => {
-                              const shouldHighlight = highlightedRowType === 'peerFeedback' && record.feedback_id === highlightedRowKey;
-                              if (highlightedRowKey && highlightedRowType === 'peerFeedback') {
-                                console.log(`Checking Peer Feedback Row: Record Key=${record.feedback_id}, Highlight Key=${highlightedRowKey}, Match=${shouldHighlight}`);
+                          <div style={{ height: '290px', overflow: 'hidden' }}> {/* Wrapper Div with fixed height */}
+                            <Table
+                              dataSource={
+                                // Apply filter when highlighted
+                                highlightedRowType === 'peerFeedback' && highlightedRowKey
+                                  ? peerFeedbackData.filter(record => record.feedback_id === highlightedRowKey)
+                                  : peerFeedbackData
                               }
-                              return shouldHighlight ? 'highlighted-row' : '';
-                            }}
-                          />
+                              columns={peerFeedbackColumns}
+                              rowKey="feedback_id"
+                              size="small"
+                              scroll={{ y: 240 }}
+                              rowClassName={(record) => {
+                                const shouldHighlight = highlightedRowType === 'peerFeedback' && record.feedback_id === highlightedRowKey;
+                                // Optional Log:
+                                // if (highlightedRowKey && highlightedRowType === 'peerFeedback') {
+                                //   console.log(`Checking Peer Feedback Row: Record Key=${record.feedback_id}, Highlight Key=${highlightedRowKey}, Match=${shouldHighlight}`);
+                                // }
+                                return shouldHighlight ? 'highlighted-row' : '';
+                              }}
+                            />
+                          </div> {/* End Wrapper Div */}
                         </Col>
                        </Row>
                      </Card>
@@ -959,31 +1076,32 @@ const BuilderDetailsPage = () => {
                             onPointClick={handlePointClick} 
                             highlightedRowKey={highlightedRowKey} 
                             highlightedRowType={highlightedRowType}
+                            onPointHover={handlePointHover}
+                            hoveredPointIndex={hoveredPointIndex}
+                            hoveredChartType={hoveredChartType}
                           /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column */}
-                           <Table 
-                              dataSource={
-                                // Apply filter when highlighted
-                                highlightedRowType === 'workProduct' && highlightedRowKey
-                                  ? workProductData.filter(record => record.task_id?.toString() === highlightedRowKey?.toString())
-                                  : workProductData
-                              } 
-                              columns={workProductColumns} 
-                              rowKey={(record) => record.task_id?.toString()} // Ensure primitive key
-                              size="small" 
-                              scroll={{ y: 240 }} 
-                              rowClassName={(record) => {
-                                const recordKey = record.task_id?.toString();
-                                const highlightKey = highlightedRowKey?.toString();
-                                const shouldHighlight = highlightedRowType === 'workProduct' && recordKey === highlightKey;
-                                // Optional Log:
-                                // if (highlightKey && highlightedRowType === 'workProduct') {
-                                //   console.log(`Checking WP Row: Record Key=${recordKey}, Highlight Key=${highlightKey}, Match=${shouldHighlight}`);
-                                // }
-                                return shouldHighlight ? 'highlighted-row' : '';
-                              }}
-                           />
+                           <div style={{ height: '290px', overflow: 'hidden' }}> {/* Wrapper Div with fixed height */}
+                             <Table 
+                                dataSource={
+                                  // Apply filter when highlighted
+                                  highlightedRowType === 'workProduct' && highlightedRowKey
+                                    ? workProductData.filter(record => record.task_id?.toString() === highlightedRowKey?.toString())
+                                    : workProductData
+                                } 
+                                columns={workProductColumns} 
+                                rowKey={(record) => record.task_id?.toString()} // Ensure primitive key
+                                size="small" 
+                                scroll={{ y: 240 }} 
+                                rowClassName={(record) => {
+                                  const recordKey = record.task_id?.toString();
+                                  const highlightKey = highlightedRowKey?.toString();
+                                  const shouldHighlight = highlightedRowType === 'workProduct' && recordKey === highlightKey;
+                                  return shouldHighlight ? 'highlighted-row' : '';
+                                }}
+                             />
+                           </div> {/* End Wrapper Div */}
                         </Col>
                        </Row>
                      </Card>
@@ -999,28 +1117,26 @@ const BuilderDetailsPage = () => {
                           <PromptsChart data={promptsData} /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column */}
-                          <Table 
-                            dataSource={
-                              // Apply filter when highlighted
-                              highlightedRowType === 'comprehension' && highlightedRowKey
-                                ? comprehensionData.filter(record => record.task_id?.toString() === highlightedRowKey?.toString())
-                                : comprehensionData
-                            } 
-                            columns={comprehensionColumns} 
-                            rowKey={(record) => record.task_id?.toString()} // Ensure primitive key
-                            size="small" 
-                            scroll={{ y: 240 }}
-                            rowClassName={(record) => {
-                              const recordKey = record.task_id?.toString();
-                              const highlightKey = highlightedRowKey?.toString();
-                              const shouldHighlight = highlightedRowType === 'comprehension' && recordKey === highlightKey;
-                              // Optional Log:
-                              // if (highlightKey && highlightedRowType === 'comprehension') {
-                              //   console.log(`Checking Comp Row: Record Key=${recordKey}, Highlight Key=${highlightKey}, Match=${shouldHighlight}`);
-                              // }
-                              return shouldHighlight ? 'highlighted-row' : '';
-                            }}
-                          />
+                          <div style={{ height: '290px', overflow: 'hidden' }}> {/* Wrapper Div with fixed height */}
+                            <Table 
+                              dataSource={
+                                // Apply filter when highlighted
+                                highlightedRowType === 'comprehension' && highlightedRowKey
+                                  ? comprehensionData.filter(record => record.task_id?.toString() === highlightedRowKey?.toString())
+                                  : comprehensionData
+                              } 
+                              columns={comprehensionColumns} 
+                              rowKey={(record) => record.task_id?.toString()} // Ensure primitive key
+                              size="small" 
+                              scroll={{ y: 240 }}
+                              rowClassName={(record) => {
+                                const recordKey = record.task_id?.toString();
+                                const highlightKey = highlightedRowKey?.toString();
+                                const shouldHighlight = highlightedRowType === 'comprehension' && recordKey === highlightKey;
+                                return shouldHighlight ? 'highlighted-row' : '';
+                              }}
+                            />
+                          </div> {/* End Wrapper Div */}
                         </Col>
                       </Row>
                     </Card>
