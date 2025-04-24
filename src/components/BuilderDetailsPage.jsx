@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, Typography, DatePicker, Table, Tabs, Spin, message, Button, Select, Space, Row, Col, Tag, Modal } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
@@ -17,6 +17,7 @@ import {
 } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation'; // Import the plugin
 import { baseChartOptions, chartContainer, chartColors } from './ChartStyles';
+import { Bar } from 'react-chartjs-2';
 
 // Add/Update CSS for highlighting - More specific selector
 const styleSheet = document.styleSheets[0];
@@ -81,26 +82,79 @@ const getGradeColor = (grade) => {
   return 'default';
 };
 
+// Helper function to map score to a sentiment label
+const mapScoreToLabel = (score) => {
+  if (score === null || score === undefined) return 'N/A';
+  const numScore = parseFloat(score);
+  if (isNaN(numScore)) return 'N/A';
+
+  if (numScore >= 0.6) return 'Very Positive';
+  if (numScore >= 0.2) return 'Positive';
+  if (numScore > -0.2) return 'Neutral';
+  if (numScore >= -0.6) return 'Negative';
+  return 'Very Negative';
+};
+
+// Helper function to map score to just a color based on fixed ranges
+const mapScoreToColor = (score) => {
+  if (score === null || score === undefined) return chartColors.default; // Default color for null/undefined
+
+  const numScore = parseFloat(score);
+  if (isNaN(numScore)) return chartColors.default; // Default color for NaN
+
+  if (numScore >= 0.6) return chartColors.veryPositive; // Use point colors
+  if (numScore >= 0.2) return chartColors.positive;
+  if (numScore > -0.2) return chartColors.neutral;
+  if (numScore >= -0.6) return chartColors.negative;
+  return chartColors.veryNegative;
+};
+
 // --- Data Processing Functions for Charts ---
 
-// Generic function for simple line charts (Score over Time)
-// Returns labels, datasets, and the sorted keys corresponding to the data points
-const processLineChartData = (data, dateField, valueField, keyField, label) => {
-  if (!data || data.length === 0) {
-    return { labels: [], datasets: [], sortedKeys: [] }; // Return empty keys array
+// Function for processing line chart data based on score ranges, now includes all dates in range
+const processScoreBasedLineChartData = (data, dateField, valueField, keyField, label, startDate, endDate) => {
+  if (!startDate || !endDate) {
+    return { labels: [], datasets: [] }; // Need date range
   }
-  
-  // Sort data by date
-  const sortedData = [...data].sort((a, b) => 
-      dayjs(a[dateField]?.value || a[dateField]).diff(dayjs(b[dateField]?.value || b[dateField]))
-  );
-  
-  const labels = sortedData.map(item => dayjs(item[dateField]?.value || item[dateField]).format('YYYY-MM-DD'));
-  const values = sortedData.map(item => {
-      const score = parseFloat(item[valueField]);
-      return isNaN(score) ? null : score;
+
+  // 1. Generate all dates in the range
+  const allDates = [];
+  let currentDate = dayjs(startDate);
+  const finalEndDate = dayjs(endDate);
+  while (currentDate.isBefore(finalEndDate) || currentDate.isSame(finalEndDate, 'day')) {
+    allDates.push(currentDate);
+    currentDate = currentDate.add(1, 'day');
+  }
+
+  // 2. Create a map of the fetched data for quick lookup (using MM-DD format)
+  const dataMap = new Map();
+  if (data) {
+    data.forEach(item => {
+      const itemDateStr = dayjs(item[dateField]?.value || item[dateField]).format('MM-DD');
+      dataMap.set(itemDateStr, item);
+    });
+  }
+
+  // 3. Generate labels and map data
+  const labels = allDates.map(date => date.format('MM-DD'));
+  const values = [];
+  const pointColors = [];
+  const keys = [];
+
+  labels.forEach(labelDateStr => {
+    const item = dataMap.get(labelDateStr);
+    if (item) {
+      values.push(item[valueField]);
+      pointColors.push(mapScoreToColor(item[valueField]));
+      keys.push(item[keyField]);
+    } else {
+      values.push(null); // Use null for gaps in line chart
+      pointColors.push('rgba(0,0,0,0.1)'); // Default/transparent color
+      keys.push(null);
+    }
   });
-  const sortedKeys = sortedData.map(item => item[keyField]); // Extract keys
+
+  // ... (rest of the function remains similar, using the generated arrays) ...
 
   return {
     labels,
@@ -108,34 +162,61 @@ const processLineChartData = (data, dateField, valueField, keyField, label) => {
       {
         label: label,
         data: values,
-        borderColor: '#000000',
-        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+        borderColor: '#000000', // Set line color to black
+        backgroundColor: 'rgba(0, 0, 0, 0.1)', // Semi-transparent black fill 
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors.map(color => {
+          if (typeof color === 'string') {
+            if (color.includes('rgba') && color.includes('0.6')) { 
+              return color.replace('0.6', '1'); 
+            }
+            return color; 
+          }
+          return chartColors.borderColor || '#000000';
+        }),
+        pointBorderWidth: 2,
+        pointRadius: 3, // Base radius
+        pointHoverRadius: 10, // Hover radius remains 10
+        fill: true,
         tension: 0.1,
-        fill: false,
-      },
+        segment: {
+          borderColor: ctx => ctx.p0.raw === null || ctx.p1.raw === null ? 'transparent' : undefined, // Hide line segments connecting to null
+        }
+      }
     ],
-    sortedKeys // Return the sorted keys
+    keys // Pass keys for click handling
   };
 };
 
-// Function for processing prompt counts over time
-const processPromptCountData = (data) => {
-  if (!data || data.length === 0) {
+// Function for processing prompt counts over time, now includes all dates in range
+const processPromptCountData = (data, startDate, endDate) => {
+  if (!startDate || !endDate) {
     return { labels: [], datasets: [] };
   }
 
-  // Aggregate counts by day
-  const countsByDay = data.reduce((acc, item) => {
-    const day = dayjs(item.created_at?.value || item.created_at).format('YYYY-MM-DD');
-    acc[day] = (acc[day] || 0) + 1;
-    return acc;
-  }, {});
+  // 1. Generate all dates in the range
+  const allDates = [];
+  let currentDate = dayjs(startDate);
+  const finalEndDate = dayjs(endDate);
+  while (currentDate.isBefore(finalEndDate) || currentDate.isSame(finalEndDate, 'day')) {
+    allDates.push(currentDate);
+    currentDate = currentDate.add(1, 'day');
+  }
 
-  // Sort days
-  const sortedDays = Object.keys(countsByDay).sort((a, b) => dayjs(a).diff(dayjs(b)));
+  // 2. Create a map of the fetched data for quick lookup (using MM-DD format)
+  const dataMap = new Map();
+  if (data) {
+    data.forEach(item => {
+      const itemDateStr = dayjs(item.date?.value || item.date).format('MM-DD');
+      dataMap.set(itemDateStr, item.prompt_count);
+    });
+  }
 
-  const labels = sortedDays;
-  const values = sortedDays.map(day => countsByDay[day]);
+  // 3. Generate labels and map data
+  const labels = allDates.map(date => date.format('MM-DD'));
+  const values = labels.map(labelDateStr => {
+    return dataMap.get(labelDateStr) || 0; // Use 0 for dates with no prompts
+  });
 
   return {
     labels,
@@ -146,7 +227,7 @@ const processPromptCountData = (data) => {
         borderColor: '#000000',
         backgroundColor: 'rgba(0, 0, 0, 0.1)',
         tension: 0.1,
-        fill: false,
+        fill: false, // This might be irrelevant for Bar chart, but keep for consistency if type changes
       },
     ],
   };
@@ -154,14 +235,16 @@ const processPromptCountData = (data) => {
 
 // --- Chart Components ---
 
-const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType }) => {
+const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType, dateRange }) => {
   const chartRef = React.useRef();
-  const { labels, datasets: originalDatasets, sortedKeys } = processLineChartData(
+  const { labels, datasets: originalDatasets, keys } = processScoreBasedLineChartData(
       data, 
       'date',
       'sentiment_score',
       'date', // Key for sentiment is the date itself
-      'Daily Sentiment Score'
+      'Daily Sentiment Score',
+      dateRange[0], // Pass start date
+      dateRange[1]  // Pass end date
   );
 
   // Calculate highlighted index
@@ -169,7 +252,7 @@ const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowT
   if (highlightedRowType === 'sentiment' && highlightedRowKey) {
     // For date keys, need to compare the primitive value
     const keyToFind = highlightedRowKey?.value || highlightedRowKey?.toString();
-    highlightedIndex = sortedKeys.findIndex(key => (key?.value || key?.toString()) === keyToFind);
+    highlightedIndex = keys.findIndex(key => (key?.value || key?.toString()) === keyToFind);
   }
 
   // Generate dynamic point styles based on hover AND highlight
@@ -212,7 +295,7 @@ const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowT
       if (elements.length > 0) {
           const firstElement = elements[0];
           const index = firstElement.index;
-          const key = sortedKeys[index];
+          const key = keys[index];
           if (key && onPointClick) {
               onPointClick(key, 'sentiment');
               event.stopPropagation(); // Prevent click from bubbling up
@@ -234,7 +317,9 @@ const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowT
       ...baseChartOptions.plugins, 
       title: { display: true, text: 'Daily Sentiment Score Over Time', color: chartColors.text },
       legend: { display: false },
-      tooltip: { enabled: false }, // Disable default tooltip
+      tooltip: {
+        enabled: false // Disable tooltip
+      },
       annotation: {
         annotations: {
           veryPositive: {
@@ -295,24 +380,26 @@ const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowT
   return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
 };
 
-const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType }) => {
+const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType, dateRange }) => {
   const chartRef = React.useRef();
   
   // Log received hover props
   console.log('PeerFeedbackChart received hover state:', { hoveredPointIndex, hoveredChartType });
 
-  const { labels, datasets: originalDatasets, sortedKeys } = processLineChartData(
+  const { labels, datasets: originalDatasets, keys } = processScoreBasedLineChartData(
       data, 
       'timestamp',
       'sentiment_score',
       'feedback_id', // Key is feedback_id
-      'Peer Feedback Sentiment'
+      'Peer Feedback Sentiment',
+      dateRange[0], // Pass start date
+      dateRange[1]  // Pass end date
   );
 
   // Calculate highlighted index
   let highlightedIndex = -1;
   if (highlightedRowType === 'peerFeedback' && highlightedRowKey) {
-    highlightedIndex = sortedKeys.indexOf(highlightedRowKey);
+    highlightedIndex = keys.indexOf(highlightedRowKey);
   }
 
   // Generate dynamic point styles based on hover AND highlight
@@ -355,7 +442,7 @@ const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedR
       if (elements.length > 0) {
           const firstElement = elements[0];
           const index = firstElement.index;
-          const key = sortedKeys[index];
+          const key = keys[index];
           if (key && onPointClick) {
               onPointClick(key, 'peerFeedback');
               event.stopPropagation(); // Prevent click from bubbling up
@@ -377,7 +464,9 @@ const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedR
       ...baseChartOptions.plugins, 
       title: { display: true, text: 'Peer Feedback Sentiment Over Time', color: chartColors.text },
       legend: { display: false },
-      tooltip: { enabled: false }, // Disable default tooltip
+      tooltip: {
+        enabled: false // Disable tooltip
+      },
       annotation: {
         annotations: {
           veryPositive: {
@@ -438,21 +527,23 @@ const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedR
   return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
 };
 
-const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType }) => {
+const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType, dateRange }) => {
   const chartRef = React.useRef();
-  const { labels, datasets: originalDatasets, sortedKeys } = processLineChartData(
+  const { labels, datasets: originalDatasets, keys } = processScoreBasedLineChartData(
       data, 
       'grading_timestamp',
       'scores',
       'task_id', // Key is task_id (ensure it's unique per point)
-      'Work Product Score'
+      'Work Product Score',
+      dateRange[0], // Pass start date
+      dateRange[1]  // Pass end date
   );
 
   // Calculate highlighted index
   let highlightedIndex = -1;
   if (highlightedRowType === 'workProduct' && highlightedRowKey) {
     // Ensure comparison uses strings if keys are potentially numbers
-    highlightedIndex = sortedKeys.findIndex(key => key?.toString() === highlightedRowKey?.toString());
+    highlightedIndex = keys.findIndex(key => key?.toString() === highlightedRowKey?.toString());
   }
 
   // Generate dynamic point styles based on hover AND highlight
@@ -495,7 +586,7 @@ const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRo
       if (elements.length > 0) {
           const firstElement = elements[0];
           const index = firstElement.index;
-          const key = sortedKeys[index];
+          const key = keys[index];
           if (key && onPointClick) {
               onPointClick(key, 'workProduct');
               event.stopPropagation(); // Prevent click from bubbling up
@@ -509,7 +600,9 @@ const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRo
         ...baseChartOptions.plugins, 
         title: { display: true, text: 'Work Product Score Over Time', color: chartColors.text },
         legend: { display: false },
-        tooltip: { enabled: false } // Disable default tooltip
+        tooltip: {
+          enabled: false // Disable tooltip
+        }
       },
       onHover: (event, chartElement, chart) => {
         const canvas = chart.canvas;
@@ -525,29 +618,60 @@ const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRo
   return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
 };
 
-const PromptsChart = ({ data }) => {
-  const chartData = processPromptCountData(data);
-  const options = { 
-    ...baseChartOptions, 
-    plugins: { 
-        ...baseChartOptions.plugins, 
-        title: { display: true, text: 'Prompts Sent Over Time (Daily)', color: chartColors.text },
-        legend: { display: false }
-      } 
+const PromptsChart = ({ data, dateRange }) => {
+  const chartRef = useRef(null);
+  const chartData = processPromptCountData(data, dateRange[0], dateRange[1]);
+
+  // Restore Bar chart options structure
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        type: 'category',
+        ticks: {
+          maxRotation: 90,
+          minRotation: 45,
+          callback: function(value, index, values) {
+            return this.getLabelForValue(value); // Use the label generated by processPromptCountData
+          }
+        },
+        grid: {
+          display: false // Keep grid display setting if it was there before
+        }
+      },
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Number of Prompts'
+        },
+        grid: {
+          color: chartColors.grid // Keep grid color if needed
+        }
+      }
+    },
+    plugins: {
+      title: { display: true, text: 'Prompts Sent Over Time (Daily)', color: chartColors.text }, // Restore title
+      legend: {
+        display: false
+      },
+      tooltip: {
+        callbacks: {
+          title: function(tooltipItems) {
+            // Format the date in the tooltip title to MM-DD
+            return dayjs(tooltipItems[0].label, 'MM-DD').format('MM-DD');
+          },
+          label: function(context) {
+            return `Prompts: ${context.parsed.y}`;
+          }
+        }
+      }
+    }
   };
-  return <div style={chartContainer}><Line options={options} data={chartData} /></div>;
-};
 
-const mapScoreToCategoryAndColor = (score) => {
-  if (score === null || score === undefined) return { label: 'N/A', color: 'default' };
-  const numScore = parseFloat(score);
-  if (isNaN(numScore)) return { label: 'N/A', color: 'default' };
-
-  if (numScore >= 0.8) return { label: 'Very Positive', color: 'green' };
-  if (numScore >= 0.4) return { label: 'Positive', color: 'cyan' };
-  if (numScore >= -0.2) return { label: 'Neutral', color: 'default' };
-  if (numScore >= -0.6) return { label: 'Negative', color: 'orange' };
-  return { label: 'Very Negative', color: 'red' };
+  // Change back to Bar chart
+  return <div style={chartContainer}><Bar ref={chartRef} options={options} data={chartData} /></div>;
 };
 
 const BuilderDetailsPage = () => {
@@ -576,6 +700,43 @@ const BuilderDetailsPage = () => {
   const [highlightedRowType, setHighlightedRowType] = useState(null);
   const [hoveredPointIndex, setHoveredPointIndex] = useState(null);
   const [hoveredChartType, setHoveredChartType] = useState(null);
+
+  // Prepare data for charts using the updated functions
+  const sentimentChartData = useMemo(() => processScoreBasedLineChartData(
+    sentimentData, 
+    'date', 
+    'sentiment_score', 
+    'date', // Use date as key for sentiment
+    'Sentiment Score',
+    dateRange[0], // Pass start date
+    dateRange[1] // Pass end date
+  ), [sentimentData, dateRange]);
+
+  const peerFeedbackChartData = useMemo(() => processScoreBasedLineChartData(
+    peerFeedbackData, 
+    'timestamp', 
+    'sentiment_score', 
+    'feedback_id', // Use feedback_id as key for peer feedback
+    'Peer Feedback Score',
+    dateRange[0], // Pass start date
+    dateRange[1] // Pass end date
+  ), [peerFeedbackData, dateRange]);
+
+  const workProductChartData = useMemo(() => processScoreBasedLineChartData(
+    workProductData, 
+    'task_date', // Use task_date from the join
+    'scores', 
+    'task_id', // Use task_id as key for work product
+    'Work Product Score',
+    dateRange[0], // Pass start date
+    dateRange[1] // Pass end date
+  ), [workProductData, dateRange]);
+
+  const promptsChartData = useMemo(() => processPromptCountData(
+    promptsData, 
+    dateRange[0], // Pass start date
+    dateRange[1] // Pass end date
+  ), [promptsData, dateRange]);
 
   // --- Data Fetching Logic ---
   const fetchTabData = async (dataType) => {
@@ -867,7 +1028,8 @@ const BuilderDetailsPage = () => {
       sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
       sortDirections: ['descend', 'ascend'],
       render: (score) => {
-        const { label, color } = mapScoreToCategoryAndColor(score);
+        const label = mapScoreToLabel(score); // Get label
+        const color = mapScoreToColor(score); // Get color
         return (
           <Tag color={color}>
             {label}
@@ -895,12 +1057,13 @@ const BuilderDetailsPage = () => {
         sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
         sortDirections: ['descend', 'ascend'],
         render: (score) => {
-           const { label, color } = mapScoreToCategoryAndColor(score);
-           return (
-             <Tag color={color}>
-               {label}
-             </Tag>
-           );
+          const label = mapScoreToLabel(score); // Get label
+          const color = mapScoreToColor(score); // Get color
+          return (
+            <Tag color={color}>
+              {label}
+            </Tag>
+          );
         }
       },
       { 
@@ -990,6 +1153,7 @@ const BuilderDetailsPage = () => {
                             onPointHover={handlePointHover}
                             hoveredPointIndex={hoveredPointIndex}
                             hoveredChartType={hoveredChartType}
+                            dateRange={dateRange}
                           /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column for table */}
@@ -1034,6 +1198,7 @@ const BuilderDetailsPage = () => {
                             onPointHover={handlePointHover}
                             hoveredPointIndex={hoveredPointIndex}
                             hoveredChartType={hoveredChartType}
+                            dateRange={dateRange}
                           /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column */}
@@ -1079,6 +1244,7 @@ const BuilderDetailsPage = () => {
                             onPointHover={handlePointHover}
                             hoveredPointIndex={hoveredPointIndex}
                             hoveredChartType={hoveredChartType}
+                            dateRange={dateRange}
                           /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column */}
@@ -1114,7 +1280,10 @@ const BuilderDetailsPage = () => {
                     <Card title="Prompts Trend & Comprehension Details" bordered={true}>
                      <Row gutter={[16, 16]}> {/* Inner row */}
                         <Col xs={24} md={12}> {/* Left column */}
-                          <PromptsChart data={promptsData} /> 
+                          <PromptsChart 
+                            data={promptsData}
+                            dateRange={dateRange}
+                          /> 
                         </Col>
                         <Col xs={24} md={12}> {/* Right column */}
                           <div style={{ height: '290px', overflow: 'hidden' }}> {/* Wrapper Div with fixed height */}
