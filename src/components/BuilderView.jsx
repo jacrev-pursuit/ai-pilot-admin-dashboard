@@ -71,7 +71,7 @@ const BuilderView = () => {
       ),
       dataIndex: 'name',
       key: 'name',
-      width: '40%',
+      width: '10%',
       render: (text, record) => (
         <Link to={`/builders/${record.user_id}`}>
           {text.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
@@ -86,7 +86,7 @@ const BuilderView = () => {
       ),
       dataIndex: 'tasks_completed_percentage',
       key: 'tasks_completed_percentage',
-      width: '30%',
+      width: '10%',
       render: (text) => text === null ? '-' : `${text}%`,
     },
     {
@@ -97,7 +97,7 @@ const BuilderView = () => {
       ),
       dataIndex: 'prompts_sent',
       key: 'prompts_sent',
-      width: '12%',
+      width: '10%',
     },
     {
       title: (
@@ -107,7 +107,7 @@ const BuilderView = () => {
       ),
       dataIndex: 'daily_sentiment',
       key: 'daily_sentiment',
-      width: '15%',
+      width: '10%',
       render: (text, record) => renderDailySentiment(text, record),
     },
     {
@@ -118,7 +118,7 @@ const BuilderView = () => {
       ),
       dataIndex: 'peer_feedback_sentiment',
       key: 'peer_feedback_sentiment',
-      width: '18%',
+      width: '20%',
       render: (text, record) => (
         text !== null && text !== undefined ? (
           <Button 
@@ -141,7 +141,7 @@ const BuilderView = () => {
       ),
       dataIndex: 'work_product_score',
       key: 'work_product_score',
-      width: '15%',
+      width: '20%',
       render: (text, record) => {
         if (text === null || text === undefined) {
           return <span>No task assessments</span>;
@@ -167,7 +167,7 @@ const BuilderView = () => {
       ),
       dataIndex: 'comprehension_score',
       key: 'comprehension_score',
-      width: '15%',
+      width: '20%',
       render: (text, record) => {
         if (text === null || text === undefined) {
           return <span>No task assessments</span>;

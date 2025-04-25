@@ -46,7 +46,12 @@
 }
 
 .builder-table {
-  margin-top: 16px;
+  max-width: 90%;
+  margin: 16px auto;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  overflow: hidden;
 }
 
 .table-row {
