@@ -613,6 +613,88 @@ const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRo
   return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
 };
 
+const ComprehensionChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType, dateRange }) => {
+  const chartRef = React.useRef();
+  // Process data specifically for comprehension
+  const { labels, datasets: originalDatasets, keys } = processScoreBasedLineChartData(
+      data, 'date', null /* valueField not used directly */, 'task_id', 'Comprehension Score', dateRange[0], dateRange[1], 'comprehension'
+  );
+
+  // Calculate highlighted index
+  let highlightedIndex = -1;
+  if (highlightedRowType === 'comprehension' && highlightedRowKey) {
+    highlightedIndex = keys.findIndex(key => key?.toString() === highlightedRowKey?.toString());
+  }
+
+  // Generate dynamic point styles based on hover AND highlight
+  const pointRadius = labels.map((_, index) => {
+    if (index === highlightedIndex) return 8;
+    if (index === hoveredPointIndex && hoveredChartType === 'comprehension') return 10;
+    return 3;
+  });
+  const pointBorderWidth = labels.map((_, index) => {
+    if (index === highlightedIndex) return 3;
+    return 1;
+  });
+  const pointBorderColor = labels.map((_, index) => {
+    if (index === highlightedIndex) return '#e65100'; // Use same highlight color
+    return '#000000';
+  });
+  const pointBackgroundColor = labels.map((_, index) => {
+    if (index === highlightedIndex) return '#ffb74d'; // Use same highlight fill
+    if (index === hoveredPointIndex && hoveredChartType === 'comprehension') return '#bbdefb';
+    return 'rgba(0, 0, 0, 0.1)';
+  });
+
+  // Create the final dataset with dynamic styles
+  const datasets = originalDatasets.map(dataset => ({
+    ...dataset,
+    pointRadius,
+    pointBorderWidth,
+    pointBorderColor,
+    pointBackgroundColor,
+    hoverRadius: pointRadius,
+    hoverBorderWidth: pointBorderWidth,
+    hoverBorderColor: pointBorderColor,
+    hoverBackgroundColor: pointBackgroundColor
+  }));
+
+  const chartData = { labels, datasets };
+
+  const handleChartClick = (event) => {
+      const elements = getElementAtEvent(chartRef.current, event);
+      if (elements.length > 0) {
+          const index = elements[0].index;
+          const key = keys[index];
+          if (key && onPointClick) {
+              onPointClick(key, 'comprehension');
+              event.stopPropagation();
+          }
+      }
+  };
+
+  const options = { 
+    ...baseChartOptions, 
+    plugins: { 
+        ...baseChartOptions.plugins, 
+        title: { display: true, text: 'Comprehension Score Over Time', color: chartColors.text },
+        legend: { display: false },
+        tooltip: { enabled: false }
+      },
+      onHover: (event, chartElement, chart) => {
+        const canvas = chart.canvas;
+        if (chartElement.length > 0) {
+          canvas.style.cursor = 'pointer';
+          onPointHover(chartElement[0].index, 'comprehension');
+        } else {
+          canvas.style.cursor = 'default';
+          onPointHover(null, null);
+        }
+      }
+  };
+  return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} onClick={handleChartClick} /></div>;
+};
+
 const PromptsChart = ({ data, dateRange }) => {
   const chartRef = useRef(null);
   const chartData = processPromptCountData(data, dateRange[0], dateRange[1]);
@@ -691,9 +773,11 @@ const BuilderDetailsPage = () => {
   const [promptsData, setPromptsData] = useState([]);
   const [sentimentData, setSentimentData] = useState([]);
 
-  // Need state for the modal
+  // Need state for the modals
   const [workProductModalVisible, setWorkProductModalVisible] = useState(false);
   const [selectedWorkProduct, setSelectedWorkProduct] = useState(null);
+  const [comprehensionModalVisible, setComprehensionModalVisible] = useState(false); // State for Comprehension modal
+  const [selectedComprehension, setSelectedComprehension] = useState(null); // State for selected Comprehension item
 
   const [highlightedRowKey, setHighlightedRowKey] = useState(null);
   const [highlightedRowType, setHighlightedRowType] = useState(null);
@@ -704,10 +788,12 @@ const BuilderDetailsPage = () => {
   const sentimentChartRef = useRef(null);
   const peerFeedbackChartRef = useRef(null);
   const workProductChartRef = useRef(null);
+  const comprehensionChartRef = useRef(null); // Add ref for Comprehension chart
   // ADD Table Refs
   const sentimentTableRef = useRef(null);
   const peerFeedbackTableRef = useRef(null);
   const workProductTableRef = useRef(null);
+  const comprehensionTableRef = useRef(null); // Add ref for Comprehension table
 
   // Updated useMemo calls to pass dataType
   const sentimentChartData = useMemo(() => processScoreBasedLineChartData(
@@ -721,6 +807,10 @@ const BuilderDetailsPage = () => {
   const workProductChartData = useMemo(() => processScoreBasedLineChartData(
     workProductData, 'date', null /* valueField not used directly */, 'task_id', 'Work Product Score', dateRange[0], dateRange[1], 'workProduct'
   ), [workProductData, dateRange]);
+
+  const comprehensionChartData = useMemo(() => processScoreBasedLineChartData(
+    comprehensionData, 'date', null, 'task_id', 'Comprehension Score', dateRange[0], dateRange[1], 'comprehension'
+  ), [comprehensionData, dateRange]);
 
   const promptsChartData = useMemo(() => processPromptCountData(
     promptsData, 
@@ -866,12 +956,6 @@ const BuilderDetailsPage = () => {
 
   const handleBuilderChange = (value) => {
     setSelectedBuilderId(value);
-     // Clear existing data when builder changes
-    setWorkProductData([]); 
-    setComprehensionData([]); 
-    setPeerFeedbackData([]); 
-    setPromptsData([]); // Keep clearing prompts data
-    setSentimentData([]); 
   };
 
   const handleDateRangeChange = (dates) => {
@@ -915,20 +999,18 @@ const BuilderDetailsPage = () => {
 
   // Effect for handling clicks outside interactive elements
   useEffect(() => {
-    const handleClickOutside = (event) => { // Receive event object
+    const handleClickOutside = (event) => { 
       // Check if the click is outside ALL chart refs and ALL table refs
-      const isOutsideCharts = ![sentimentChartRef, peerFeedbackChartRef, workProductChartRef].some(
+      const isOutsideCharts = ![sentimentChartRef, peerFeedbackChartRef, workProductChartRef, comprehensionChartRef].some(
         ref => ref.current && ref.current.contains(event.target)
       );
-      const isOutsideTables = ![sentimentTableRef, peerFeedbackTableRef, workProductTableRef].some(
+      const isOutsideTables = ![sentimentTableRef, peerFeedbackTableRef, workProductTableRef, comprehensionTableRef].some(
         ref => ref.current && ref.current.contains(event.target)
       );
 
       if (isOutsideCharts && isOutsideTables && (highlightedRowKey !== null || highlightedRowType !== null)) {
-        // Reset highlight state only if click is outside both charts and tables
         setHighlightedRowKey(null);
         setHighlightedRowType(null);
-        // Also reset chart hover state if needed
         setHoveredPointIndex(null);
         setHoveredChartType(null);
       }
@@ -938,8 +1020,8 @@ const BuilderDetailsPage = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-    // Add table refs to dependency array
-  }, [highlightedRowKey, highlightedRowType, sentimentChartRef, peerFeedbackChartRef, workProductChartRef, sentimentTableRef, peerFeedbackTableRef, workProductTableRef]);
+    // Add new refs to dependency array
+  }, [highlightedRowKey, highlightedRowType, sentimentChartRef, peerFeedbackChartRef, workProductChartRef, comprehensionChartRef, sentimentTableRef, peerFeedbackTableRef, workProductTableRef, comprehensionTableRef]);
 
   // Define columns for each table
   const workProductColumns = [
@@ -967,18 +1049,34 @@ const BuilderDetailsPage = () => {
       } 
     },
     { 
-      title: 'Grade', // Renamed from Score
-      key: 'grade', // Changed key 
-      width: '10%', // Adjusted width
-      render: (_, record) => { // Parse analysis for score
+      title: 'Grade', 
+      key: 'grade', 
+      width: '10%', 
+      render: (_, record) => { 
         const analysis = parseAnalysis(record.analysis);
-        const score = analysis?.completion_score;
+        if (!analysis) return null; // Handle case where analysis is null
+
+        const score = analysis.completion_score;
+        const criteria = analysis.criteria_met;
+
+        // Check for Tech Issue condition FIRST
+        if (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received') {
+          return null; // Return nothing for tech issue
+        }
+
+        // Check for Document Access Error (score is 0)
+        if (score === 0) {
+           return null; // Return nothing for Document Access Error
+        }
+
+        // If score is null/undefined/NaN, getLetterGrade returns 'F', which is fine to display.
         const grade = getLetterGrade(score);
-        // Only return the Tag
+
+        // Only return the Tag if it's not a special case handled above
         return <Tag color={getGradeColor(grade)}>{grade}</Tag>; 
       }
     },
-    { 
+    {
       title: 'Actions',
       key: 'actions',
       width: '15%', // Adjusted width
@@ -992,28 +1090,31 @@ const BuilderDetailsPage = () => {
 
   const comprehensionColumns = [
     { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '25%' },
-    { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => d ? dayjs(d?.value || d).format('YYYY-MM-DD') : 'N/A', width: '15%' },
     { 
-      title: 'Score', 
-      key: 'score', 
-      width: '60%',
-      render: (_, record) => { // Parse analysis for score
+      title: 'Date', 
+      dataIndex: 'date', 
+      key: 'date', 
+      render: (d) => d ? dayjs(d?.value || d).format('MMMM D') : 'N/A', // Use Month Day format
+      width: '15%' 
+    }, 
+    { 
+      title: 'Grade', 
+      key: 'grade', 
+      width: '10%', 
+      render: (_, record) => { 
         const analysis = parseAnalysis(record.analysis);
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
-        return (
-          <Space>
-            <span>{score?.toFixed(2) ?? 'N/A'}</span> {/* Display numeric score */}
-            <Tag color={getGradeColor(grade)}>{grade}</Tag>
-          </Space>
-        );
+        return <Tag color={getGradeColor(grade)}>{grade}</Tag>; 
       }
     },
-    // Add Feedback column back, parsing from analysis
-    { title: 'Feedback', key: 'feedback', width: '50%', render: (_, record) => {
+    { 
+      title: 'Feedback', 
+      key: 'feedback', 
+      width: '35%', 
+      render: (_, record) => { 
         const analysis = parseAnalysis(record.analysis);
         const feedback = analysis?.feedback;
-        // Add checks for special feedback tags if needed
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
         const criteria = analysis?.criteria_met;
@@ -1021,6 +1122,16 @@ const BuilderDetailsPage = () => {
         if (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received') return <Tag color="red">Tech issue</Tag>;
         return feedback || '-';
       } 
+    },
+    { // Add Actions column
+      title: 'Actions',
+      key: 'actions',
+      width: '15%', 
+      render: (_, record) => (
+        <Button size="small" onClick={() => showComprehensionDetails(record)}>
+          View Details
+        </Button>
+      ),
     },
   ].map(col => ({ ...col, className: 'comprehension-col' }));
 
@@ -1129,6 +1240,17 @@ const BuilderDetailsPage = () => {
     setSelectedWorkProduct(null); // Clear selected record
   };
 
+  // Functions to show/hide Comprehension modal
+  const showComprehensionDetails = (record) => {
+    setSelectedComprehension(record);
+    setComprehensionModalVisible(true);
+  };
+
+  const hideComprehensionDetails = () => {
+    setComprehensionModalVisible(false);
+    setSelectedComprehension(null); // Clear selected record
+  };
+
   return (
     <div style={{ padding: '20px' }}>
       <Button 
@@ -1186,8 +1308,8 @@ const BuilderDetailsPage = () => {
                 <Row gutter={[16, 16]}>
                   <Col span={24}> 
                     <Card title="Sentiment Trend & Details" bordered={true}>
-                      <Row gutter={[16, 16]}> 
-                        <Col xs={24} md={12}> 
+                <Row gutter={[16, 16]}> 
+                  <Col xs={24} md={12}>
                           <SentimentChart 
                             ref={sentimentChartRef}
                             data={sentimentData} 
@@ -1199,8 +1321,8 @@ const BuilderDetailsPage = () => {
                             hoveredChartType={hoveredChartType}
                             dateRange={dateRange}
                           /> 
-                        </Col>
-                        <Col xs={24} md={12}> 
+                  </Col>
+                  <Col xs={24} md={12}>
                           <div ref={sentimentTableRef} style={{ height: '290px', overflow: 'hidden' }}>
                             <Table 
                               dataSource={
@@ -1222,7 +1344,7 @@ const BuilderDetailsPage = () => {
                               }}
                             />
                           </div>
-                        </Col>
+                  </Col>
                       </Row>
                     </Card>
                   </Col>
@@ -1233,7 +1355,7 @@ const BuilderDetailsPage = () => {
                    <Col span={24}> 
                      <Card title="Peer Feedback Trend & Details" bordered={true}>
                       <Row gutter={[16, 16]}> 
-                        <Col xs={24} md={12}> 
+                  <Col xs={24} md={12}>
                           <PeerFeedbackChart 
                             ref={peerFeedbackChartRef}
                             data={peerFeedbackData} 
@@ -1245,8 +1367,8 @@ const BuilderDetailsPage = () => {
                             hoveredChartType={hoveredChartType}
                             dateRange={dateRange}
                           /> 
-                        </Col>
-                        <Col xs={24} md={12}> 
+                  </Col>
+                  <Col xs={24} md={12}>
                           <div ref={peerFeedbackTableRef} style={{ height: '290px', overflow: 'hidden' }}>
                             <Table
                               dataSource={
@@ -1269,9 +1391,9 @@ const BuilderDetailsPage = () => {
                               }}
                             />
                           </div>
-                        </Col>
-                       </Row>
-                     </Card>
+                  </Col>
+                </Row>
+             </Card>
                   </Col>
                 </Row>
 
@@ -1316,11 +1438,55 @@ const BuilderDetailsPage = () => {
                            </div>
                         </Col>
                        </Row>
+              </Card>
+                  </Col>
+                </Row>
+                
+                {/* Row 4: Comprehension - NEW SECTION */}
+                 <Row gutter={[16, 16]}>
+                   <Col span={24}> 
+                     <Card title="Comprehension Trend & Details" bordered={true}>
+                      <Row gutter={[16, 16]}> 
+                        <Col xs={24} md={12}> 
+                          <ComprehensionChart 
+                            ref={comprehensionChartRef} // Assign ref
+                            data={comprehensionData} 
+                            onPointClick={handlePointClick} 
+                            highlightedRowKey={highlightedRowKey} 
+                            highlightedRowType={highlightedRowType}
+                            onPointHover={handlePointHover}
+                            hoveredPointIndex={hoveredPointIndex}
+                            hoveredChartType={hoveredChartType}
+                            dateRange={dateRange}
+                          /> 
+                        </Col>
+                        <Col xs={24} md={12}> 
+                           <div ref={comprehensionTableRef} style={{ height: '290px', overflow: 'hidden' }}> // Assign ref
+                             <Table 
+                                dataSource={ 
+                                  highlightedRowType === 'comprehension' && highlightedRowKey
+                                    ? comprehensionData.filter(record => record.task_id?.toString() === highlightedRowKey?.toString())
+                                    : comprehensionData
+                                } 
+                                columns={comprehensionColumns} 
+                                rowKey={(record) => record.task_id?.toString()} 
+                                size="small" 
+                                scroll={{ y: 240 }} 
+                                rowClassName={(record) => {
+                                  const recordKey = record.task_id?.toString();
+                                  const highlightKey = highlightedRowKey?.toString();
+                                  const shouldHighlight = highlightedRowType === 'comprehension' && recordKey === highlightKey;
+                                  return shouldHighlight ? 'highlighted-row' : '';
+                                }}
+                             />
+                           </div>
+                        </Col>
+                       </Row>
                      </Card>
                   </Col>
                 </Row>
                 
-                {/* Row 4: Prompts - Assuming no interaction needed for outside click */}
+                {/* Row 5: Prompts */}
                 <Row gutter={[16, 16]}>
                   <Col span={24}> 
                     <Card title="Prompts Sent Over Time (Daily)" bordered={true}>
@@ -1409,8 +1575,8 @@ const BuilderDetailsPage = () => {
                             <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
                               {findings.strengths.map((item, index) => <li key={`str-${catIndex}-${index}`}>{item}</li>)}
                             </ul>
-                          </div>
-                        )}
+          </div>
+        )}
                         {findings?.weaknesses && findings.weaknesses.length > 0 && (
                           <div style={{ marginTop: '4px' }}>
                             <Text>Weaknesses:</Text>
@@ -1435,6 +1601,98 @@ const BuilderDetailsPage = () => {
                 )}
                 
                 {/* Add Strengths/Weaknesses parsing later if needed */}
+
+              </Space>
+            );
+          })()
+        }
+      </Modal>
+
+      {/* Comprehension Details Modal - NEW */}
+      <Modal
+        title="Comprehension Details" 
+        open={comprehensionModalVisible}
+        onCancel={hideComprehensionDetails}
+        footer={[
+          <Button key="back" onClick={hideComprehensionDetails}>
+            Close
+          </Button>,
+        ]}
+        width={800}
+      >
+        {selectedComprehension && ( // Ensure record exists
+          () => { // Use function to parse safely
+            const analysis = parseAnalysis(selectedComprehension.analysis);
+            return (
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Title level={4}>{selectedComprehension.task_title || 'Task Details'}</Title>
+                
+                {analysis?.submission_summary && (
+                  <> 
+                    <Text strong>Submission Summary:</Text>
+                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                      {analysis.submission_summary}
+                    </Paragraph>
+                  </>
+                )}
+
+                {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
+                  <Text strong>Score: {analysis.completion_score}</Text>
+                )}
+                
+                {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
+                  <>
+                    <Text strong>Criteria Met:</Text>
+                    <Space wrap size={[4, 8]}>
+                      {analysis.criteria_met.map((item, index) => <Tag color="green" key={`crit-${index}`}>{item}</Tag>)}
+                    </Space>
+                  </>
+                )}
+
+                {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
+                  <>
+                    <Text strong>Areas for Improvement:</Text>
+                    <Space wrap size={[4, 8]}>
+                      {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`area-${index}`}>{item}</Tag>)}
+                    </Space>
+                  </>
+                )}
+                
+                {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
+                  <>
+                    <Title level={5} style={{ marginTop: '16px', marginBottom: '8px' }}>Specific Findings:</Title>
+                    {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
+                      <div key={`find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
+                        <Text strong>{category}:</Text>
+                        {findings?.strengths && findings.strengths.length > 0 && (
+                          <div style={{ marginTop: '4px' }}>
+                            <Text>Strengths:</Text>
+                            <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
+                              {findings.strengths.map((item, index) => <li key={`str-${catIndex}-${index}`}>{item}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {findings?.weaknesses && findings.weaknesses.length > 0 && (
+                          <div style={{ marginTop: '4px' }}>
+                            <Text>Weaknesses:</Text>
+                            <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
+                              {findings.weaknesses.map((item, index) => <li key={`weak-${catIndex}-${index}`}>{item}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+                
+                {analysis?.feedback && (
+                  <>
+                    <Text strong>Feedback:</Text>
+                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                      {analysis.feedback}
+                    </Paragraph>
+                  </>
+                )}
 
               </Space>
             );
