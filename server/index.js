@@ -67,7 +67,7 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'Test route working!' });
 });
 
-// Builders endpoint (Old Query Logic)
+// Builders endpoint (Re-applying New Task Completion % Logic)
 app.get('/api/builders', async (req, res) => {
   console.log(`Handling request for /api/builders. BigQuery Client Ready: ${!!bigquery}`);
   const startDate = req.query.startDate || '2000-01-01';
@@ -75,14 +75,13 @@ app.get('/api/builders', async (req, res) => {
 
   if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
 
-  // OLD QUERY logic for /api/builders from provided code
+  // QUERY with updated Task Completion %
   const query = `
     WITH BaseMetrics AS (
+        -- Removed task completion fields, kept others
         SELECT
             user_id,
             name,
-            SUM(tasks_completed_today) as total_completed_tasks,
-            SUM(tasks_attempted_today) as total_attempted_tasks,
             SUM(prompts_sent_today) as total_prompts_sent,
             SAFE_DIVIDE(SUM(sum_daily_sentiment_score_today), SUM(count_daily_sentiment_score_today)) as avg_daily_sentiment,
             SAFE_DIVIDE(SUM(sum_peer_feedback_score_today), SUM(count_peer_feedback_score_today)) as avg_peer_feedback_sentiment
@@ -90,17 +89,16 @@ app.get('/api/builders', async (req, res) => {
         WHERE metric_date BETWEEN DATE(@startDate) AND DATE(@endDate)
         GROUP BY user_id, name
     ),
+    -- CTEs for WP/Comp Scores (Keep from previous working version)
     TaskAnalysis AS (
-        SELECT
-            user_id,
-            learning_type,
-            SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score,
-            JSON_EXTRACT_ARRAY(analysis, '$.criteria_met') as criteria_met
+        SELECT user_id, learning_type,
+               SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score,
+               JSON_EXTRACT_ARRAY(analysis, '$.criteria_met') as criteria_met
         FROM \`${taskAnalysisTable}\`
         WHERE curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
           AND learning_type IN ('Work product', 'Key concept')
     ),
-    FilteredTaskAnalysis AS (
+    FilteredTaskAnalysis AS ( 
         SELECT user_id, learning_type, completion_score
         FROM TaskAnalysis
         WHERE completion_score IS NOT NULL AND completion_score != 0
@@ -113,12 +111,44 @@ app.get('/api/builders', async (req, res) => {
     ComprehensionAvg AS (
         SELECT user_id, AVG(completion_score) as avg_comp_score 
         FROM FilteredTaskAnalysis WHERE learning_type = 'Key concept' GROUP BY user_id
+    ),
+    -- NEW CTEs for Task Completion Percentage --
+    EligibleTasksInRange AS (
+        SELECT t.id as task_id, t.deliverable_type
+        FROM \`${tasksTable}\` t
+        LEFT JOIN \`${timeBlocksTable}\` tb ON t.block_id = tb.id
+        LEFT JOIN \`${curriculumDaysTable}\` cd ON tb.day_id = cd.id
+        WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+          AND t.deliverable_type IN ('text', 'link')
+    ),
+    TotalEligibleTaskCount AS (
+        SELECT COUNT(DISTINCT task_id) as total_tasks
+        FROM EligibleTasksInRange
+    ),
+    CompletedTasksByUser AS (
+        SELECT et.task_id, utp.user_id
+        FROM EligibleTasksInRange et
+        JOIN \`${userTaskProgressTable}\` utp ON et.task_id = utp.task_id
+        WHERE et.deliverable_type = 'text' AND utp.status = 'completed'
+        UNION ALL
+        SELECT et.task_id, ts.user_id
+        FROM EligibleTasksInRange et
+        JOIN \`${taskSubmissionsTable}\` ts ON et.task_id = ts.task_id
+        WHERE et.deliverable_type = 'link'
+    ),
+    UserCompletionCounts AS (
+        SELECT user_id, COUNT(DISTINCT task_id) as completed_count
+        FROM CompletedTasksByUser
+        GROUP BY user_id
     )
+    -- Final SELECT joining all CTEs --
     SELECT 
       bm.user_id,
       bm.name,
-      ROUND((bm.total_completed_tasks / NULLIF(bm.total_attempted_tasks, 0)) * 100, 2) as tasks_completed_percentage, // Using old task % logic
+      -- Calculate New Task Completion Percentage (Rounded to 0) --
+      ROUND((COALESCE(ucc.completed_count, 0) / NULLIF(tetc.total_tasks, 0)) * 100, 0) as tasks_completed_percentage,
       bm.total_prompts_sent as prompts_sent,
+      -- Other fields (Sentiment, WP/Comp Scores) from previous working query
       CASE 
         WHEN bm.avg_daily_sentiment IS NULL THEN NULL
         WHEN bm.avg_daily_sentiment >= 0.6 THEN 'Very Positive'
@@ -135,11 +165,13 @@ app.get('/api/builders', async (req, res) => {
         WHEN bm.avg_peer_feedback_sentiment >= -0.6 THEN 'Negative'
         ELSE 'Very Negative'
       END as peer_feedback_sentiment,
-      ROUND(wp.avg_wp_score, 2) as work_product_score, // Back to 0-1 scale
-      ROUND(comp.avg_comp_score, 2) as comprehension_score // Back to 0-1 scale
+      ROUND(wp.avg_wp_score, 2) as work_product_score,
+      ROUND(comp.avg_comp_score, 2) as comprehension_score
     FROM BaseMetrics bm
     LEFT JOIN WorkProductAvg wp ON bm.user_id = wp.user_id
     LEFT JOIN ComprehensionAvg comp ON bm.user_id = comp.user_id
+    LEFT JOIN UserCompletionCounts ucc ON bm.user_id = ucc.user_id
+    CROSS JOIN TotalEligibleTaskCount tetc -- Need total count for calculation
   `;
 
   const options = { query, location: BIGQUERY_LOCATION, params: { startDate, endDate } };
@@ -151,7 +183,7 @@ app.get('/api/builders', async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error(`Error in ${req.path}:`, error);
-    logger.error('Error executing BigQuery builders query', { /* ... */ });
+    logger.error(`Error executing BigQuery query for ${req.path}`, { error: error.message, stack: error.stack, query: options.query }); 
     res.status(500).json({ error: 'Failed to fetch builder data' });
   }
 });
@@ -405,74 +437,77 @@ app.get('/api/sentiment/details', async (req, res) => {
   }
 });
 
-app.get('/api/grades/distribution', async (req, res) => {
+// Restore /api/overview/grade-distribution endpoint (filters by type, groups by grade)
+app.get('/api/overview/grade-distribution', async (req, res) => {
   console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
-  const { startDate, endDate } = req.query;
-  if (!startDate || !endDate || !bigquery) return res.status(400).json({ error: 'Missing parameters or BQ client issue' });
+  const { startDate, endDate, learningType } = req.query; // Add learningType back
 
-  // OLD QUERY logic (using task_responses)
+  // Add back validation for all params
+  if (!startDate || !endDate || !learningType || !bigquery) {
+      return res.status(400).json({ error: 'Missing required parameters or BQ client issue' });
+  }
+  if (!['Work product', 'Key concept'].includes(learningType)) {
+      return res.status(400).json({ error: 'Invalid learningType' });
+  }
+
   const query = `
-    SELECT t.id as task_id, t.task_title, CAST(tr.scores AS FLOAT64) as score, cd.day_date as task_date
-    FROM \`${taskResponsesTable}\` tr
-    JOIN \`${tasksTable}\` t ON CAST(tr.task_id AS STRING) = CAST(t.id AS STRING)
-    LEFT JOIN \`${timeBlocksTable}\` tb ON t.block_id = tb.id
-    LEFT JOIN \`${curriculumDaysTable}\` cd ON tb.day_id = cd.id
-    WHERE tr.grading_timestamp BETWEEN TIMESTAMP(@startDate) AND TIMESTAMP(@endDate)
-      AND tr.scores IS NOT NULL
+    WITH ValidTasks AS (
+        SELECT SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score
+        FROM \`${taskAnalysisTable}\` tar
+        WHERE tar.curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+          AND tar.learning_type = @learningType -- Filter by learning type
+          -- Filter out invalid tasks --
+          AND SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) IS NOT NULL
+          AND SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) != 0
+          AND NOT (
+              JSON_EXTRACT_ARRAY(analysis, '$.criteria_met') IS NOT NULL AND 
+              ARRAY_LENGTH(JSON_EXTRACT_ARRAY(analysis, '$.criteria_met')) = 1 AND 
+              JSON_VALUE(JSON_EXTRACT_ARRAY(analysis, '$.criteria_met')[OFFSET(0)]) = 'Submission received'
+          )
+    ),
+    GradedTasks AS (
+        SELECT
+            CASE 
+                WHEN completion_score >= 93 THEN 'A+'
+                WHEN completion_score >= 85 THEN 'A'
+                WHEN completion_score >= 80 THEN 'A-'
+                WHEN completion_score >= 70 THEN 'B+'
+                WHEN completion_score >= 60 THEN 'B'
+                WHEN completion_score >= 50 THEN 'B-'
+                WHEN completion_score >= 40 THEN 'C+'
+                ELSE 'C'
+            END as grade
+        FROM ValidTasks vt
+    )
+    SELECT 
+        grade,
+        COUNT(*) as count
+    FROM GradedTasks gt
+    GROUP BY grade -- Group only by grade
+    ORDER BY 
+        CASE grade 
+            WHEN 'A+' THEN 1 WHEN 'A' THEN 2 WHEN 'A-' THEN 3 
+            WHEN 'B+' THEN 4 WHEN 'B' THEN 5 WHEN 'B-' THEN 6 
+            WHEN 'C+' THEN 7 WHEN 'C' THEN 8 ELSE 9 
+        END -- Order grades logically
   `;
-  const options = { query, location: BIGQUERY_LOCATION, params: { startDate, endDate } };
+
+  const options = { query, location: BIGQUERY_LOCATION, params: { startDate, endDate, learningType } }; // Pass learningType
+
   try {
-    console.log(`Executing BigQuery query for ${req.path}...`);
+    console.log(`Executing BigQuery query for ${req.path} (Type: ${learningType})...`);
     const [rows] = await bigquery.query(options);
-    console.log(`Query for ${req.path} finished. Row count: ${rows.length}`);
-    res.json(rows);
+    console.log(`Query for ${req.path} (Type: ${learningType}) finished. Row count: ${rows.length}`);
+    res.json(rows); // Returns array like [{ grade: 'A', count: 25 }, ...]
   } catch (error) {
-    console.error(`Error in ${req.path}:`, error);
-    logger.error('Error fetching grade distribution data', { error: error.message, stack: error.stack });
+    console.error(`Error in ${req.path} (Type: ${learningType}):`, error);
+    logger.error('Error executing BigQuery grade distribution query', { error: error.message, stack: error.stack, learningType: learningType });
     res.status(500).json({ error: 'Failed to fetch grade distribution data' });
   }
 });
 
-app.get('/api/grades/submissions', async (req, res) => {
-  console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
-  const { task_title, task_date, grade } = req.query;
-  if (!task_title || !task_date || !grade || !bigquery) return res.status(400).json({ error: 'Missing parameters or BQ client issue' });
-
-  // Grade mapping logic remains the same
-  const gradeScoreRanges = { 'A+': { min: 0.9, max: 1.0 }, /* ...other grades... */ 'C': { min: 0.0, max: 0.5 }, 'F': { min: -1.0, max: 0.0 } };
-  const range = gradeScoreRanges[grade];
-  if (!range) return res.status(400).json({ error: 'Invalid grade parameter' });
-
-  // OLD QUERY logic
-  const query = `
-    WITH TaskInfo AS (
-      SELECT t.id FROM \`${tasksTable}\` t
-      LEFT JOIN \`${timeBlocksTable}\` tb ON t.block_id = tb.id
-      LEFT JOIN \`${curriculumDaysTable}\` cd ON tb.day_id = cd.id
-      WHERE t.task_title = @task_title AND DATE(cd.day_date) = DATE(@task_date) LIMIT 1
-    )
-    SELECT tr.user_id, tr.scores, tr.feedback, tr.response_content, tr.grading_timestamp, CONCAT(u.first_name, ' ', u.last_name) as user_name
-    FROM \`${taskResponsesTable}\` tr
-    JOIN TaskInfo ON CAST(tr.task_id AS STRING) = CAST(TaskInfo.id AS STRING)
-    LEFT JOIN \`${usersTable}\` u ON tr.user_id = u.user_id
-    WHERE tr.scores IS NOT NULL
-      AND CAST(tr.scores AS FLOAT64) >= @min_score
-      AND CAST(tr.scores AS FLOAT64) < @max_score
-      ${grade === 'A+' ? 'OR CAST(tr.scores AS FLOAT64) = 1.0' : ''}
-    ORDER BY tr.user_id
-  `;
-  const options = { query, location: BIGQUERY_LOCATION, params: { task_title, task_date, grade, min_score: range.min, max_score: range.max } };
-  try {
-    console.log(`Executing BigQuery query for ${req.path}...`);
-    const [rows] = await bigquery.query(options);
-    console.log(`Query for ${req.path} finished. Row count: ${rows.length}`);
-    res.json(rows);
-  } catch (error) {
-    console.error(`Error in ${req.path}:`, error);
-    logger.error('Error fetching grade submission details', { error: error.message, stack: error.stack });
-    res.status(500).json({ error: 'Failed to fetch grade submission details' });
-  }
-});
+// Remove the older /api/grades/distribution endpoint if it exists
+// ... ensure the old endpoint is removed or commented out ...
 
 // Restore static serving and fallback
 const frontendDistPath = path.resolve(__dirname, '../dist');

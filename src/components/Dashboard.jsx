@@ -168,7 +168,7 @@ const PilotOverview = () => {
   const [selectedDailySentCategory, setSelectedDailySentCategory] = useState('');
   const dailySentimentChartRef = React.useRef(); // Ref for the daily sentiment chart
 
-  // State for Grade Distribution Charts (Separate states)
+  // State for Grade Distribution Charts (Separate states again)
   const [workProductGradeDistData, setWorkProductGradeDistData] = useState(null); 
   const [comprehensionGradeDistData, setComprehensionGradeDistData] = useState(null); 
   const [gradeDistLoading, setGradeDistLoading] = useState(false);
@@ -226,7 +226,7 @@ const PilotOverview = () => {
     fetchTrends();
   }, [trendDateRange]);
 
-  // Modified useEffect for Grade Distribution
+  // useEffect for Grade Distribution (Fetch separately)
   useEffect(() => {
     const fetchAllGradeDistributions = async () => {
       if (!trendDateRange || trendDateRange.length !== 2) return;
@@ -240,16 +240,14 @@ const PilotOverview = () => {
       const endDate = trendDateRange[1].format('YYYY-MM-DD');
 
       try {
-        // Fetch Work Product Grades
+        // Fetch Work Product Grades using the correct endpoint
         const wpResponse = await fetchData('overview/grade-distribution', { startDate, endDate, learningType: 'Work product' });
         if (!wpResponse) throw new Error('No data returned for Work Product grade distribution');
-        console.log("[Debug] Raw WP Grade Dist Data:", wpResponse);
         setWorkProductGradeDistData(processGradeDistributionData(wpResponse));
 
-        // Fetch Comprehension Grades
+        // Fetch Comprehension Grades using the correct endpoint
         const compResponse = await fetchData('overview/grade-distribution', { startDate, endDate, learningType: 'Key concept' });
         if (!compResponse) throw new Error('No data returned for Comprehension grade distribution');
-        console.log("[Debug] Raw Comp Grade Dist Data:", compResponse);
         setComprehensionGradeDistData(processGradeDistributionData(compResponse));
 
       } catch (error) {
@@ -263,79 +261,42 @@ const PilotOverview = () => {
     fetchAllGradeDistributions();
   }, [trendDateRange]);
 
-  // Keep processGradeDistributionData helper (it works for both)
+  // Helper function to process grade distribution data for simple bar chart
   const processGradeDistributionData = (apiData) => {
-    // Group counts by task_title, then by grade
-    const gradesByTask = apiData.reduce((acc, item) => {
-      const taskTitle = item.task_title || 'Unknown Task';
-      const grade = item.grade;
-      const count = item.count || 0;
+      const gradeCounts = gradeCategories.reduce((acc, grade) => {
+        acc[grade] = 0;
+        return acc;
+      }, {});
 
-      if (!acc[taskTitle]) {
-        acc[taskTitle] = {};
-        gradeCategories.forEach(g => { acc[taskTitle][g] = 0; }); // Initialize all grades for the task
-      }
-      if (gradeCategories.includes(grade)) {
-         acc[taskTitle][grade] = count; // Assign the count for this grade
-      }
-      return acc;
-    }, {});
+      apiData.forEach(item => {
+        if (gradeCounts.hasOwnProperty(item.grade)) {
+          gradeCounts[item.grade] = item.count;
+        }
+      });
 
-    const taskLabels = Object.keys(gradesByTask).sort(); // Sort task titles alphabetically if desired
-
-    // Create a dataset for each grade category
-    const datasets = gradeCategories.map(grade => ({
-      label: grade,
-      data: taskLabels.map(task => gradesByTask[task][grade] || 0), // Get count for this task/grade
-      backgroundColor: gradeColors[grade] || '#adb5bd'
-    }));
-
-    return {
-      labels: taskLabels,
-      datasets: datasets
-    };
+      return {
+          labels: gradeCategories, // Use predefined sorted grade categories as labels
+          datasets: [{
+              label: 'Count',
+              data: gradeCategories.map(grade => gradeCounts[grade]),
+              backgroundColor: gradeCategories.map(grade => gradeColors[grade] || '#adb5bd'),
+          }]
+      };
   };
 
-  // Keep gradeChartOptions (pass title dynamically)
-  const gradeChartOptions = (title) => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'right',
+  // Simple Bar Chart Options
+  const gradeDistributionBarOptions = (title) => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: title },
+        tooltip: { callbacks: { label: function(context) { return `Count: ${context.parsed.y}`; } } }
       },
-      title: {
-        display: true,
-        text: title // Use dynamic title
-      },
-      tooltip: {
-        mode: 'index', 
-        intersect: false,
+      scales: {
+        x: { title: { display: true, text: 'Grade' } },
+        y: { beginAtZero: true, title: { display: true, text: 'Number of Tasks' }, ticks: { stepSize: 1 } }
       }
-    },
-    scales: {
-      x: {
-        stacked: true, // Enable stacking
-        title: {
-            display: true,
-            text: 'Task Title'
-        },
-        ticks: { // Optional: shorten labels if needed
-             callback: function(value, index, values) {
-                const label = this.getLabelForValue(value);
-                return label.length > 25 ? label.substring(0, 22) + '...' : label;
-            }
-        }
-      },
-      y: {
-        stacked: true, // Enable stacking
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Number of Assessments'
-        }
-      }
-    }
   });
 
   // --- Click Handlers for Charts --- //
@@ -492,19 +453,19 @@ const PilotOverview = () => {
         )}
       </Card>
 
-      {/* Grade Distribution Section (Now two charts) */}
+      {/* Grade Distribution Section (Two Charts) */}
       <Card style={{ marginBottom: '24px' }}>
-         <Title level={4} style={{ margin: 0, marginBottom: '16px' }}>Grade Distributions per Task</Title>
+         <Title level={4} style={{ margin: 0, marginBottom: '16px' }}>Overall Grade Distributions</Title>
          {gradeDistLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
          {gradeDistError && <Alert message="Error loading grade distributions" description={gradeDistError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
          {!gradeDistLoading && !gradeDistError && (
            <Row gutter={[16, 16]}>
               {/* Work Product Grade Chart */}
               <Col xs={24} md={12}>
-                <div style={{ ...chartContainer, height: '450px' }}>
+                <div style={{ ...chartContainer, height: '400px' }}>
                   {workProductGradeDistData && workProductGradeDistData.labels.length > 0 ? (
                       <Bar 
-                        options={gradeChartOptions('Work Product Grade Distribution')} 
+                        options={gradeDistributionBarOptions('Work Product Grades')} 
                         data={workProductGradeDistData} 
                       />
                   ) : (
@@ -514,10 +475,10 @@ const PilotOverview = () => {
               </Col>
               {/* Comprehension Grade Chart */}
               <Col xs={24} md={12}>
-                 <div style={{ ...chartContainer, height: '450px' }}>
+                 <div style={{ ...chartContainer, height: '400px' }}>
                    {comprehensionGradeDistData && comprehensionGradeDistData.labels.length > 0 ? (
                       <Bar 
-                        options={gradeChartOptions('Comprehension Grade Distribution')} 
+                        options={gradeDistributionBarOptions('Comprehension Grades')} 
                         data={comprehensionGradeDistData} 
                       />
                    ) : (
