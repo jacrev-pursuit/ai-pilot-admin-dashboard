@@ -452,7 +452,9 @@ app.get('/api/overview/grade-distribution', async (req, res) => {
 
   const query = `
     WITH ValidTasks AS (
-        SELECT SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score
+        SELECT
+            tar.task_id,
+            SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score
         FROM \`${taskAnalysisTable}\` tar
         WHERE tar.curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
           AND tar.learning_type = @learningType -- Filter by learning type
@@ -466,7 +468,9 @@ app.get('/api/overview/grade-distribution', async (req, res) => {
           )
     ),
     GradedTasks AS (
+        -- Assign letter grades based on 0-100 score
         SELECT
+            vt.task_id,
             CASE 
                 WHEN completion_score >= 93 THEN 'A+'
                 WHEN completion_score >= 85 THEN 'A'
@@ -479,17 +483,15 @@ app.get('/api/overview/grade-distribution', async (req, res) => {
             END as grade
         FROM ValidTasks vt
     )
+    -- Final count aggregation by task and grade --
     SELECT 
-        grade,
+        t.task_title, 
+        gt.grade,
         COUNT(*) as count
     FROM GradedTasks gt
-    GROUP BY grade -- Group only by grade
-    ORDER BY 
-        CASE grade 
-            WHEN 'A+' THEN 1 WHEN 'A' THEN 2 WHEN 'A-' THEN 3 
-            WHEN 'B+' THEN 4 WHEN 'B' THEN 5 WHEN 'B-' THEN 6 
-            WHEN 'C+' THEN 7 WHEN 'C' THEN 8 ELSE 9 
-        END -- Order grades logically
+    JOIN \`${tasksTable}\` t ON gt.task_id = t.id -- Join to get task title
+    GROUP BY t.task_title, gt.grade -- Group by both
+    -- ORDER BY t.task_title -- Optional ordering if needed
   `;
 
   const options = { query, location: BIGQUERY_LOCATION, params: { startDate, endDate, learningType } }; // Pass learningType
