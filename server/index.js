@@ -40,17 +40,20 @@ app.get('/api/builders', async (req, res) => {
   const endDate = req.query.endDate || '2100-12-31';
   
   const metricsTable = `${PROJECT_ID}.${DATASET}.daily_builder_metrics`;
-  const taskAnalysisTable = `${PROJECT_ID}.${DATASET}.task_analysis_results`;
+  const tasksTable = `${PROJECT_ID}.${DATASET}.tasks`;
+  const curriculumDaysTable = `${PROJECT_ID}.${DATASET}.curriculum_days`;
+  const timeBlocksTable = `${PROJECT_ID}.${DATASET}.time_blocks`;
+  const userTaskProgressTable = `${PROJECT_ID}.${DATASET}.user_task_progress`;
+  const taskSubmissionsTable = `${PROJECT_ID}.${DATASET}.task_submissions`;
+  const taskAnalysisTable = `${PROJECT_ID}.${DATASET}.task_analysis_results`; // Needed for WP/Comp
 
-  // Updated Query using task_analysis_results for WP and Comp scores
+  // New Query with revised Task Completion % logic
   const query = `
     WITH BaseMetrics AS (
-        -- Keep calculations for Task%, Prompts, Daily Sentiment, Peer Sentiment
+        -- Calculates basic metrics and averages EXCEPT task completion %
         SELECT
             user_id,
             name,
-            SUM(tasks_completed_today) as total_completed_tasks,
-            SUM(tasks_attempted_today) as total_attempted_tasks,
             SUM(prompts_sent_today) as total_prompts_sent,
             SAFE_DIVIDE(SUM(sum_daily_sentiment_score_today), SUM(count_daily_sentiment_score_today)) as avg_daily_sentiment,
             SAFE_DIVIDE(SUM(sum_peer_feedback_score_today), SUM(count_peer_feedback_score_today)) as avg_peer_feedback_sentiment
@@ -58,51 +61,72 @@ app.get('/api/builders', async (req, res) => {
         WHERE metric_date BETWEEN DATE(@startDate) AND DATE(@endDate)
         GROUP BY user_id, name
     ),
-    TaskAnalysis AS (
-        -- Extract scores and criteria from task_analysis_results
+    TaskAnalysis AS ( -- Keep for WP/Comp scores
         SELECT
             user_id,
             learning_type,
             SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score,
-            JSON_EXTRACT_ARRAY(analysis, '$.criteria_met') as criteria_met -- Extract criteria
+            JSON_EXTRACT_ARRAY(analysis, '$.criteria_met') as criteria_met
         FROM \`${taskAnalysisTable}\`
         WHERE curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
           AND learning_type IN ('Work product', 'Key concept')
-          -- No score/criteria filtering here yet
     ),
-    FilteredTaskAnalysis AS ( -- Add a new CTE to apply filtering
-        SELECT
-            user_id,
-            learning_type,
-            completion_score
+    FilteredTaskAnalysis AS ( -- Keep for WP/Comp scores
+        SELECT user_id, learning_type, completion_score
         FROM TaskAnalysis
-        WHERE
-          -- Exclude NULL (F grade) and 0 (Doc Access Error) scores
-          completion_score IS NOT NULL
-          AND completion_score != 0
-          -- Exclude "Tech issue" (criteria_met = ["Submission received"])
-          AND NOT (\n            criteria_met IS NOT NULL AND -- Ensure criteria_met exists and is an array\n            ARRAY_LENGTH(criteria_met) = 1 AND\n            JSON_VALUE(criteria_met[OFFSET(0)]) = \'Submission received\' -- Safer comparison\n          )\n    ),
-    WorkProductAvg AS (
-        -- Calculate average Work Product score from filtered data
-        SELECT
-            user_id,
-            AVG(completion_score) as avg_wp_score \n        FROM FilteredTaskAnalysis -- Use filtered data
-        WHERE learning_type = 'Work product'
-        GROUP BY user_id
+        WHERE completion_score IS NOT NULL AND completion_score != 0
+          AND NOT (criteria_met IS NOT NULL AND ARRAY_LENGTH(criteria_met) = 1 AND JSON_VALUE(criteria_met[OFFSET(0)]) = 'Submission received')
     ),
-    ComprehensionAvg AS (
-        -- Calculate average Comprehension score from filtered data
-        SELECT
-            user_id,
-            AVG(completion_score) as avg_comp_score \n        FROM FilteredTaskAnalysis -- Use filtered data
-        WHERE learning_type = 'Key concept'
+    WorkProductAvg AS ( -- Keep for WP/Comp scores
+        SELECT user_id, AVG(completion_score) as avg_wp_score 
+        FROM FilteredTaskAnalysis WHERE learning_type = 'Work product' GROUP BY user_id
+    ),
+    ComprehensionAvg AS ( -- Keep for WP/Comp scores
+        SELECT user_id, AVG(completion_score) as avg_comp_score 
+        FROM FilteredTaskAnalysis WHERE learning_type = 'Key concept' GROUP BY user_id
+    ),
+    -- NEW CTEs for Task Completion Percentage --
+    EligibleTasksInRange AS (
+        -- Find all tasks within the selected date range, EXCLUDING type 'none'
+        SELECT t.id as task_id, t.deliverable_type
+        FROM \`${tasksTable}\` t
+        LEFT JOIN \`${timeBlocksTable}\` tb ON t.block_id = tb.id
+        LEFT JOIN \`${curriculumDaysTable}\` cd ON tb.day_id = cd.id
+        WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+          AND t.deliverable_type IN ('text', 'link') -- Exclude 'none' type
+    ),
+    TotalEligibleTaskCount AS (
+        -- Count total distinct eligible tasks in the range
+        SELECT COUNT(DISTINCT task_id) as total_tasks
+        FROM EligibleTasksInRange
+    ),
+    CompletedTasksByUser AS (
+        -- Find tasks completed by each user within the range
+        SELECT et.task_id, utp.user_id
+        FROM EligibleTasksInRange et
+        JOIN \`${userTaskProgressTable}\` utp ON et.task_id = utp.task_id
+        WHERE et.deliverable_type = 'text' AND utp.status = 'completed'
+        UNION ALL
+        SELECT et.task_id, ts.user_id
+        FROM EligibleTasksInRange et
+        JOIN \`${taskSubmissionsTable}\` ts ON et.task_id = ts.task_id
+        WHERE et.deliverable_type = 'link'
+        -- Note: This assumes any submission counts as complete for link tasks
+    ),
+    UserCompletionCounts AS (
+        -- Count distinct completed tasks per user
+        SELECT 
+            user_id, 
+            COUNT(DISTINCT task_id) as completed_count
+        FROM CompletedTasksByUser
         GROUP BY user_id
     )
-    -- Final SELECT joining all CTEs
+    -- Final SELECT joining all CTEs --
     SELECT 
       bm.user_id,
       bm.name,
-      ROUND((bm.total_completed_tasks / NULLIF(bm.total_attempted_tasks, 0)) * 100, 2) as tasks_completed_percentage,
+      -- Calculate New Task Completion Percentage --
+      ROUND((COALESCE(ucc.completed_count, 0) / NULLIF(tetc.total_tasks, 0)) * 100, 0) as tasks_completed_percentage,
       bm.total_prompts_sent as prompts_sent,
       -- Daily Sentiment (from BaseMetrics)
       CASE 
@@ -122,13 +146,14 @@ app.get('/api/builders', async (req, res) => {
         WHEN bm.avg_peer_feedback_sentiment >= -0.6 THEN 'Negative'
         ELSE 'Very Negative'
       END as peer_feedback_sentiment,
-      -- Work Product Score (Normalized and Rounded)
-      ROUND(wp.avg_wp_score, 2) as work_product_score,
-      -- Comprehension Score (Normalized and Rounded)
-      ROUND(comp.avg_comp_score, 2) as comprehension_score
+      -- Work Product & Comprehension Scores (from existing CTEs, scaled to 0-100)
+      ROUND(wp.avg_wp_score * 100, 0) as work_product_score, -- Multiply by 100 and round
+      ROUND(comp.avg_comp_score * 100, 0) as comprehension_score -- Multiply by 100 and round
     FROM BaseMetrics bm
     LEFT JOIN WorkProductAvg wp ON bm.user_id = wp.user_id
     LEFT JOIN ComprehensionAvg comp ON bm.user_id = comp.user_id
+    LEFT JOIN UserCompletionCounts ucc ON bm.user_id = ucc.user_id
+    CROSS JOIN TotalEligibleTaskCount tetc -- Get the total count for calculation
   `;
 
   const options = {
@@ -199,14 +224,21 @@ app.get('/api/builders/:userId/details', async (req, res) => {
   `;
 
   if (type === 'workProduct') {
-    query = baseQuery + `
-      AND tar.learning_type = 'Work product'
-      ORDER BY tar.curriculum_date DESC
+    // Temporarily REMOVE filtering to debug - Fetch all WP tasks for user/date
+    query = `
+      WITH RelevantTasks AS (
+        ${baseQuery} AND tar.learning_type = 'Work product'
+      )
+      SELECT * 
+      FROM RelevantTasks
+      ORDER BY date DESC -- Keep original ordering
     `;
   } else if (type === 'comprehension') {
+    // Add similar filtering for comprehension if needed, or keep as is
     query = baseQuery + `
       AND tar.learning_type = 'Key concept'
-      ORDER BY tar.curriculum_date DESC
+      -- Optional: Add filtering for comprehension here if desired
+      ORDER BY tar.curriculum_date DESC 
     `;
   } else if (type === 'peer_feedback') {
     // Keep existing peer_feedback logic

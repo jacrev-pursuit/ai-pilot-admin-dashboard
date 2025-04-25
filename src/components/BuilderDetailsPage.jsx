@@ -14,10 +14,13 @@ import {
   Title as ChartTitle, // Renamed to avoid conflict with Typography.Title
   Tooltip,
   Legend,
+  Filler, // Import Filler plugin
 } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation'; // Import the plugin
 import { baseChartOptions, chartContainer, chartColors } from './ChartStyles';
 import { Bar } from 'react-chartjs-2';
+// Import the correct grading utils
+import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
 
 // Add/Update CSS for highlighting - More specific selector
 const styleSheet = document.styleSheets[0];
@@ -49,10 +52,11 @@ ChartJS.register(
   ChartTitle,
   Tooltip,
   Legend,
-  annotationPlugin // Register the plugin
+  annotationPlugin, // Register the annotation plugin
+  Filler // Register the Filler plugin
 );
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -66,31 +70,6 @@ const parseAnalysis = (analysisString) => {
     // console.error("Failed to parse analysis JSON:", error, "String:", analysisString);
     return null;
   }
-};
-
-// --- Grade Helper Functions (Copied from BuilderView) ---
-const getLetterGrade = (score) => {
-  if (score === null || score === undefined) return 'F';
-  const numScore = parseFloat(score);
-  if (isNaN(numScore)) return 'F';
-  if (numScore >= 0.9) return 'A+';
-  if (numScore >= 0.8) return 'A';
-  if (numScore >= 0.75) return 'A-';
-  if (numScore >= 0.7) return 'B+';
-  if (numScore >= 0.6) return 'B';
-  if (numScore >= 0.55) return 'B-';
-  if (numScore >= 0.5) return 'C+';
-  return 'C';
-};
-
-const getGradeColor = (grade) => {
-  if (grade === 'N/A') return 'default';
-  const firstChar = grade.charAt(0);
-  if (firstChar === 'A') return 'green';
-  if (firstChar === 'B') return 'cyan';
-  if (firstChar === 'C') return 'orange';
-  if (firstChar === 'D' || firstChar === 'F') return 'red';
-  return 'default';
 };
 
 // Helper function to map score to a sentiment label
@@ -699,7 +678,11 @@ const BuilderDetailsPage = () => {
   const [selectedBuilderId, setSelectedBuilderId] = useState(builderId || null);
   const [selectedBuilderName, setSelectedBuilderName] = useState('');
   
-  const [dateRange, setDateRange] = useState([dayjs().subtract(30, 'day'), dayjs()]);
+  // Set default date range: 3/15/2025 to today
+  const [dateRange, setDateRange] = useState([
+    dayjs('2025-03-15'), // Start date
+    dayjs() // End date (today)
+  ]);
   const [activeTab, setActiveTab] = useState('workProduct');
   
   const [workProductData, setWorkProductData] = useState([]);
@@ -960,13 +943,21 @@ const BuilderDetailsPage = () => {
 
   // Define columns for each table
   const workProductColumns = [
-    { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '15%' },
-    { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => d ? dayjs(d?.value || d).format('YYYY-MM-DD') : 'N/A', width: '15%' },
-    // Feedback column needs to parse analysis
-    { title: 'Feedback', key: 'feedback', width: '50%', render: (_, record) => {
+    { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '25%' }, // Adjusted width
+    { 
+      title: 'Date', 
+      dataIndex: 'date', 
+      key: 'date', 
+      render: (d) => d ? dayjs(d?.value || d).format('MMMM D') : 'N/A', // Updated format
+      width: '15%' // Adjusted width
+    }, 
+    { 
+      title: 'Feedback', 
+      key: 'feedback', 
+      width: '35%', // Adjusted width
+      render: (_, record) => { 
         const analysis = parseAnalysis(record.analysis);
         const feedback = analysis?.feedback;
-        // Add checks for special feedback tags if needed (like in modal)
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
         const criteria = analysis?.criteria_met;
@@ -976,25 +967,21 @@ const BuilderDetailsPage = () => {
       } 
     },
     { 
-      title: 'Score', 
-      key: 'scores', 
-      width: '10%',
+      title: 'Grade', // Renamed from Score
+      key: 'grade', // Changed key 
+      width: '10%', // Adjusted width
       render: (_, record) => { // Parse analysis for score
         const analysis = parseAnalysis(record.analysis);
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
-        return (
-          <Space>
-            <span>{score?.toFixed(2) ?? 'N/A'}</span> {/* Display numeric score */} 
-            <Tag color={getGradeColor(grade)}>{grade}</Tag>
-          </Space>
-        );
+        // Only return the Tag
+        return <Tag color={getGradeColor(grade)}>{grade}</Tag>; 
       }
     },
-    {
+    { 
       title: 'Actions',
       key: 'actions',
-      width: '10%',
+      width: '15%', // Adjusted width
       render: (_, record) => (
         <Button size="small" onClick={() => showWorkProductDetails(record)}>
           View Details
@@ -1361,28 +1348,98 @@ const BuilderDetailsPage = () => {
 
       {/* Work Product Details Modal */}
       <Modal
-        title={selectedWorkProduct?.task_title || "Work Product Details"}
+        title="Work Product Details" 
         open={workProductModalVisible}
         onCancel={hideWorkProductDetails}
         footer={[
-          <Button key="close" onClick={hideWorkProductDetails}>
+          <Button key="back" onClick={hideWorkProductDetails}>
             Close
           </Button>,
         ]}
-        width={800} // Make modal wider
+        width={800} // Adjusted width
       >
-        {selectedWorkProduct && (
-          <div>
-            <h4>Response Content:</h4>
-            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#f0f0f0', padding: '10px', borderRadius: '4px' }}>
-              {selectedWorkProduct.response_content}
-            </pre>
-            <h4 style={{ marginTop: '16px' }}>Feedback:</h4>
-            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#f0f0f0', padding: '10px', borderRadius: '4px' }}>
-              {selectedWorkProduct.feedback}
-            </pre>
-          </div>
-        )}
+        {selectedWorkProduct && ( // Ensure record exists
+          () => { // Use function to parse safely
+            const analysis = parseAnalysis(selectedWorkProduct.analysis);
+            return (
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Title level={4}>{selectedWorkProduct.task_title || 'Task Details'}</Title>
+                
+                {analysis?.submission_summary && (
+                  <> 
+                    <Text strong>Submission Summary:</Text>
+                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                      {analysis.submission_summary}
+                    </Paragraph>
+                  </>
+                )}
+
+                {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
+                  <Text strong>Score: {analysis.completion_score}</Text>
+                )}
+                
+                {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
+                  <>
+                    <Text strong>Criteria Met:</Text>
+                    <Space wrap size={[4, 8]}>
+                      {analysis.criteria_met.map((item, index) => <Tag color="green" key={`crit-${index}`}>{item}</Tag>)}
+                    </Space>
+                  </>
+                )}
+
+                {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
+                  <>
+                    <Text strong>Areas for Improvement:</Text>
+                    <Space wrap size={[4, 8]}>
+                      {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`area-${index}`}>{item}</Tag>)}
+                    </Space>
+                  </>
+                )}
+
+                {/* --- Specific Findings Section --- */}
+                {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
+                  <>
+                    <Title level={5} style={{ marginTop: '16px', marginBottom: '8px' }}>Specific Findings:</Title>
+                    {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
+                      <div key={`find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
+                        <Text strong>{category}:</Text>
+                        {findings?.strengths && findings.strengths.length > 0 && (
+                          <div style={{ marginTop: '4px' }}>
+                            <Text>Strengths:</Text>
+                            <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
+                              {findings.strengths.map((item, index) => <li key={`str-${catIndex}-${index}`}>{item}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {findings?.weaknesses && findings.weaknesses.length > 0 && (
+                          <div style={{ marginTop: '4px' }}>
+                            <Text>Weaknesses:</Text>
+                            <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
+                              {findings.weaknesses.map((item, index) => <li key={`weak-${catIndex}-${index}`}>{item}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+                {/* --- End Specific Findings --- */}
+                
+                {analysis?.feedback && (
+                  <>
+                    <Text strong>Feedback:</Text>
+                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                      {analysis.feedback}
+                    </Paragraph>
+                  </>
+                )}
+                
+                {/* Add Strengths/Weaknesses parsing later if needed */}
+
+              </Space>
+            );
+          })()
+        }
       </Modal>
     </div>
   );
