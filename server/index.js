@@ -238,13 +238,13 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         fd.feedback,
         fd.sentiment_score,
         fd.sentiment_category as sentiment_label,
-        u.name as reviewer_name,
+        CONCAT(u.first_name, ' ', u.last_name) as reviewer_name,
         fd.summary,
         fd.from_user_id,
-        fd.timestamp -- Keep original submission timestamp for info?
-        -- fd.analysis_date -- Return the date used for filtering
+        fd.timestamp
       FROM feedback_data fd
-      LEFT JOIN \`${usersTable}\` u ON fd.from_user_id = u.id
+      LEFT JOIN \`${usersTable}\` u 
+        ON fd.from_user_id = u.user_id
       ORDER BY fd.timestamp DESC
     `;
   } else if (type === 'prompts') {
@@ -262,20 +262,34 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         ORDER BY 1 ASC
       `;
   } else if (type === 'sentiment') {
-      // Query for daily sentiment details
-      const dailyMetricsTable = `${PROJECT_ID}.${DATASET}.daily_builder_metrics`;
+      // Correct Query: Use sentiment_results and outliers, aggregate reasons
+      const resultsTable = `${PROJECT_ID}.${DATASET}.sentiment_results`;
+      const outliersTable = `${PROJECT_ID}.${DATASET}.sentiment_sentence_outliers`;
       query = `
-          SELECT 
-            metric_date as date,
-            daily_sentiment_score as sentiment_score,
-            daily_sentiment_reason as sentiment_reason
-            -- Exclude rows where reason is null or empty?
-            -- WHERE daily_sentiment_reason IS NOT NULL AND daily_sentiment_reason != ''
-          FROM \`${dailyMetricsTable}\`
+        WITH DailyOutliers AS (
+          SELECT
+            user_id,
+            date,
+            STRING_AGG(sentence_text, '; ') AS daily_sentiment_reasons -- Aggregate sentences
+          FROM \`${outliersTable}\`
           WHERE user_id = CAST(@userId AS INT64)
-            AND metric_date BETWEEN @startDate AND @endDate
-            AND daily_sentiment_score IS NOT NULL -- Only show days with a score
-          ORDER BY metric_date ASC
+            AND date BETWEEN DATE(@startDate) AND DATE(@endDate)
+          GROUP BY user_id, date
+        )
+        SELECT 
+          sr.date, -- Use sr.date as date
+          sr.sentiment_score, -- Use sr.sentiment_score as sentiment_score
+          sr.sentiment_category, 
+          sr.message_count,
+          do.daily_sentiment_reasons AS sentiment_reason -- Alias aggregated reasons
+        FROM \`${resultsTable}\` sr
+        LEFT JOIN DailyOutliers do
+          ON sr.user_id = do.user_id
+          AND sr.date = do.date
+        WHERE sr.user_id = CAST(@userId AS INT64)
+          AND sr.date BETWEEN DATE(@startDate) AND DATE(@endDate)
+          -- AND sr.sentiment_score IS NOT NULL -- Keep this filter if needed
+        ORDER BY sr.date ASC -- Order by date ascending for chart
       `;
   } else {
     return res.status(400).json({ error: 'Invalid detail type specified' });

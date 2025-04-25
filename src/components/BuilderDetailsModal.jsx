@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 
-// Function to safely parse analysis JSON
+// Restore parseAnalysis function
 const parseAnalysis = (analysisString) => {
   if (!analysisString) return null;
   try {
@@ -21,68 +21,59 @@ const parseAnalysis = (analysisString) => {
 const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder }) => {
   console.log('BuilderDetailsModal rendering:', { visible, type, dataLength: data?.length });
   
+  // Restore Work Product Columns to use parseAnalysis
   const workProductColumns = [
-    { 
-      title: 'Task', 
-      dataIndex: 'task_title', 
-      key: 'task_title', 
+    {
+      title: 'Task',
+      dataIndex: 'task_title',
+      key: 'task_title',
       width: '15%',
     },
-    { 
-      title: 'Date', 
-      dataIndex: 'date', 
-      key: 'date', 
+    {
+      title: 'Date',
+      dataIndex: 'date', // Use date from API
+      key: 'date',
       width: '10%',
-      render: (d) => d ? dayjs(d?.value || d).format('MMM D, YYYY') : 'N/A', 
+      render: (d) => d ? dayjs(d?.value || d).format('MMM D, YYYY') : 'N/A',
     },
-    { 
-      title: 'Score', 
-      key: 'score', 
+    {
+      title: 'Score',
+      key: 'score',
       width: '10%',
       render: (_, record) => { 
-        const analysis = parseAnalysis(record.analysis);
+        const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
         const criteria = analysis?.criteria_met;
-
-        // Check error conditions
         if (grade === 'Document Access Error' || (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received')) {
-          return '-'; // Show dash instead of tag
+          return '-';
         }
-        
-        // Default: Render normal grade
         return <Tag color={getGradeColor(grade)}>{grade}</Tag>;
       }
     },
     {
-      title: 'Assessment',
+      title: 'Assessment', // Restore Assessment column
       key: 'assessment',
       width: '25%',
       render: (_, record) => {
-        const analysis = parseAnalysis(record.analysis);
+        const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
         const criteria = analysis?.criteria_met;
         const areas = analysis?.areas_for_improvement;
-        
-        // Check conditions to render blank
         if (grade === 'Document Access Error' || (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received')) {
             return '-';
         }
-        
-        const criteriaTags = (Array.isArray(criteria) && criteria.length > 0) 
-          ? criteria.map(c => <Tag key={`crit-${c}`} color="green">{c}</Tag>) 
+        const criteriaTags = (Array.isArray(criteria) && criteria.length > 0)
+          ? criteria.map(c => <Tag key={`crit-${c}`} color="green">{c}</Tag>)
           : null;
-        
         const areaTags = (Array.isArray(areas) && areas.length > 0)
           ? areas.map(a => {
               const label = a === "technical issue with analysis - please try again" ? "tech issue" : a;
               return <Tag key={`area-${a}`} color="red">{label}</Tag>;
-            }) 
+            })
           : null;
-
         if (!criteriaTags && !areaTags) return '-';
-
         return (
           <Space wrap size={[0, 8]}>
             {criteriaTags}
@@ -91,90 +82,77 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         );
       }
     },
-    { 
-      title: 'Feedback', 
-      key: 'feedback', 
+    {
+      title: 'Feedback',
+      key: 'feedback',
       width: '40%',
       render: (_, record) => {
-        const analysis = parseAnalysis(record.analysis);
+        const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
         const criteria = analysis?.criteria_met;
         const feedback = analysis?.feedback;
-        
-        // Check special conditions first
         if (grade === 'Document Access Error') {
-          return <Tag color="red">Document Access Error</Tag>; // Show tag here
+          return <Tag color="red">Document Access Error</Tag>;
         }
         if (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received') {
-           return <Tag color="red">Tech issue</Tag>; // Show tag here
+           return <Tag color="red">Tech issue</Tag>;
         }
-
-        // Default rendering
         return <Text style={{ whiteSpace: 'pre-wrap' }}>{feedback || '-'}</Text>;
       }
     },
   ];
 
+  // Restore Comprehension Columns to use parseAnalysis
   const comprehensionColumns = [
-    { 
-      title: 'Task', 
-      dataIndex: 'task_title', 
-      key: 'task_title', 
+    {
+      title: 'Task',
+      dataIndex: 'task_title',
+      key: 'task_title',
       width: '20%',
     },
-    { 
-      title: 'Date', 
-      dataIndex: 'date', 
-      key: 'date', 
+    {
+      title: 'Date',
+      dataIndex: 'date', // Use date from API
+      key: 'date',
       width: '10%',
-      render: (d) => d ? dayjs(d?.value || d).format('MMM D, YYYY') : 'N/A', 
+      render: (d) => d ? dayjs(d?.value || d).format('MMM D, YYYY') : 'N/A',
     },
-    { 
-      title: 'Score', 
-      key: 'score', 
+    {
+      title: 'Score',
+      key: 'score',
       width: '10%',
-      render: (_, record) => { 
-        const analysis = parseAnalysis(record.analysis);
+      render: (_, record) => {
+        const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
         const criteria = analysis?.criteria_met;
-
-        // Check error conditions
         if (grade === 'Document Access Error' || (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received')) {
-          return '-'; // Show dash instead of tag
+          return '-';
         }
-
-        // Default: Render normal grade
         return <Tag color={getGradeColor(grade)}>{grade}</Tag>;
       }
     },
      {
-      title: 'Assessment',
+      title: 'Assessment', // Restore Assessment column
       key: 'assessment',
       width: '30%',
       render: (_, record) => {
-        const analysis = parseAnalysis(record.analysis);
+        const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
         const criteria = analysis?.criteria_met;
         const areas = analysis?.areas_for_improvement;
-
-        // Check conditions to render blank
         if (grade === 'Document Access Error' || (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received')) {
             return '-';
         }
-
-        const criteriaTags = (Array.isArray(criteria) && criteria.length > 0) 
-          ? criteria.map(c => <Tag key={`crit-${c}`} color="green">{c}</Tag>) 
+        const criteriaTags = (Array.isArray(criteria) && criteria.length > 0)
+          ? criteria.map(c => <Tag key={`crit-${c}`} color="green">{c}</Tag>)
           : null;
-        
         const areaTags = (Array.isArray(areas) && areas.length > 0)
           ? areas.map(a => <Tag key={`area-${a}`} color="red">{a}</Tag>)
           : null;
-
         if (!criteriaTags && !areaTags) return '-';
-
         return (
           <Space wrap size={[0, 8]}>
             {criteriaTags}
@@ -183,26 +161,22 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         );
       }
     },
-    { 
-      title: 'Feedback', 
-      key: 'feedback', 
+    {
+      title: 'Feedback', // Restore Feedback column
+      key: 'feedback',
       width: '30%',
       render: (_, record) => {
-        const analysis = parseAnalysis(record.analysis);
+        const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
         const criteria = analysis?.criteria_met;
         const feedback = analysis?.feedback;
-        
-        // Check special conditions first
         if (grade === 'Document Access Error') {
-          return <Tag color="red">Document Access Error</Tag>; // Show tag here
+          return <Tag color="red">Document Access Error</Tag>;
         }
          if (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received') {
-           return <Tag color="red">Tech issue</Tag>; // Show tag here
+           return <Tag color="red">Tech issue</Tag>;
         }
-
-        // Default rendering
         return <Text style={{ whiteSpace: 'pre-wrap' }}>{feedback || '-'}</Text>;
       }
     },
@@ -215,7 +189,6 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       key: 'reviewer_name',
       width: '15%',
       render: (text, record) => {
-        // NO onClick handler here
         return record.from_user_id ? (
           <Link
             to={`/builders/${record.from_user_id}`}
@@ -223,7 +196,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
             {text || 'Unknown'}
           </Link>
         ) : (
-          text || 'Unknown' // Fallback if no ID
+          text || 'Unknown'
         );
       }
     },
@@ -231,9 +204,10 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       title: 'Feedback',
       dataIndex: 'feedback',
       key: 'feedback',
+      width: '30%',
       render: (text) => (
-        <Text>
-          {text || 'No feedback provided'}
+        <Text style={{ whiteSpace: 'pre-wrap' }}>
+          {text || '-'}
         </Text>
       ),
     },
@@ -241,9 +215,10 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       title: 'Summary',
       dataIndex: 'summary',
       key: 'summary',
+      width: '30%',
       render: (text) => (
-        <Text style={{ whiteSpace: 'pre-wrap' }}> 
-          {text || 'No summary available'}
+        <Text style={{ whiteSpace: 'pre-wrap' }}>
+          {text || '-'}
         </Text>
       ),
     },
@@ -251,6 +226,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       title: 'Sentiment',
       dataIndex: 'sentiment_label',
       key: 'sentiment_label',
+      width: '10%',
       render: (label) => {
         const sentimentMap = {
           'Very Positive': 'green',
@@ -263,25 +239,22 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
           <Tag color={sentimentMap[label] || 'default'}>
             {label || 'N/A'}
           </Tag>
-        )
+        );
       },
     },
     {
       title: 'Date',
       dataIndex: 'timestamp',
       key: 'timestamp',
+      width: '15%',
       render: (date) => {
         if (!date) return 'N/A';
         try {
-          // Handle different date formats
           if (typeof date === 'string') {
-            // If it's a string, try to parse it
             return dayjs(date).format('MMM D, YYYY');
           } else if (date.value) {
-            // If it's a BigQuery timestamp object
             return dayjs(date.value).format('MMM D, YYYY');
           } else {
-            // Fallback to standard Date parsing
             return new Date(date).toLocaleDateString();
           }
         } catch (error) {
@@ -294,11 +267,8 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
 
   const [selectedBuilder, setSelectedBuilder] = useState(builder);
   const [detailsType, setDetailsType] = useState(type);
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
   const [detailsData, setDetailsData] = useState(data);
   const [loadingDetails, setLoadingDetails] = useState(loading);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     setSelectedBuilder(builder);
@@ -307,9 +277,18 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     setLoadingDetails(loading);
   }, [builder, type, data, loading]);
 
+  let columnsToRender;
+  if (type === 'workProduct') {
+    columnsToRender = workProductColumns;
+  } else if (type === 'comprehension') {
+    columnsToRender = comprehensionColumns;
+  } else {
+    columnsToRender = peerFeedbackColumns;
+  }
+
   return (
     <Modal
-      title={`${type === 'workProduct' ? 'Work Product' : type === 'comprehension' ? 'Comprehension' : 'Peer Feedback'} Details for ${builder?.name || 'Builder'}`}
+      title={`${type === 'workProduct' ? 'Work Product' : type === 'comprehension' ? 'Comprehension' : 'Peer Feedback'} Details for ${selectedBuilder?.name || 'Builder'}`}
       open={visible}
       onCancel={onClose}
       width={1200}
@@ -326,15 +305,15 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
             <Title level={4}>Summary</Title>
             <Space direction="vertical">
               <Text>
-                Total {type === 'workProduct' ? 'Tasks' : type === 'comprehension' ? 'Questions' : 'Feedback Items'}: {data?.length || 0}
+                Total Items: {detailsData?.length || 0}
               </Text>
             </Space>
           </Card>
 
           <Table
-            columns={type === 'workProduct' ? workProductColumns : type === 'comprehension' ? comprehensionColumns : peerFeedbackColumns}
-            dataSource={data}
-            rowKey={type === 'peerFeedback' ? 'id' : 'task_id'}
+            columns={columnsToRender}
+            dataSource={detailsData}
+            rowKey={type === 'peerFeedback' ? 'feedback_id' : 'task_id'}
             pagination={{ pageSize: 5 }}
             tableLayout="fixed"
           />

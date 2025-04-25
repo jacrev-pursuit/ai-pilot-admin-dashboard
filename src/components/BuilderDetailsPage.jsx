@@ -57,6 +57,17 @@ const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 const { Option } = Select;
 
+// Add parseAnalysis helper function here (needed for WP/Comp processing)
+const parseAnalysis = (analysisString) => {
+  if (!analysisString || typeof analysisString !== 'string') return null;
+  try {
+    return JSON.parse(analysisString);
+  } catch (error) {
+    // console.error("Failed to parse analysis JSON:", error, "String:", analysisString);
+    return null;
+  }
+};
+
 // --- Grade Helper Functions (Copied from BuilderView) ---
 const getLetterGrade = (score) => {
   if (score === null || score === undefined) return 'F';
@@ -112,13 +123,12 @@ const mapScoreToColor = (score) => {
 
 // --- Data Processing Functions for Charts ---
 
-// Function for processing line chart data based on score ranges, now includes all dates in range
-const processScoreBasedLineChartData = (data, dateField, valueField, keyField, label, startDate, endDate) => {
+// Updated function to handle different data structures
+const processScoreBasedLineChartData = (data, dateField, valueField, keyField, label, startDate, endDate, dataType) => {
   if (!startDate || !endDate) {
     return { labels: [], datasets: [] }; // Need date range
   }
 
-  // 1. Generate all dates in the range
   const allDates = [];
   let currentDate = dayjs(startDate);
   const finalEndDate = dayjs(endDate);
@@ -127,35 +137,59 @@ const processScoreBasedLineChartData = (data, dateField, valueField, keyField, l
     currentDate = currentDate.add(1, 'day');
   }
 
-  // 2. Create a map of the fetched data for quick lookup (using MM-DD format)
   const dataMap = new Map();
   if (data) {
     data.forEach(item => {
       const itemDateStr = dayjs(item[dateField]?.value || item[dateField]).format('MM-DD');
-      dataMap.set(itemDateStr, item);
+      // Allow multiple items per date (e.g., multiple WP tasks on one day)
+      if (!dataMap.has(itemDateStr)) {
+          dataMap.set(itemDateStr, []);
+      }
+      dataMap.get(itemDateStr).push(item);
     });
   }
 
-  // 3. Generate labels and map data
   const labels = allDates.map(date => date.format('MM-DD'));
   const values = [];
   const pointColors = [];
   const keys = [];
 
   labels.forEach(labelDateStr => {
-    const item = dataMap.get(labelDateStr);
-    if (item) {
-      values.push(item[valueField]);
-      pointColors.push(mapScoreToColor(item[valueField]));
-      keys.push(item[keyField]);
+    const itemsForDate = dataMap.get(labelDateStr);
+    if (itemsForDate && itemsForDate.length > 0) {
+      // For WP/Comp, potentially average scores if multiple on one day
+      let score = null;
+      let key = null;
+      if (dataType === 'workProduct' || dataType === 'comprehension') {
+          let totalScore = 0;
+          let count = 0;
+          let firstKey = null; // Use the key of the first item for click handling
+          itemsForDate.forEach((item, index) => {
+              const analysis = parseAnalysis(item.analysis); // Parse analysis here
+              const itemScore = analysis?.completion_score;
+              if (itemScore !== null && itemScore !== undefined) {
+                  totalScore += itemScore;
+                  count++;
+                  if (index === 0) firstKey = item[keyField]; // Capture first key
+              }
+          });
+          score = count > 0 ? totalScore / count : null;
+          key = firstKey; // Use the key of the first task for the day
+      } else { // For Sentiment/Peer Feedback, assume only one relevant value per day
+          score = itemsForDate[0][valueField];
+          key = itemsForDate[0][keyField];
+      }
+
+      values.push(score);
+      pointColors.push(mapScoreToColor(score)); // Use the potentially averaged score for color
+      keys.push(key); // Use the determined key
+
     } else {
-      values.push(null); // Use null for gaps in line chart
-      pointColors.push('rgba(0,0,0,0.1)'); // Default/transparent color
+      values.push(null);
+      pointColors.push('rgba(0,0,0,0.1)');
       keys.push(null);
     }
   });
-
-  // ... (rest of the function remains similar, using the generated arrays) ...
 
   return {
     labels,
@@ -163,8 +197,8 @@ const processScoreBasedLineChartData = (data, dateField, valueField, keyField, l
       {
         label: label,
         data: values,
-        borderColor: '#000000', // Set line color to black
-        backgroundColor: 'rgba(0, 0, 0, 0.1)', // Semi-transparent black fill 
+        borderColor: '#000000', 
+        backgroundColor: 'rgba(0, 0, 0, 0.1)', 
         pointBackgroundColor: pointColors,
         pointBorderColor: pointColors.map(color => {
           if (typeof color === 'string') {
@@ -176,16 +210,16 @@ const processScoreBasedLineChartData = (data, dateField, valueField, keyField, l
           return chartColors.borderColor || '#000000';
         }),
         pointBorderWidth: 2,
-        pointRadius: 3, // Base radius
-        pointHoverRadius: 10, // Hover radius remains 10
+        pointRadius: 3, 
+        pointHoverRadius: 10, 
         fill: true,
         tension: 0.1,
         segment: {
-          borderColor: ctx => ctx.p0.raw === null || ctx.p1.raw === null ? 'transparent' : undefined, // Hide line segments connecting to null
+          borderColor: ctx => ctx.p0.raw === null || ctx.p1.raw === null ? 'transparent' : undefined,
         }
       }
     ],
-    keys // Pass keys for click handling
+    keys 
   };
 };
 
@@ -238,14 +272,9 @@ const processPromptCountData = (data, startDate, endDate) => {
 
 const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType, dateRange }) => {
   const chartRef = React.useRef();
+  // Pass dataType to processor
   const { labels, datasets: originalDatasets, keys } = processScoreBasedLineChartData(
-      data, 
-      'date',
-      'sentiment_score',
-      'date', // Key for sentiment is the date itself
-      'Daily Sentiment Score',
-      dateRange[0], // Pass start date
-      dateRange[1]  // Pass end date
+      data, 'date', 'sentiment_score', 'date', 'Daily Sentiment Score', dateRange[0], dateRange[1], 'sentiment' 
   );
 
   // Calculate highlighted index
@@ -383,18 +412,9 @@ const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowT
 
 const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType, dateRange }) => {
   const chartRef = React.useRef();
-  
-  // Log received hover props
-  console.log('PeerFeedbackChart received hover state:', { hoveredPointIndex, hoveredChartType });
-
+  // Pass dataType to processor
   const { labels, datasets: originalDatasets, keys } = processScoreBasedLineChartData(
-      data, 
-      'timestamp',
-      'sentiment_score',
-      'feedback_id', // Key is feedback_id
-      'Peer Feedback Sentiment',
-      dateRange[0], // Pass start date
-      dateRange[1]  // Pass end date
+      data, 'timestamp', 'sentiment_score', 'feedback_id', 'Peer Feedback Sentiment', dateRange[0], dateRange[1], 'peerFeedback' 
   );
 
   // Calculate highlighted index
@@ -530,14 +550,9 @@ const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedR
 
 const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRowType, onPointHover, hoveredPointIndex, hoveredChartType, dateRange }) => {
   const chartRef = React.useRef();
+  // Pass dataType and updated valueField placeholder (logic is inside processor)
   const { labels, datasets: originalDatasets, keys } = processScoreBasedLineChartData(
-      data, 
-      'grading_timestamp',
-      'scores',
-      'task_id', // Key is task_id (ensure it's unique per point)
-      'Work Product Score',
-      dateRange[0], // Pass start date
-      dateRange[1]  // Pass end date
+      data, 'date', null /* valueField not used directly */, 'task_id', 'Work Product Score', dateRange[0], dateRange[1], 'workProduct'
   );
 
   // Calculate highlighted index
@@ -711,35 +726,17 @@ const BuilderDetailsPage = () => {
   const peerFeedbackTableRef = useRef(null);
   const workProductTableRef = useRef(null);
 
-  // Prepare data for charts using the updated functions
+  // Updated useMemo calls to pass dataType
   const sentimentChartData = useMemo(() => processScoreBasedLineChartData(
-    sentimentData, 
-    'date', 
-    'sentiment_score', 
-    'date', // Use date as key for sentiment
-    'Sentiment Score',
-    dateRange[0], // Pass start date
-    dateRange[1] // Pass end date
+    sentimentData, 'date', 'sentiment_score', 'date', 'Sentiment Score', dateRange[0], dateRange[1], 'sentiment'
   ), [sentimentData, dateRange]);
 
   const peerFeedbackChartData = useMemo(() => processScoreBasedLineChartData(
-    peerFeedbackData, 
-    'timestamp', 
-    'sentiment_score', 
-    'feedback_id', // Use feedback_id as key for peer feedback
-    'Peer Feedback Score',
-    dateRange[0], // Pass start date
-    dateRange[1] // Pass end date
+    peerFeedbackData, 'timestamp', 'sentiment_score', 'feedback_id', 'Peer Feedback Score', dateRange[0], dateRange[1], 'peerFeedback'
   ), [peerFeedbackData, dateRange]);
 
   const workProductChartData = useMemo(() => processScoreBasedLineChartData(
-    workProductData, 
-    'task_date', // Use task_date from the join
-    'scores', 
-    'task_id', // Use task_id as key for work product
-    'Work Product Score',
-    dateRange[0], // Pass start date
-    dateRange[1] // Pass end date
+    workProductData, 'date', null /* valueField not used directly */, 'task_id', 'Work Product Score', dateRange[0], dateRange[1], 'workProduct'
   ), [workProductData, dateRange]);
 
   const promptsChartData = useMemo(() => processPromptCountData(
@@ -964,22 +961,35 @@ const BuilderDetailsPage = () => {
   // Define columns for each table
   const workProductColumns = [
     { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '15%' },
-    { title: 'Date', dataIndex: 'task_date', key: 'task_date', render: (d) => d ? dayjs(d?.value || d).format('YYYY-MM-DD') : 'N/A', width: '15%' },
-    { title: 'Feedback', dataIndex: 'feedback', key: 'feedback', width: '50%' },
+    { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => d ? dayjs(d?.value || d).format('YYYY-MM-DD') : 'N/A', width: '15%' },
+    // Feedback column needs to parse analysis
+    { title: 'Feedback', key: 'feedback', width: '50%', render: (_, record) => {
+        const analysis = parseAnalysis(record.analysis);
+        const feedback = analysis?.feedback;
+        // Add checks for special feedback tags if needed (like in modal)
+        const score = analysis?.completion_score;
+        const grade = getLetterGrade(score);
+        const criteria = analysis?.criteria_met;
+        if (grade === 'Document Access Error') return <Tag color="red">Document Access Error</Tag>;
+        if (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received') return <Tag color="red">Tech issue</Tag>;
+        return feedback || '-';
+      } 
+    },
     { 
-      title: 'Score',
-      dataIndex: 'scores', 
+      title: 'Score', 
       key: 'scores', 
-      render: (score) => {
+      width: '10%',
+      render: (_, record) => { // Parse analysis for score
+        const analysis = parseAnalysis(record.analysis);
+        const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
         return (
           <Space>
-            <span>{score}</span>
+            <span>{score?.toFixed(2) ?? 'N/A'}</span> {/* Display numeric score */} 
             <Tag color={getGradeColor(grade)}>{grade}</Tag>
           </Space>
         );
-      },
-      width: '10%' 
+      }
     },
     {
       title: 'Actions',
@@ -995,21 +1005,35 @@ const BuilderDetailsPage = () => {
 
   const comprehensionColumns = [
     { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '25%' },
-    { title: 'Date', dataIndex: 'task_date', key: 'task_date', render: (d) => d ? dayjs(d?.value || d).format('YYYY-MM-DD') : 'N/A', width: '15%' },
+    { title: 'Date', dataIndex: 'date', key: 'date', render: (d) => d ? dayjs(d?.value || d).format('YYYY-MM-DD') : 'N/A', width: '15%' },
     { 
       title: 'Score', 
-      dataIndex: 'score', 
       key: 'score', 
-      render: (score) => {
+      width: '60%',
+      render: (_, record) => { // Parse analysis for score
+        const analysis = parseAnalysis(record.analysis);
+        const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
         return (
           <Space>
-            <span>{score}</span>
+            <span>{score?.toFixed(2) ?? 'N/A'}</span> {/* Display numeric score */}
             <Tag color={getGradeColor(grade)}>{grade}</Tag>
           </Space>
         );
-      },
-      width: '60%'
+      }
+    },
+    // Add Feedback column back, parsing from analysis
+    { title: 'Feedback', key: 'feedback', width: '50%', render: (_, record) => {
+        const analysis = parseAnalysis(record.analysis);
+        const feedback = analysis?.feedback;
+        // Add checks for special feedback tags if needed
+        const score = analysis?.completion_score;
+        const grade = getLetterGrade(score);
+        const criteria = analysis?.criteria_met;
+        if (grade === 'Document Access Error') return <Tag color="red">Document Access Error</Tag>;
+        if (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received') return <Tag color="red">Tech issue</Tag>;
+        return feedback || '-';
+      } 
     },
   ].map(col => ({ ...col, className: 'comprehension-col' }));
 
@@ -1018,9 +1042,9 @@ const BuilderDetailsPage = () => {
       title: 'Date', 
       dataIndex: 'timestamp', 
       key: 'timestamp', 
-      render: (ts) => ts ? dayjs(ts?.value || ts).format('MMMM D') : 'N/A', // Format date
+      render: (ts) => ts ? dayjs(ts?.value || ts).format('MMMM D') : 'N/A', 
       width: '15%',
-      sorter: (a, b) => dayjs(a.timestamp?.value || a.timestamp).unix() - dayjs(b.timestamp?.value || b.timestamp).unix(), // Add sorter
+      sorter: (a, b) => dayjs(a.timestamp?.value || a.timestamp).unix() - dayjs(b.timestamp?.value || b.timestamp).unix(), 
       sortDirections: ['descend', 'ascend']
     },
     { 
@@ -1029,7 +1053,6 @@ const BuilderDetailsPage = () => {
       key: 'reviewer_name',
       width: '15%',
       render: (text, record) => {
-        // Revert to plain Link without any wrapper or onClick
         return record.from_user_id ? (
           <Link 
             to={`/builders/${record.from_user_id}`} 
@@ -1037,7 +1060,7 @@ const BuilderDetailsPage = () => {
             {text || 'Unknown'}
           </Link>
         ) : (
-          text || 'Unknown' // Fallback if no ID
+          text || 'Unknown'
         );
       }
     },
@@ -1045,17 +1068,25 @@ const BuilderDetailsPage = () => {
     { title: 'Summary', dataIndex: 'summary', key: 'summary', render: (text) => <Text style={{ whiteSpace: 'pre-wrap' }}>{text || '-'}</Text>, width: '25%' },
     { 
       title: 'Sentiment', 
-      dataIndex: 'sentiment_score',
-      key: 'sentiment_score', 
+      dataIndex: 'sentiment_label', // Use the label from the API for display
+      key: 'sentiment_label', 
       width: '15%', 
+      // Still sort by the numeric score
       sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
       sortDirections: ['descend', 'ascend'],
-      render: (score) => {
-        const label = mapScoreToLabel(score); // Get label
-        const color = mapScoreToColor(score); // Get color
+      render: (label) => { // Render function now receives the label
+        // Define color mapping based on the label text
+        const sentimentColorMap = {
+          'Very Positive': 'green',
+          'Positive': 'cyan',
+          'Neutral': 'default', // Or 'blue' if you prefer
+          'Negative': 'orange',
+          'Very Negative': 'red'
+        };
+        const color = sentimentColorMap[label] || 'default'; // Fallback color
         return (
           <Tag color={color}>
-            {label}
+            {label || 'N/A'} {/* Display the label directly */}
           </Tag>
         );
       }
@@ -1068,20 +1099,21 @@ const BuilderDetailsPage = () => {
         dataIndex: 'date', 
         key: 'date', 
         render: (d) => d ? dayjs(d?.value || d).format('MMMM D') : 'N/A', 
-        width: '25%',
+        width: '15%', // Adjusted width
         sorter: (a, b) => dayjs(a.date?.value || a.date).unix() - dayjs(b.date?.value || b.date).unix(),
         sortDirections: ['descend', 'ascend']
       },
-      { 
-        title: 'Sentiment Category', 
-        dataIndex: 'sentiment_score',
+      {
+        title: 'Category', // Shortened title
+        dataIndex: 'sentiment_score', // Still sorting/coloring by score
         key: 'sentiment_score', 
-        width: '25%',
+        width: '15%', // Adjusted width
         sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
         sortDirections: ['descend', 'ascend'],
-        render: (score) => {
-          const label = mapScoreToLabel(score); // Get label
-          const color = mapScoreToColor(score); // Get color
+        render: (score, record) => { // Access full record if needed (for category fallback)
+          // Use category from data if available, otherwise map from score
+          const label = record.sentiment_category || mapScoreToLabel(score);
+          const color = mapScoreToColor(score);
           return (
             <Tag color={color}>
               {label}
@@ -1090,10 +1122,11 @@ const BuilderDetailsPage = () => {
         }
       },
       { 
-        title: 'Sentiment Reason', 
-        dataIndex: 'sentiment_reason', 
+        title: 'Sentiment Reason (Outlier Sentence)', 
+        dataIndex: 'sentiment_reason', // Use the new field from backend
         key: 'sentiment_reason', 
-        width: '50%'
+        width: '70%', // Adjusted width
+        render: (text) => text || '-' // Display text or dash if null
       },
   ].map(col => ({ ...col, className: 'sentiment-col' }));
 

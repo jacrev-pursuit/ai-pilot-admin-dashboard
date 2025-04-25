@@ -143,16 +143,19 @@ const BuilderView = () => {
       key: 'work_product_score',
       width: '15%',
       render: (text, record) => {
-        return text !== null && text !== undefined ? (
+        if (text === null || text === undefined) {
+          return <span>No task assessments</span>;
+        }
+        const grade = getLetterGrade(text);
+        const color = getGradeColor(grade);
+        return (
           <Button 
             type="link" 
             icon={<ExpandOutlined />}
             onClick={(e) => { e.stopPropagation(); handleExpand('workProduct', record); }}
           >
-            {renderWorkProductScore(text)} 
+            <Tag color={color}>{grade}</Tag>
           </Button>
-        ) : (
-          <span>-</span>
         );
       },
     },
@@ -166,8 +169,11 @@ const BuilderView = () => {
       key: 'comprehension_score',
       width: '15%',
       render: (text, record) => {
-        const grade = text !== null && text !== undefined ? getLetterGrade(text) : 'N/A';
-        return text !== null && text !== undefined ? (
+        if (text === null || text === undefined) {
+          return <span>No task assessments</span>;
+        }
+        const grade = getLetterGrade(text);
+        return (
           <Button 
             type="link" 
             icon={<ExpandOutlined />}
@@ -175,8 +181,6 @@ const BuilderView = () => {
           >
             <Tag color={getGradeColor(grade)}>{grade}</Tag>
           </Button>
-        ) : (
-           <span>-</span>
         );
       },
     },
