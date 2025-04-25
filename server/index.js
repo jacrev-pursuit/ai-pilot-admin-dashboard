@@ -691,8 +691,94 @@ app.get('/api/grades/submissions', async (req, res) => {
   }
 });
 
-// --- Fallback for Client-Side Routing --- //
-// Serve index.html for any route not handled by API or static files
+// Endpoint for Grade Distribution Overview (Filters by Learning Type)
+app.get('/api/overview/grade-distribution', async (req, res) => {
+  // Add learningType back
+  const { startDate, endDate, learningType } = req.query; 
+  logger.info('Received request for grade distribution by task and type', { startDate, endDate, learningType });
+
+  // Update validation: Check for all three parameters
+  if (!startDate || !endDate || !learningType) {
+    return res.status(400).json({ error: 'Missing required query parameters: startDate, endDate, learningType' });
+  }
+  
+  // Add back learningType validation
+  if (!['Work product', 'Key concept'].includes(learningType)) {
+    return res.status(400).json({ error: 'Invalid learningType. Must be "Work product" or "Key concept"' });
+  }
+
+  const taskAnalysisTable = `${PROJECT_ID}.${DATASET}.task_analysis_results`;
+  const tasksTable = `${PROJECT_ID}.${DATASET}.tasks`;
+
+  const query = `
+    WITH ValidTasks AS (
+        -- Select and filter tasks, include task_id
+        SELECT 
+            tar.task_id,
+            SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score
+        FROM \`${taskAnalysisTable}\` tar
+        WHERE tar.curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+          AND tar.learning_type = @learningType -- Filter by learning type
+          -- Filter out invalid tasks --
+          AND SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) IS NOT NULL
+          AND SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) != 0
+          AND NOT (
+              JSON_EXTRACT_ARRAY(analysis, '$.criteria_met') IS NOT NULL AND 
+              ARRAY_LENGTH(JSON_EXTRACT_ARRAY(analysis, '$.criteria_met')) = 1 AND 
+              JSON_VALUE(JSON_EXTRACT_ARRAY(analysis, '$.criteria_met')[OFFSET(0)]) = 'Submission received'
+          )
+    ),
+    GradedTasks AS (
+        -- Assign letter grades based on 0-100 score
+        SELECT
+            vt.task_id,
+            CASE 
+                WHEN completion_score >= 93 THEN 'A+'
+                WHEN completion_score >= 85 THEN 'A'
+                WHEN completion_score >= 80 THEN 'A-'
+                WHEN completion_score >= 70 THEN 'B+'
+                WHEN completion_score >= 60 THEN 'B'
+                WHEN completion_score >= 50 THEN 'B-'
+                WHEN completion_score >= 40 THEN 'C+'
+                ELSE 'C'
+            END as grade
+        FROM ValidTasks vt
+    )
+    -- Final count aggregation by task and grade --
+    SELECT 
+        t.task_title, 
+        gt.grade,
+        COUNT(*) as count
+    FROM GradedTasks gt
+    JOIN \`${tasksTable}\` t ON gt.task_id = t.id 
+    GROUP BY t.task_title, gt.grade
+  `;
+
+  const options = {
+    query: query,
+    location: 'us-central1',
+    params: { 
+        startDate: startDate, 
+        endDate: endDate, 
+        learningType: learningType // Add learningType to params
+    },
+  };
+
+  try {
+    const [rows] = await bigquery.query(options);
+    logger.info(`Successfully fetched grade distribution for ${learningType}`, { count: rows.length });
+    res.json(rows); 
+  } catch (error) {
+    logger.error('Error executing BigQuery grade distribution query', { 
+        error: error.message, 
+        query: options.query, 
+        params: options.params 
+    });
+    res.status(500).json({ error: 'Failed to fetch grade distribution data' });
+  }
+});
+
+// Catch-all for serving the frontend app
 app.get('*', (req, res) => {
   res.sendFile(path.resolve(frontendDistPath, 'index.html'), (err) => {
     if (err) {
