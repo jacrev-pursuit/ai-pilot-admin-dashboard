@@ -146,9 +146,9 @@ app.get('/api/builders', async (req, res) => {
         WHEN bm.avg_peer_feedback_sentiment >= -0.6 THEN 'Negative'
         ELSE 'Very Negative'
       END as peer_feedback_sentiment,
-      -- Work Product & Comprehension Scores (from existing CTEs, scaled to 0-100)
-      ROUND(wp.avg_wp_score * 100, 0) as work_product_score, -- Multiply by 100 and round
-      ROUND(comp.avg_comp_score * 100, 0) as comprehension_score -- Multiply by 100 and round
+      -- Work Product & Comprehension Scores (from existing CTEs, revert to 0-1 scale)
+      ROUND(wp.avg_wp_score, 2) as work_product_score, -- Reverted: No * 100, round to 2 decimals
+      ROUND(comp.avg_comp_score, 2) as comprehension_score -- Reverted: No * 100, round to 2 decimals
     FROM BaseMetrics bm
     LEFT JOIN WorkProductAvg wp ON bm.user_id = wp.user_id
     LEFT JOIN ComprehensionAvg comp ON bm.user_id = comp.user_id
