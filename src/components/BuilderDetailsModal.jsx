@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Table, Typography, Card, Space, Tag, Spin } from 'antd';
+import { Modal, Table, Typography, Card, Space, Tag, Spin, Button } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
@@ -18,7 +18,7 @@ const parseAnalysis = (analysisString) => {
   }
 };
 
-const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder }) => {
+const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder, onShowMoreDetails }) => {
   console.log('BuilderDetailsModal rendering:', { visible, type, dataLength: data?.length });
   
   // Restore Work Product Columns to use parseAnalysis
@@ -101,6 +101,16 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         return <Text style={{ whiteSpace: 'pre-wrap' }}>{feedback || '-'}</Text>;
       }
     },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: '10%',
+      render: (_, record) => (
+        <Button size="small" onClick={() => onShowMoreDetails(record, 'workProduct')}> 
+          View Details
+        </Button>
+      ),
+    },
   ];
 
   // Restore Comprehension Columns to use parseAnalysis
@@ -179,6 +189,16 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         }
         return <Text style={{ whiteSpace: 'pre-wrap' }}>{feedback || '-'}</Text>;
       }
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: '10%',
+      render: (_, record) => (
+        <Button size="small" onClick={() => onShowMoreDetails(record, 'comprehension')}> 
+          View Details
+        </Button>
+      ),
     },
   ];
 

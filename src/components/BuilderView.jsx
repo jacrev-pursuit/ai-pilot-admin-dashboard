@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import { Link } from 'react-router-dom';
 import { fetchBuilderData, fetchBuilderDetails } from '../services/builderService';
 import BuilderDetailsModal from './BuilderDetailsModal';
+import TaskSubmissionDetailModal from './TaskSubmissionDetailModal';
 import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
 
 const { Title } = Typography;
@@ -23,6 +24,11 @@ const BuilderView = () => {
   const [error, setError] = useState(null);
   const [builderFilter, setBuilderFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  // State for the second-level details modal
+  const [submissionDetailModalVisible, setSubmissionDetailModalVisible] = useState(false);
+  const [selectedSubmissionRecord, setSelectedSubmissionRecord] = useState(null);
+  const [selectedSubmissionType, setSelectedSubmissionType] = useState(''); // 'workProduct' or 'comprehension'
 
   // Function to handle sorting
   const handleSort = (key) => {
@@ -286,6 +292,13 @@ const BuilderView = () => {
     ? sortedBuilders 
     : sortedBuilders.filter(builder => builder.user_id.toString() === builderFilter);
 
+  // Function to handle showing the second-level modal
+  const handleShowMoreDetails = (record, type) => {
+    setSelectedSubmissionRecord(record);
+    setSelectedSubmissionType(type);
+    setSubmissionDetailModalVisible(true);
+  };
+
   return (
     <div className="builder-view-container">
       <div className="builder-view-header">
@@ -354,6 +367,15 @@ const BuilderView = () => {
         data={detailsData}
         loading={detailsLoading}
         builder={selectedBuilder}
+        onShowMoreDetails={handleShowMoreDetails}
+      />
+
+      {/* Render the second-level details modal */}
+      <TaskSubmissionDetailModal
+        visible={submissionDetailModalVisible}
+        onClose={() => setSubmissionDetailModalVisible(false)}
+        record={selectedSubmissionRecord}
+        type={selectedSubmissionType}
       />
     </div>
   );

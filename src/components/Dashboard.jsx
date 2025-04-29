@@ -261,41 +261,64 @@ const PilotOverview = () => {
     fetchAllGradeDistributions();
   }, [trendDateRange]);
 
-  // Helper function to process grade distribution data for simple bar chart
+  // Helper function to process grade distribution data for STACKED bar chart
   const processGradeDistributionData = (apiData) => {
-      const gradeCounts = gradeCategories.reduce((acc, grade) => {
-        acc[grade] = 0;
-        return acc;
-      }, {});
+    // Group counts by task_title, then by grade
+    const gradesByTask = apiData.reduce((acc, item) => {
+      const taskTitle = item.task_title || 'Unknown Task';
+      const grade = item.grade;
+      const count = item.count || 0;
 
-      apiData.forEach(item => {
-        if (gradeCounts.hasOwnProperty(item.grade)) {
-          gradeCounts[item.grade] = item.count;
-        }
-      });
+      if (!acc[taskTitle]) {
+        acc[taskTitle] = {};
+        gradeCategories.forEach(g => { acc[taskTitle][g] = 0; }); // Initialize all grades for the task
+      }
+      if (gradeCategories.includes(grade)) {
+         acc[taskTitle][grade] = count; // Assign the count received from API
+      }
+      return acc;
+    }, {});
 
-      return {
-          labels: gradeCategories, // Use predefined sorted grade categories as labels
-          datasets: [{
-              label: 'Count',
-              data: gradeCategories.map(grade => gradeCounts[grade]),
-              backgroundColor: gradeCategories.map(grade => gradeColors[grade] || '#adb5bd'),
-          }]
-      };
+    const taskLabels = Object.keys(gradesByTask).sort(); // Sort task titles alphabetically
+
+    // Create a dataset for each grade category
+    const datasets = gradeCategories.map(grade => ({
+      label: grade,
+      data: taskLabels.map(task => gradesByTask[task][grade] || 0), // Get count for this task/grade
+      backgroundColor: gradeColors[grade] || '#adb5bd'
+    }));
+
+    return {
+      labels: taskLabels,
+      datasets: datasets
+    };
   };
 
-  // Simple Bar Chart Options
+  // Options for Stacked Bar Chart
   const gradeDistributionBarOptions = (title) => ({
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: { position: 'right' },
         title: { display: true, text: title },
-        tooltip: { callbacks: { label: function(context) { return `Count: ${context.parsed.y}`; } } }
+        tooltip: { mode: 'index', intersect: false }
       },
       scales: {
-        x: { title: { display: true, text: 'Grade' } },
-        y: { beginAtZero: true, title: { display: true, text: 'Number of Tasks' }, ticks: { stepSize: 1 } }
+        x: {
+            stacked: true, // Enable stacking
+            title: { display: true, text: 'Task Title' },
+             ticks: { // Optional: shorten labels
+               callback: function(value, index, values) {
+                  const label = this.getLabelForValue(value);
+                  return label.length > 25 ? label.substring(0, 22) + '...' : label;
+              }
+          }
+        },
+        y: {
+            stacked: true, // Enable stacking
+            beginAtZero: true,
+            title: { display: true, text: 'Number of Assessments' }
+        }
       }
   });
 

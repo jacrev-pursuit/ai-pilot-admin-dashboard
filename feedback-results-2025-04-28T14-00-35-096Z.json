@@ -1,0 +1,170 @@
+[
+  {
+    "id": 86,
+    "from_user_id": 66,
+    "to_user_id": 86,
+    "feedback_text": "Productization tool I asked him about it and he said it works, he said he would show me about how the tool worked. I thought it was a great idea.",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Interest in the productization tool. Positive response to the idea of learning how the tool works.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:22.089Z"
+  },
+  {
+    "id": 83,
+    "from_user_id": 66,
+    "to_user_id": 94,
+    "feedback_text": "Our group was great learning what everybody was working on and how they intended to get to the end. What they were doing for troubleshooting. Jen gave me some great ideas about notetaking as well.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective group learning and sharing of work progress. Valuable troubleshooting discussions. Beneficial exchange of ideas on notetaking.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:23.225Z"
+  },
+  {
+    "id": 82,
+    "from_user_id": 66,
+    "to_user_id": 37,
+    "feedback_text": "Ayisha always help me with understanding  the code and different prompts to use.",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Consistent support in understanding code and prompts.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:24.241Z"
+  },
+  {
+    "id": 84,
+    "from_user_id": 66,
+    "to_user_id": 19,
+    "feedback_text": "Ethan Davey I learned about what he was working on and how he planned to get to the end of the project.",
+    "sentiment_score": 0.3,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Neutral",
+    "summary": "Strengths: Clear understanding of Ethan Davey's project and plan.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:25.264Z"
+  },
+  {
+    "id": 85,
+    "from_user_id": 66,
+    "to_user_id": 17,
+    "feedback_text": "Shanell is great she told me how she was gonna get the finish line and hopefully get her app finished.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Positive attitude and determination to reach goals. Clear communication about plans and objectives.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:26.402Z"
+  },
+  {
+    "id": 87,
+    "from_user_id": 69,
+    "to_user_id": 32,
+    "feedback_text": "Ethan is a teacher and always ready to jump into and help ",
+    "sentiment_score": 0.5,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Readiness to help. Dedication to teaching.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:27.488Z"
+  },
+  {
+    "id": 89,
+    "from_user_id": 69,
+    "to_user_id": 90,
+    "feedback_text": "Easy to collaborate with. ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Ease of collaboration.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:28.463Z"
+  },
+  {
+    "id": 88,
+    "from_user_id": 69,
+    "to_user_id": 88,
+    "feedback_text": "Quiet and pleasant - may not be outspoken - but, ask him anything and he's quick to answer and offer his assistance.  ",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Responsive and helpful when asked for assistance.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:29.550Z"
+  },
+  {
+    "id": 90,
+    "from_user_id": 49,
+    "to_user_id": 84,
+    "feedback_text": "Working with Josue was very insightful, he helped new ways on how to approach my project, i was feeling stuck yesterday coming off the group project which created a mind block, and he eased up the process and made me rethink my idea with a positive approach. It was great to get to know him a little more, would definitely work with him again! :)",
+    "sentiment_score": 0.7,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing insightful help in approaching projects. Ability to ease mind blocks and encourage positive thinking. Building rapport and fostering a positive working relationship.\n\nAdditional Comments: Great to hear about the positive impact Josue had on your project and mindset. Looking forward to future collaborations!.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:31.076Z"
+  },
+  {
+    "id": 91,
+    "from_user_id": 84,
+    "to_user_id": 49,
+    "feedback_text": "I learned a lot from Emily today. She helped figure out shell commands, taught me about industry terms and her workflow when working with her app. It was interesting seeing her approach to front end first when mine is back-end centric. ",
+    "sentiment_score": 0.5,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Sharing knowledge and expertise. Openness to different approaches.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:32.767Z"
+  },
+  {
+    "id": 92,
+    "from_user_id": 88,
+    "to_user_id": 32,
+    "feedback_text": "It was great receiving feedback from Ethan Anderson in how to the integration and Testing in order to implement onto my project!! Overall, I was able to progress with my project. ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Valuable feedback on integration and testing. Enabled progress on the project.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:33.791Z"
+  },
+  {
+    "id": 93,
+    "from_user_id": 90,
+    "to_user_id": 24,
+    "feedback_text": "Lee was very helpful with offering me troubleshoot options. Also helped me with fixing my background for the chatbot.\n",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing troubleshoot options. Assisting with fixing background for the chatbot.",
+    "created_at": {
+      "value": "2025-04-02"
+    },
+    "processed_at": "2025-04-28T14:00:35.095Z"
+  }
+]

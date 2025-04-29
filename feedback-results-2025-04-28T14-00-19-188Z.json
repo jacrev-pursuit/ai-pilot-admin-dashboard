@@ -1,0 +1,324 @@
+[
+  {
+    "id": 59,
+    "from_user_id": 98,
+    "to_user_id": 24,
+    "feedback_text": "Great job, You did your best with limited time. You are very determing",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Demonstrated determination in completing tasks. Managed limited time effectively.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T13:59:49.321Z"
+  },
+  {
+    "id": 61,
+    "from_user_id": 64,
+    "to_user_id": 28,
+    "feedback_text": "was great",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Demonstrated excellence.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T13:59:50.337Z"
+  },
+  {
+    "id": 60,
+    "from_user_id": 64,
+    "to_user_id": 64,
+    "feedback_text": "very good",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Overall performance is very good.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T13:59:51.437Z"
+  },
+  {
+    "id": 63,
+    "from_user_id": 69,
+    "to_user_id": 77,
+    "feedback_text": "Eager to ask questions and learn from fellow builders ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Proactive attitude towards learning and seeking knowledge. Openness to feedback and willingness to improve.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T13:59:52.759Z"
+  },
+  {
+    "id": 64,
+    "from_user_id": 69,
+    "to_user_id": 20,
+    "feedback_text": "Shared some tips with the table that he uses in his works and that he found useful ",
+    "sentiment_score": 0.4,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Sharing useful tips from personal experience. Demonstrating practical knowledge.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T13:59:53.808Z"
+  },
+  {
+    "id": 65,
+    "from_user_id": 69,
+    "to_user_id": 60,
+    "feedback_text": "Very friendly and helpful. ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Being very friendly and helpful.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T13:59:54.855Z"
+  },
+  {
+    "id": 62,
+    "from_user_id": 69,
+    "to_user_id": 63,
+    "feedback_text": "Great collaborator, gives very constructive criticisms and is very open to feedback from fellow builders ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Great collaborator. Provides very constructive criticisms. Open to feedback from fellow builders.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T13:59:55.879Z"
+  },
+  {
+    "id": 66,
+    "from_user_id": 48,
+    "to_user_id": 66,
+    "feedback_text": "Ray thank you for allowing me to expand on ideas today, it was such a helpful time working with you!",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.7,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Openness to ideas and collaboration. Creating a helpful and supportive environment.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T13:59:57.100Z"
+  },
+  {
+    "id": 67,
+    "from_user_id": 48,
+    "to_user_id": 88,
+    "feedback_text": "Tommy you always keep me on track and I appreciate when you are able to ask questions because it provides me with clarification as well!",
+    "sentiment_score": 0.7,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Keeping the recipient on track. Asking questions for clarification.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T13:59:58.122Z"
+  },
+  {
+    "id": 68,
+    "from_user_id": 84,
+    "to_user_id": 90,
+    "feedback_text": "I enjjoyed collaborating with her!\n",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective collaboration skills.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T13:59:59.660Z"
+  },
+  {
+    "id": 71,
+    "from_user_id": 46,
+    "to_user_id": 103,
+    "feedback_text": "You can try adding something to your project to make it more personal and make it something that you'll be able to use it later on.",
+    "sentiment_score": 0.3,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Neutral",
+    "summary": "Opportunities: Consider adding a personal touch to the project to make it more meaningful and practical for future use..",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:00.790Z"
+  },
+  {
+    "id": 69,
+    "from_user_id": 46,
+    "to_user_id": 90,
+    "feedback_text": "You can ask your preferred llm to give you ideas on how to improve your previous project. ",
+    "sentiment_score": 0.3,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Encourages seeking input and ideas from others.\n\nOpportunities: Could provide more specific guidance on how to improve the project.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:01.979Z"
+  },
+  {
+    "id": 70,
+    "from_user_id": 46,
+    "to_user_id": 84,
+    "feedback_text": "Your idea is fantastic. I would love to use it once you are done with it!",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Fantastic idea that is highly valued.\n\nAdditional Comments: Encouraging and supportive tone towards the recipient.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:04.783Z"
+  },
+  {
+    "id": 72,
+    "from_user_id": 90,
+    "to_user_id": 46,
+    "feedback_text": "Very good I like your views on things about what we were talking about and speak up more you know what your \ntalking about. Also you're doing a great job.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Confident and knowledgeable in expressing views. Doing a great job.\n\nOpportunities: Speaking up more to share valuable insights.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:06.218Z"
+  },
+  {
+    "id": 73,
+    "from_user_id": 88,
+    "to_user_id": 48,
+    "feedback_text": "Overall, great work and I was helped a lot by Melissa in how to approach certain task and better understand the workflow template. ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Melissa's guidance in approaching tasks and understanding workflow templates.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:07.271Z"
+  },
+  {
+    "id": 74,
+    "from_user_id": 96,
+    "to_user_id": 67,
+    "feedback_text": "Great team member",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Valuable team member who contributes effectively. Positive impact on team dynamics.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:08.675Z"
+  },
+  {
+    "id": 78,
+    "from_user_id": 96,
+    "to_user_id": 43,
+    "feedback_text": "Great team member",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Valuable team member who contributes positively. Enhances team dynamics and productivity.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:10.620Z"
+  },
+  {
+    "id": 76,
+    "from_user_id": 96,
+    "to_user_id": 95,
+    "feedback_text": "Markenley is cool. I realized there was a misunderstanding on Sunday. \nHe apologized for the misunderstanding and I realized I communicated with confidence which gave the impression I was an \"expert\" on Vector Database and he wanted to learn more about from me. I felt challenged because I didn't fully grasp the new concept of Vector Database. Come to find out we just simply misunderstood each other.\nBut I feel that we can be friends and continue to work on more projects.",
+    "sentiment_score": 0.3,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Open communication and willingness to address misunderstandings. Creating a friendly and collaborative work environment.\n\nOpportunities: Improving clarity in communication to avoid future misunderstandings. Enhancing understanding of technical concepts to work more effectively.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:12.304Z"
+  },
+  {
+    "id": 79,
+    "from_user_id": 96,
+    "to_user_id": 66,
+    "feedback_text": "Great team member",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Valued team member. Contributed positively to the team dynamic.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:13.487Z"
+  },
+  {
+    "id": 75,
+    "from_user_id": 96,
+    "to_user_id": 60,
+    "feedback_text": "Great team member",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Valued team member. Contributes positively to team dynamics.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:14.645Z"
+  },
+  {
+    "id": 77,
+    "from_user_id": 96,
+    "to_user_id": 89,
+    "feedback_text": "Great team member",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Valued team member who contributes positively to the group dynamic.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:15.900Z"
+  },
+  {
+    "id": 80,
+    "from_user_id": 96,
+    "to_user_id": 37,
+    "feedback_text": "Great team member",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Valuable team member. Contributes positively to the team dynamic.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:17.103Z"
+  },
+  {
+    "id": 81,
+    "from_user_id": 26,
+    "to_user_id": 19,
+    "feedback_text": "I thought Ethan handled the leadership role well. He provided the group with a framework and a centralized plan. ",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective handling of the leadership role. Providing the group with a framework and centralized plan.",
+    "created_at": {
+      "value": "2025-04-01"
+    },
+    "processed_at": "2025-04-28T14:00:19.187Z"
+  }
+]

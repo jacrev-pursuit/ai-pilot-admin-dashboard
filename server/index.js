@@ -206,7 +206,8 @@ app.get('/api/builders/:userId/details', async (req, res) => {
     // OLD logic for workProduct - No validity filtering
     query = `
       SELECT 
-        tar.task_id, t.task_title, tar.analysis, tar.curriculum_date as date
+        tar.task_id, t.task_title, tar.analysis, tar.curriculum_date as date,
+        tar.analyzed_content -- Added analyzed_content
       FROM \`${taskAnalysisTable}\` tar
       LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
       WHERE tar.user_id = CAST(@userId AS INT64)
@@ -218,7 +219,8 @@ app.get('/api/builders/:userId/details', async (req, res) => {
     // OLD logic for comprehension
     query = `
       SELECT 
-        tar.task_id, t.task_title, tar.analysis, tar.curriculum_date as date
+        tar.task_id, t.task_title, tar.analysis, tar.curriculum_date as date,
+        tar.analyzed_content -- Added analyzed_content
       FROM \`${taskAnalysisTable}\` tar
       LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
       WHERE tar.user_id = CAST(@userId AS INT64)
@@ -508,8 +510,183 @@ app.get('/api/overview/grade-distribution', async (req, res) => {
   }
 });
 
-// Remove the older /api/grades/distribution endpoint if it exists
-// ... ensure the old endpoint is removed or commented out ...
+// --- NEW Endpoint: Cohort Task Details --- 
+app.get('/api/tasks/:taskId/cohort-details', async (req, res) => {
+  console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
+  const { taskId } = req.params;
+
+  if (!taskId) {
+      return res.status(400).json({ error: 'Missing required parameter: taskId' });
+  }
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  // NEW QUERY: Fetch individual submissions for the given task ID
+  const query = `
+    SELECT 
+      tar.id as analysis_id, -- Unique ID for each analysis record
+      tar.task_id,
+      t.task_title,
+      tar.user_id,
+      CONCAT(u.first_name, ' ', u.last_name) as user_name,
+      tar.curriculum_date AS date, -- Alias curriculum_date to 'date'
+      tar.analysis -- Select the full analysis JSON string
+      -- tar.grading_timestamp -- Can add if needed
+    FROM \`${taskAnalysisTable}\` tar
+    LEFT JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
+    LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
+    WHERE tar.task_id = CAST(@taskId AS INT64)
+      -- Optionally keep filters for invalid/incomplete tasks if desired
+      AND JSON_EXTRACT_SCALAR(tar.analysis, '$.completion_score') IS NOT NULL
+      AND SAFE_CAST(JSON_EXTRACT_SCALAR(tar.analysis, '$.completion_score') AS FLOAT64) != 0
+      AND (
+           JSON_QUERY_ARRAY(tar.analysis, '$.criteria_met') IS NULL OR
+           NOT (
+              ARRAY_LENGTH(JSON_QUERY_ARRAY(tar.analysis, '$.criteria_met')) = 1 AND
+              JSON_VALUE(JSON_QUERY_ARRAY(tar.analysis, '$.criteria_met')[OFFSET(0)]) = 'Submission received'
+           )
+      )
+    ORDER BY tar.curriculum_date DESC, user_name ASC -- Example ordering
+  `;
+
+  const options = { query, location: BIGQUERY_LOCATION, params: { taskId } }; 
+
+  try {
+    console.log(`Executing BigQuery query for ${req.path} (Task ID: ${taskId})...`);
+    const [rows] = await bigquery.query(options);
+    console.log(`Query for ${req.path} finished. Row count: ${rows.length}`);
+    
+    // Simply return the array of individual submission rows
+    res.json(rows); 
+
+  } catch (error) {
+    console.error(`Error in ${req.path} (Task ID: ${taskId}):`, error);
+    logger.error(`Error executing BigQuery cohort task details query (Task ID: ${taskId})`, { error: error.message, stack: error.stack, query: options.query });
+    res.status(500).json({ error: 'Failed to fetch cohort task details' });
+  }
+});
+
+// --- NEW Endpoint: List Tasks with Analyses ---
+app.get('/api/tasks/list', async (req, res) => {
+  console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  // Query to get distinct tasks that have at least one record in task_analysis_results
+  const query = `
+    SELECT DISTINCT
+      t.id as task_id,
+      t.task_title
+    FROM \`${tasksTable}\` t
+    INNER JOIN \`${taskAnalysisTable}\` tar ON t.id = tar.task_id
+    -- Optional: Add filters if needed, e.g., only certain learning_types or date ranges
+    -- WHERE tar.learning_type IN ('Work product', 'Key concept') 
+    ORDER BY t.task_title ASC
+  `;
+
+  const options = { query, location: BIGQUERY_LOCATION };
+
+  try {
+    console.log(`Executing BigQuery query for ${req.path}...`);
+    const [rows] = await bigquery.query(options);
+    console.log(`Query for ${req.path} finished. Row count: ${rows.length}`);
+    res.json(rows); // Returns array like [{ task_id: 1, task_title: 'Task A' }, ...]
+  } catch (error) {
+    console.error(`Error in ${req.path}:`, error);
+    logger.error('Error fetching task list', { error: error.message, stack: error.stack, query: options.query });
+    res.status(500).json({ error: 'Failed to fetch task list' });
+  }
+});
+
+// --- NEW Endpoint: Paginated Individual Task Submissions/Analyses ---
+app.get('/api/tasks/:taskId/submissions', async (req, res) => {
+  console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
+  const { taskId } = req.params;
+  const { page = 1, pageSize = 10 } = req.query; // Remove startDate, endDate
+
+  // Remove date param validation
+  // if (!taskId || !startDate || !endDate) {\n  //   return res.status(400).json({ error: 'Missing required parameters (taskId, startDate, endDate)' });\n  // }\n  if (!taskId) {\n    return res.status(400).json({ error: 'Missing required parameter: taskId' });\n  }\n  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });\n
+
+  const pageNum = parseInt(page, 10) || 1;
+  const sizeNum = parseInt(pageSize, 10) || 10;
+  const offset = (pageNum - 1) * sizeNum;
+
+  // Define task_threads table name (assuming it's in the same dataset)
+  const taskThreadsTable = `${PROJECT_ID}.${DATASET}.task_threads`;
+
+  // Revised query using CTEs to fetch content from different sources
+  const query = `\n    WITH AnalysisBase AS (\n      SELECT\n        tar.user_id,\n        tar.task_id,\n        CONCAT(u.first_name, \' \', u.last_name) as builder_name,\n        tar.curriculum_date as date,\n        tar.analysis,\n        t.deliverable_type\n      FROM \`${taskAnalysisTable}\` tar\n      LEFT JOIN \`${usersTable}\` u ON tar.user_id = u.user_id\n      LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id\n      WHERE tar.task_id = CAST(@taskId AS INT64)\n        -- Apply validity filters --\n        AND JSON_EXTRACT_SCALAR(tar.analysis, \'$.completion_score\') IS NOT NULL\n        AND SAFE_CAST(JSON_EXTRACT_SCALAR(tar.analysis, \'$.completion_score\') AS FLOAT64) != 0\n        AND (\n            JSON_QUERY_ARRAY(tar.analysis, \'$.criteria_met\') IS NULL OR\n            NOT (\n                ARRAY_LENGTH(JSON_QUERY_ARRAY(tar.analysis, \'$.criteria_met\')) = 1 AND \n                JSON_VALUE(JSON_QUERY_ARRAY(tar.analysis, \'$.criteria_met\')[OFFSET(0)]) = \'Submission received\'\n            )\n        )      \n    ),\n    SubmissionContent AS (\n      SELECT task_id, user_id, content as submission_content\n      FROM \`${taskSubmissionsTable}\`\n      WHERE task_id = CAST(@taskId AS INT64)\n    ),\n    ResponseContent AS (\n      SELECT task_id, user_id, STRING_AGG(response_content ORDER BY date ASC) as response_aggregate\n      FROM \`${taskResponsesTable}\`\n      WHERE task_id = CAST(@taskId AS INT64)\n      GROUP BY task_id, user_id\n    ),\n    ConversationContent AS (\n      SELECT \n        tt.task_id, \n        tt.user_id, \n        STRING_AGG(cm.content ORDER BY cm.created_at ASC) as conversation_aggregate\n      FROM \`${taskThreadsTable}\` tt\n      JOIN \`${messagesTable}\` cm ON tt.thread_id = cm.thread_id \n      WHERE tt.task_id = CAST(@taskId AS INT64)\n        AND cm.message_role = \'user\'\n      GROUP BY tt.task_id, tt.user_id\n    ),\n    FilteredCount AS (\n      SELECT COUNT(*) as total_items\n      FROM AnalysisBase\n    )\n    -- Final selection joining all data sources\n    SELECT \n      ab.user_id,\n      ab.builder_name,\n      ab.date,\n      ab.analysis,\n      ab.deliverable_type,\n      CASE \n        WHEN ab.deliverable_type = \'link\' THEN sc.submission_content \n        WHEN ab.deliverable_type = \'text\' THEN cc.conversation_aggregate \n        ELSE rc.response_aggregate \n      END as analyzed_content,\n      fc.total_items as total_count\n    FROM AnalysisBase ab\n    LEFT JOIN SubmissionContent sc ON ab.task_id = sc.task_id AND ab.user_id = sc.user_id\n    LEFT JOIN ResponseContent rc ON ab.task_id = rc.task_id AND ab.user_id = rc.user_id\n    LEFT JOIN ConversationContent cc ON ab.task_id = cc.task_id AND ab.user_id = cc.user_id\n    CROSS JOIN FilteredCount fc \n    ORDER BY ab.date DESC, ab.builder_name ASC\n    LIMIT @limit OFFSET @offset\n  `;
+
+  // Remove date params
+  const options = { 
+    query, 
+    location: BIGQUERY_LOCATION, 
+    params: { taskId, limit: sizeNum, offset }
+  };
+
+  try {
+    console.log(`Executing BigQuery query for ${req.path} (Task ID: ${taskId}, Page: ${pageNum}, Size: ${sizeNum})...`);
+    const [rows] = await bigquery.query(options);
+    console.log(`Query for ${req.path} finished. Row count: ${rows.length}`);
+    
+    const totalCount = rows.length > 0 ? rows[0].total_count : 0;
+
+    // Remove total_count from individual rows before sending
+    const results = rows.map(({ total_count, ...rest }) => rest);
+
+    res.json({
+      submissions: results, // Array of submission objects
+      pagination: {
+        currentPage: pageNum,
+        pageSize: sizeNum,
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / sizeNum)
+      }
+    }); 
+
+  } catch (error) {
+    console.error(`Error in ${req.path} (Task ID: ${taskId}):`, error);
+    logger.error('Error fetching task submissions', { error: error.message, stack: error.stack, query: options.query });
+    res.status(500).json({ error: 'Failed to fetch task submissions' });
+  }
+});
+
+// --- NEW Endpoint: Fetch All Task Analysis Results ---
+app.get('/api/tasks/all-analysis', async (req, res) => {
+  console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  // TODO: Add pagination, filtering, sorting later if needed
+  const query = `
+    SELECT 
+      tar.id as analysis_id,
+      tar.task_id,
+      t.task_title,
+      tar.user_id,
+      CONCAT(u.first_name, ' ', u.last_name) as user_name,
+      tar.curriculum_date AS date,
+      tar.analysis, -- Select the full analysis JSON string
+      tar.learning_type,
+      tar.grading_timestamp
+    FROM \`${taskAnalysisTable}\` tar
+    LEFT JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
+    LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
+    -- WHERE clauses for filtering can be added here based on query params
+    ORDER BY tar.grading_timestamp DESC -- Default sort: newest first
+    -- LIMIT/OFFSET for pagination can be added here
+  `;
+
+  const options = { query, location: BIGQUERY_LOCATION, params: {} }; // Params can be added for filtering
+
+  try {
+    console.log(`Executing BigQuery query for ${req.path}...`);
+    const [rows] = await bigquery.query(options);
+    console.log(`Query for ${req.path} finished. Row count: ${rows.length}`);
+    res.json(rows);
+  } catch (error) {
+    console.error(`Error in ${req.path}:`, error);
+    logger.error('Error executing BigQuery all task analysis query', { error: error.message, stack: error.stack, query: options.query });
+    res.status(500).json({ error: 'Failed to fetch all task analysis results' });
+  }
+});
 
 // Restore static serving and fallback
 const frontendDistPath = path.resolve(__dirname, '../dist');

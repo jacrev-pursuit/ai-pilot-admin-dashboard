@@ -1,0 +1,814 @@
+[
+  {
+    "id": 1,
+    "from_user_id": 48,
+    "to_user_id": 100,
+    "feedback_text": "You were awesome in our team, something I admired from you was your continued communication and shared knowledge. I always am impressed on how well you can articulate your thoughts into words, and your enthusiastic and friendly approach to everyone!",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Strong communication skills that enhance team collaboration. Ability to articulate thoughts effectively. Enthusiastic and friendly approach towards others.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:14.541Z"
+  },
+  {
+    "id": 2,
+    "from_user_id": 11,
+    "to_user_id": 48,
+    "feedback_text": "I'm testing to see how this feedback function works. You're always a joy to work with, and you articulate your ideas really well.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Joy to work with. Articulate in expressing ideas.\n\nAdditional Comments: The recipient is highly valued for their positive attitude and clear communication skills..",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:15.787Z"
+  },
+  {
+    "id": 3,
+    "from_user_id": 48,
+    "to_user_id": 11,
+    "feedback_text": "Your positivity, knowledge, and voice really made me understand the pain points in my knowledge gap of my previous days. Thank you for always providing the humor we need when the stress becomes high!",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Positivity that helps in understanding pain points. Knowledge that fills knowledge gaps. Voice that enhances communication.\n\nAdditional Comments: Providing humor during high-stress moments is appreciated.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:17.547Z"
+  },
+  {
+    "id": 4,
+    "from_user_id": 69,
+    "to_user_id": 92,
+    "feedback_text": "I appreciate his proactive approach to problem solving; he jumps in and find solutions and significantly contributes to our team's success",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Proactive approach to problem-solving. Contribution to team success.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:18.661Z"
+  },
+  {
+    "id": 5,
+    "from_user_id": 48,
+    "to_user_id": 29,
+    "feedback_text": "You are someone who I relate to when it comes to how we view ourselves in our work. You allowed me to feel comfortable in feeling uncomfortable with my knowledge gap, and getting to understand these concepts we learned in our groups really helped my understanding of the work.\n",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Creating a comfortable environment for others to address knowledge gaps. Helping others understand concepts in group settings.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:20.291Z"
+  },
+  {
+    "id": 6,
+    "from_user_id": 48,
+    "to_user_id": 77,
+    "feedback_text": "You legit made this team flow. Your knowledge, immaculate, thank you for helping all of us really dig deep in our understanding of how to build",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: In-depth knowledge that facilitated team collaboration and understanding.\n\nAdditional Comments: Great job in helping the team delve deep into the subject matter and fostering a cohesive work environment.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:21.406Z"
+  },
+  {
+    "id": 7,
+    "from_user_id": 48,
+    "to_user_id": 80,
+    "feedback_text": "Jason, you have been such a pleasure to work with these past weeks, I cannot wait to see your finished project. When it came to your explanation of your personal project, You provided me with insight on how I can break my product down into smaller parts. Part of my issues with working on LLMs is I am used to seeing a Whole product vs. the individual parts.\n",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing insightful explanations that help others break down complex projects. Creating a positive and collaborative work environment.\n\nOpportunities: Consider providing more guidance on how to approach projects as a whole.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:23.384Z"
+  },
+  {
+    "id": 9,
+    "from_user_id": 28,
+    "to_user_id": 62,
+    "feedback_text": "He was very focused and brought the energy to the group.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Strong focus on tasks. Brings positive energy to the group.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:26.149Z"
+  },
+  {
+    "id": 8,
+    "from_user_id": 28,
+    "to_user_id": 79,
+    "feedback_text": "She contributed a lot to the project, despite not being at HQ on Saturday.",
+    "sentiment_score": 0.4,
+    "sentiment_magnitude": 0.7,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Dedication to the project despite physical location.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:27.427Z"
+  },
+  {
+    "id": 12,
+    "from_user_id": 28,
+    "to_user_id": 71,
+    "feedback_text": "Great public speaker, understood her topic which made things easy. She contributed to a lot of the project. Great to work with!",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Great public speaker with a strong understanding of her topic. Contributed significantly to the project.\n\nAdditional Comments: Described as great to work with, indicating positive teamwork and collaboration skills.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:29.323Z"
+  },
+  {
+    "id": 11,
+    "from_user_id": 28,
+    "to_user_id": 56,
+    "feedback_text": "The tech expert and really came in clutch. Great teammate.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Tech expertise that was valuable to the team. Being a great teammate and coming through when needed.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:30.704Z"
+  },
+  {
+    "id": 10,
+    "from_user_id": 28,
+    "to_user_id": 86,
+    "feedback_text": "Added feedback and was helpful to the group.",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.5,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Providing helpful feedback to the group.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:31.735Z"
+  },
+  {
+    "id": 13,
+    "from_user_id": 48,
+    "to_user_id": 31,
+    "feedback_text": "Kelvin, I have not worked with you before this group, your ideas and insight on LLMs were refreshing to see. I enjoyed seeing how you allowed us to narrow down our understanding and timing of our finished product. You kept our team grounded in keeping us all uniformed while working together.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Refreshing ideas and insight on LLMs. Effective in narrowing down understanding and timing of finished product. Kept the team grounded and uniformed while working together.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:32.885Z"
+  },
+  {
+    "id": 14,
+    "from_user_id": 48,
+    "to_user_id": 34,
+    "feedback_text": "Thank you for being a part of Team 9! it was my first time working with you and I enjoyed how honest you were in helping Jason and myself try to understand the work we did individually the first day! Thank you for opening up to us, it helped my knowledge on LLMs",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Honesty in helping team members understand their work. Contributing to knowledge on LLMs.\n\nAdditional Comments: Great job on being open and honest in your interactions with team members, it had a positive impact on knowledge sharing.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:34.505Z"
+  },
+  {
+    "id": 18,
+    "from_user_id": 11,
+    "to_user_id": 77,
+    "feedback_text": "I love working with you. You're always receptive to other people's suggestions and feedback, you have great taste in music, and you take active steps to keep the vibe Good. Thanks.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Receptive to others' suggestions and feedback. Great taste in music. Maintains a positive vibe.\n\nAdditional Comments: Thank you for your positive attitude and collaborative spirit.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:35.875Z"
+  },
+  {
+    "id": 17,
+    "from_user_id": 11,
+    "to_user_id": 29,
+    "feedback_text": "You consistently volunteer your help, and always are trying to keep things moving! A lot of people would be content to just sit and wait for something to happen, but your proactivity is always a boon.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Consistently volunteering help. Proactive attitude.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:36.854Z"
+  },
+  {
+    "id": 15,
+    "from_user_id": 11,
+    "to_user_id": 100,
+    "feedback_text": "Jessenia! I think you're one of the most consistent sources of positivity, even in the most dire of situations. Your refusal to give up even to the last minute is inspiring.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Consistent source of positivity. Refusal to give up even in dire situations. Inspiring to others.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:38.154Z"
+  },
+  {
+    "id": 19,
+    "from_user_id": 11,
+    "to_user_id": 48,
+    "feedback_text": "Okay, not test feedback this time: You have a knack for picking up when it's the right time to step in and guide discussion. Your ability to read a room is strong as heck, don't doubt it.\nThe feedback in my test of \"You always articulate your ideas wonderfully, and are a joy to work with\" still stands.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Ability to read a room and guide discussions effectively. Articulate communication skills.\n\nAdditional Comments: Encouragement to trust in your strong ability to read situations and lead discussions.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:40.073Z"
+  },
+  {
+    "id": 16,
+    "from_user_id": 11,
+    "to_user_id": 31,
+    "feedback_text": "I'm grateful for your dedication to trying to Make Stuff Work. The only possible constructive feedback I could think of is \"you know your stuff, don't be afraid of sharing it out loud.\"",
+    "sentiment_score": 0.5,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Dedication to trying to Make Stuff Work.\n\nOpportunities: Don't be afraid to share your knowledge out loud.\n\nAdditional Comments: Grateful for the dedication shown.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:43.613Z"
+  },
+  {
+    "id": 22,
+    "from_user_id": 30,
+    "to_user_id": 17,
+    "feedback_text": "thanks for being out there in the trenches and bringing the app to life",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Dedication to the project by being actively involved. Ability to bring the app to life.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:45.526Z"
+  },
+  {
+    "id": 20,
+    "from_user_id": 30,
+    "to_user_id": 18,
+    "feedback_text": "thanks for being a participant in the group and helping out in certain topics",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.5,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Active participation in group discussions. Willingness to help others with certain topics.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:46.755Z"
+  },
+  {
+    "id": 25,
+    "from_user_id": 30,
+    "to_user_id": 36,
+    "feedback_text": "thanks for being out there in the trenches and bringing the app to life",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Dedication to the project by being actively involved. Ability to bring the app to life.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:47.797Z"
+  },
+  {
+    "id": 21,
+    "from_user_id": 30,
+    "to_user_id": 38,
+    "feedback_text": "thanks for being a participant in the group and helping out in certain topics",
+    "sentiment_score": 0.7,
+    "sentiment_magnitude": 0.5,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Active participation in the group. Helpful contributions to specific topics.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:48.928Z"
+  },
+  {
+    "id": 24,
+    "from_user_id": 30,
+    "to_user_id": 72,
+    "feedback_text": "thanks for being a participant in the group and helping out in certain topics",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.5,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Active participation in the group. Helpful in certain topics.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:50.244Z"
+  },
+  {
+    "id": 23,
+    "from_user_id": 30,
+    "to_user_id": 99,
+    "feedback_text": "thanks for the feed back",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.5,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Appreciation for feedback.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:51.848Z"
+  },
+  {
+    "id": 26,
+    "from_user_id": 60,
+    "to_user_id": 66,
+    "feedback_text": "you doing great, keep it up",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Consistent performance and progress.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:52.874Z"
+  },
+  {
+    "id": 27,
+    "from_user_id": 20,
+    "to_user_id": 45,
+    "feedback_text": "Tenacious builder, went above and beyond and did not give up given the time constraints with a lot of creativity",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Tenacious attitude and determination. Ability to think creatively under time constraints.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:54.230Z"
+  },
+  {
+    "id": 28,
+    "from_user_id": 43,
+    "to_user_id": 66,
+    "feedback_text": "Try different prompts every time and always work with better prompts.",
+    "sentiment_score": 0.3,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Neutral",
+    "summary": "Opportunities: Experiment with a variety of prompts to keep engagement high. Continuously seek out and utilize more effective prompts.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:56.563Z"
+  },
+  {
+    "id": 29,
+    "from_user_id": 25,
+    "to_user_id": 41,
+    "feedback_text": "It was awesome working with you.  I loved the energy you brought to the team. ",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Positive energy that enhanced team dynamics.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:58.096Z"
+  },
+  {
+    "id": 33,
+    "from_user_id": 18,
+    "to_user_id": 36,
+    "feedback_text": "You're hard working!! ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Demonstrates strong work ethic and dedication.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:58:59.137Z"
+  },
+  {
+    "id": 30,
+    "from_user_id": 18,
+    "to_user_id": 30,
+    "feedback_text": "You're awesome! you got this!",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Encouraging and uplifting attitude. Confidence booster.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:00.143Z"
+  },
+  {
+    "id": 31,
+    "from_user_id": 18,
+    "to_user_id": 72,
+    "feedback_text": "You're awesome! you got this!",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Encouraging and uplifting tone.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:01.963Z"
+  },
+  {
+    "id": 32,
+    "from_user_id": 18,
+    "to_user_id": 17,
+    "feedback_text": "You're smart and come up with solution so quickly! ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Quick problem-solving skills. Intelligence.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:03.012Z"
+  },
+  {
+    "id": 34,
+    "from_user_id": 18,
+    "to_user_id": 38,
+    "feedback_text": "You're awesome! you got this!",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Encouraging and uplifting attitude.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:04.086Z"
+  },
+  {
+    "id": 40,
+    "from_user_id": 96,
+    "to_user_id": 67,
+    "feedback_text": "Great team worker",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Strong team working skills. Contributes positively to group dynamics.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:07.269Z"
+  },
+  {
+    "id": 39,
+    "from_user_id": 96,
+    "to_user_id": 43,
+    "feedback_text": "Great team worker",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective team worker who contributes positively to group dynamics.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:08.332Z"
+  },
+  {
+    "id": 37,
+    "from_user_id": 96,
+    "to_user_id": 89,
+    "feedback_text": "Great team worker",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Strong team working skills. Enhanced collaboration within the team.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:09.395Z"
+  },
+  {
+    "id": 35,
+    "from_user_id": 96,
+    "to_user_id": 37,
+    "feedback_text": "Great team worker",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective team collaboration skills.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:10.386Z"
+  },
+  {
+    "id": 41,
+    "from_user_id": 96,
+    "to_user_id": 95,
+    "feedback_text": "He is argumentative.",
+    "sentiment_score": -0.6,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Negative",
+    "summary": "Opportunities: Opportunity to work on being more open-minded and receptive to different viewpoints.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:17.849Z"
+  },
+  {
+    "id": 38,
+    "from_user_id": 96,
+    "to_user_id": 66,
+    "feedback_text": "Great team worker",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Strong team working skills.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:19.054Z"
+  },
+  {
+    "id": 36,
+    "from_user_id": 96,
+    "to_user_id": 60,
+    "feedback_text": "Great team worker",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Effective team collaboration skills.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:20.113Z"
+  },
+  {
+    "id": 44,
+    "from_user_id": 100,
+    "to_user_id": 80,
+    "feedback_text": "Incredible energy and another great team lead! Help with fast ideation and idea build out. ",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Incredible energy that boosts team morale. Great team lead that guides and motivates the team. Helps with fast ideation and idea build out.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:21.581Z"
+  },
+  {
+    "id": 46,
+    "from_user_id": 100,
+    "to_user_id": 31,
+    "feedback_text": "First to launch MVP, excited about using tech and making sure functionality is integrated. Worked fast and hard. Good mindset to stay on track. ",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Proactive in launching MVP. Excitement for using technology. Efficient and hardworking. Maintains a focused mindset.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:22.960Z"
+  },
+  {
+    "id": 42,
+    "from_user_id": 100,
+    "to_user_id": 29,
+    "feedback_text": "SO great at admin and. building workflow to help support team. Worked and gave input and tried to teach me new concepts though i had 0 clue what she was talking about.",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Great at admin tasks and building workflows to support the team. Actively contributed and provided input.\n\nOpportunities: Clarify explanations for better understanding by team members with varying levels of knowledge.\n\nAdditional Comments: Appreciate the effort to teach new concepts, but consider adjusting the approach for better comprehension.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:24.414Z"
+  },
+  {
+    "id": 48,
+    "from_user_id": 100,
+    "to_user_id": 48,
+    "feedback_text": "Wonderful team lead! She did an amazing job of keeping the team on task, idea building and leading the product direction, and idea ideation.",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Effective team leadership. Kept the team on task. Facilitated idea building and product direction.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:26.105Z"
+  },
+  {
+    "id": 47,
+    "from_user_id": 100,
+    "to_user_id": 34,
+    "feedback_text": "Quiet, but was working to get Api keys and work through implementation. Would love to see him speak up more, but did great in voiceover. ",
+    "sentiment_score": 0.4,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Neutral",
+    "summary": "Strengths: Effective in voiceover tasks.\n\nOpportunities: Encourage to speak up more during discussions.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:27.218Z"
+  },
+  {
+    "id": 43,
+    "from_user_id": 100,
+    "to_user_id": 11,
+    "feedback_text": "So helpful, connecting his skills and knowledge to project every step of the way to close gaps in workflow. Such a sweet, fun team member. First, to jump in and catch me up on what I was missing. ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Proactively connects skills and knowledge to project to close workflow gaps. Sweet and fun team member. First to jump in and catch up team members.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:28.456Z"
+  },
+  {
+    "id": 49,
+    "from_user_id": 100,
+    "to_user_id": 82,
+    "feedback_text": "Mosi came late, perhaps because he was unwell. He showed up for a short time yesterday and then disappeared without notice. Our team was not aware of what was happening. He wasn't able to input due to health reasons, but he was creating a build out.",
+    "sentiment_score": -0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Negative",
+    "summary": "Strengths: Despite health issues, Mosi attempted to contribute by creating a build out.\n\nOpportunities: Improvement in communication regarding absence and health issues to keep the team informed.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:29.972Z"
+  },
+  {
+    "id": 45,
+    "from_user_id": 100,
+    "to_user_id": 77,
+    "feedback_text": "Rad worked really hard on learning concepts and explaining things. Brought many ideas to the table for project model.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.7,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Dedication to learning and explaining concepts. Contributing multiple ideas for project model.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:31.317Z"
+  },
+  {
+    "id": 54,
+    "from_user_id": 80,
+    "to_user_id": 34,
+    "feedback_text": "Eager to learn and easy to work with.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Eagerness to learn. Easy to work with.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:33.198Z"
+  },
+  {
+    "id": 55,
+    "from_user_id": 80,
+    "to_user_id": 100,
+    "feedback_text": "Worked with Kelvin creating our blue sky idea. Shared her development process using a custom business plan template and Replit.",
+    "sentiment_score": 0.3,
+    "sentiment_magnitude": 0.5,
+    "sentiment_category": "Neutral",
+    "summary": "Strengths: Collaborating with Kelvin to create a blue sky idea. Sharing her development process using a custom business plan template and Replit.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:34.489Z"
+  },
+  {
+    "id": 53,
+    "from_user_id": 80,
+    "to_user_id": 48,
+    "feedback_text": "Led the brainstorming and organization on Sunday. Created our video presentation",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Took the lead in brainstorming and organizing. Created a video presentation for the team.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:38.092Z"
+  },
+  {
+    "id": 51,
+    "from_user_id": 80,
+    "to_user_id": 11,
+    "feedback_text": "Stepped up in a big way today creating a simplified working MVP demo for us.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Proactively creating a simplified working MVP demo. Stepping up in a big way.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:39.342Z"
+  },
+  {
+    "id": 56,
+    "from_user_id": 80,
+    "to_user_id": 77,
+    "feedback_text": "Worked well with the group, a positive attitude.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Positive attitude that contributed to group dynamics.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:40.288Z"
+  },
+  {
+    "id": 50,
+    "from_user_id": 80,
+    "to_user_id": 29,
+    "feedback_text": "Had great ideas during the brainstorming session on Sunday.",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Creative and innovative ideas shared during the brainstorming session.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:41.570Z"
+  },
+  {
+    "id": 52,
+    "from_user_id": 80,
+    "to_user_id": 31,
+    "feedback_text": "Worked closely with Jessenia on creating our original big idea MVP",
+    "sentiment_score": 0.6,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Collaborative work with Jessenia on creating the original big idea MVP.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:42.783Z"
+  },
+  {
+    "id": 57,
+    "from_user_id": 19,
+    "to_user_id": 24,
+    "feedback_text": "Lee is an amazing teammate with great emotional intelligence. He was able to see when I was being stressed as a leader the first day and help me break problem dow to refocus. He also provided fair and constructive criticism that I found extremely valuable",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Great emotional intelligence. Ability to provide fair and constructive criticism. Supportive teammate.\n\nAdditional Comments: Lee's emotional intelligence and constructive feedback were instrumental in helping the recipient as a leader..",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:44.409Z"
+  },
+  {
+    "id": 58,
+    "from_user_id": 88,
+    "to_user_id": 25,
+    "feedback_text": "You were great at presenting, however, the presentation could have been a bit more simpler for the audience to understand the concept within the presentation.",
+    "sentiment_score": 0.4,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Great presentation skills.\n\nOpportunities: Simplify the presentation for better audience understanding.",
+    "created_at": {
+      "value": "2025-03-31"
+    },
+    "processed_at": "2025-04-28T13:59:45.840Z"
+  }
+]

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Card, Typography, DatePicker, Table, Tabs, Spin, message, Button, Select, Space, Row, Col, Tag, Modal } from 'antd';
+import { Card, Typography, DatePicker, Table, Tabs, Spin, message, Button, Select, Space, Row, Col, Tag, Modal, Descriptions, Alert } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { fetchBuilderData, fetchBuilderDetails } from '../services/builderService';
@@ -774,9 +774,9 @@ const BuilderDetailsPage = () => {
   const [sentimentData, setSentimentData] = useState([]);
 
   // Need state for the modals
-  const [workProductModalVisible, setWorkProductModalVisible] = useState(false);
+  const [isWorkProductModalVisible, setWorkProductModalVisible] = useState(false);
   const [selectedWorkProduct, setSelectedWorkProduct] = useState(null);
-  const [comprehensionModalVisible, setComprehensionModalVisible] = useState(false); // State for Comprehension modal
+  const [isComprehensionModalVisible, setComprehensionModalVisible] = useState(false); // State for Comprehension modal
   const [selectedComprehension, setSelectedComprehension] = useState(null); // State for selected Comprehension item
 
   const [highlightedRowKey, setHighlightedRowKey] = useState(null);
@@ -1025,7 +1025,7 @@ const BuilderDetailsPage = () => {
 
   // Define columns for each table
   const workProductColumns = [
-    { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '25%' }, // Adjusted width
+    { title: 'Task Title', dataIndex: 'task_title', key: 'task_title', width: '25%' },
     { 
       title: 'Date', 
       dataIndex: 'date', 
@@ -1123,7 +1123,7 @@ const BuilderDetailsPage = () => {
         return feedback || '-';
       } 
     },
-    { // Add Actions column
+    {
       title: 'Actions',
       key: 'actions',
       width: '15%', 
@@ -1249,6 +1249,39 @@ const BuilderDetailsPage = () => {
   const hideComprehensionDetails = () => {
     setComprehensionModalVisible(false);
     setSelectedComprehension(null); // Clear selected record
+  };
+
+  // Helper function to render analyzed content (outside the main component)
+  const renderAnalyzedContent = (content) => {
+    if (!content) return '-';
+
+    // Regex to check if the string is likely a URL
+    const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
+
+    // Attempt to parse as JSON link structure first
+    try {
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].type === 'link' && typeof parsed[0].content === 'string') {
+        const url = parsed[0].content;
+         // Additional check if the extracted content is actually a URL
+         if (urlRegex.test(url)) { 
+           return <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>;
+         } else {
+           // If JSON structure is there but content isn't a URL, display raw JSON
+           return <Text style={{ whiteSpace: 'pre-wrap', fontSize: '12px' }}><pre>{JSON.stringify(parsed, null, 2)}</pre></Text>;
+         }
+      }
+    } catch (e) {
+      // Not JSON or wrong format, proceed to check if it's a plain URL
+    }
+
+    // Check if the plain text content is a URL
+    if (typeof content === 'string' && urlRegex.test(content)) {
+      return <a href={content} target="_blank" rel="noopener noreferrer">{content}</a>;
+    }
+
+    // Fallback: Render as plain text (use pre for potential formatting)
+    return <Text style={{ whiteSpace: 'pre-wrap', fontSize: '12px' }}><pre>{content}</pre></Text>;
   };
 
   return (
@@ -1514,190 +1547,206 @@ const BuilderDetailsPage = () => {
 
       {/* Work Product Details Modal */}
       <Modal
-        title="Work Product Details" 
-        open={workProductModalVisible}
+        title={`Work Product Details - ${selectedWorkProduct?.task_title || 'Task'}`}
+        open={isWorkProductModalVisible}
         onCancel={hideWorkProductDetails}
         footer={[
-          <Button key="back" onClick={hideWorkProductDetails}>
-            Close
-          </Button>,
-        ]}
-        width={800} // Adjusted width
-      >
-        {selectedWorkProduct && ( // Ensure record exists
-          () => { // Use function to parse safely
-            const analysis = parseAnalysis(selectedWorkProduct.analysis);
-            return (
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Title level={4}>{selectedWorkProduct.task_title || 'Task Details'}</Title>
-                
-                {analysis?.submission_summary && (
-                  <> 
-                    <Text strong>Submission Summary:</Text>
-                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                      {analysis.submission_summary}
-                    </Paragraph>
-                  </>
-                )}
-
-                {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
-                  <Text strong>Score: {analysis.completion_score}</Text>
-                )}
-                
-                {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
-                  <>
-                    <Text strong>Criteria Met:</Text>
-                    <Space wrap size={[4, 8]}>
-                      {analysis.criteria_met.map((item, index) => <Tag color="green" key={`crit-${index}`}>{item}</Tag>)}
-                    </Space>
-                  </>
-                )}
-
-                {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
-                  <>
-                    <Text strong>Areas for Improvement:</Text>
-                    <Space wrap size={[4, 8]}>
-                      {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`area-${index}`}>{item}</Tag>)}
-                    </Space>
-                  </>
-                )}
-
-                {/* --- Specific Findings Section --- */}
-                {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
-                  <>
-                    <Title level={5} style={{ marginTop: '16px', marginBottom: '8px' }}>Specific Findings:</Title>
-                    {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
-                      <div key={`find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
-                        <Text strong>{category}:</Text>
-                        {findings?.strengths && findings.strengths.length > 0 && (
-                          <div style={{ marginTop: '4px' }}>
-                            <Text>Strengths:</Text>
-                            <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
-                              {findings.strengths.map((item, index) => <li key={`str-${catIndex}-${index}`}>{item}</li>)}
-                            </ul>
-          </div>
-        )}
-                        {findings?.weaknesses && findings.weaknesses.length > 0 && (
-                          <div style={{ marginTop: '4px' }}>
-                            <Text>Weaknesses:</Text>
-                            <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
-                              {findings.weaknesses.map((item, index) => <li key={`weak-${catIndex}-${index}`}>{item}</li>)}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
-                {/* --- End Specific Findings --- */}
-                
-                {analysis?.feedback && (
-                  <>
-                    <Text strong>Feedback:</Text>
-                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                      {analysis.feedback}
-                    </Paragraph>
-                  </>
-                )}
-                
-                {/* Add Strengths/Weaknesses parsing later if needed */}
-
-              </Space>
-            );
-          })()
-        }
-      </Modal>
-
-      {/* Comprehension Details Modal - NEW */}
-      <Modal
-        title="Comprehension Details" 
-        open={comprehensionModalVisible}
-        onCancel={hideComprehensionDetails}
-        footer={[
-          <Button key="back" onClick={hideComprehensionDetails}>
-            Close
-          </Button>,
-        ]}
+           <Button key="back" onClick={hideWorkProductDetails}>
+             Close
+           </Button>,
+         ]}
         width={800}
       >
-        {selectedComprehension && ( // Ensure record exists
-          () => { // Use function to parse safely
-            const analysis = parseAnalysis(selectedComprehension.analysis);
-            return (
+        {selectedWorkProduct && (
+           (() => {
+             const analysis = parseAnalysis(selectedWorkProduct.analysis);
+             // Check if analysis parsing failed
+             if (!analysis || analysis.feedback === 'Error parsing analysis data.') {
+                 return <Alert message="Error" description="Could not parse analysis data for this record." type="error" showIcon />;
+             }
+             return (
               <Space direction="vertical" style={{ width: '100%' }}>
-                <Title level={4}>{selectedComprehension.task_title || 'Task Details'}</Title>
-                
-                {analysis?.submission_summary && (
-                  <> 
-                    <Text strong>Submission Summary:</Text>
-                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                      {analysis.submission_summary}
-                    </Paragraph>
-                  </>
-                )}
+                 <Title level={4}>{selectedWorkProduct.task_title || 'Task Details'}</Title>
+                 
+                 {/* Restore previous fields */}
+                 {analysis?.submission_summary && (
+                   <> 
+                     <Text strong>Submission Summary:</Text>
+                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                       {analysis.submission_summary}
+                     </Paragraph>
+                   </>
+                 )}
+                 {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
+                   <Text strong>Score: {analysis.completion_score}</Text>
+                 )}
+                 {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
+                   <>
+                     <Text strong>Criteria Met:</Text>
+                     <Space wrap size={[4, 8]}>
+                       {analysis.criteria_met.map((item, index) => <Tag color="green" key={`wp-crit-${index}`}>{item}</Tag>)}
+                     </Space>
+                   </>
+                 )}
+                 {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
+                   <>
+                     <Text strong>Areas for Improvement:</Text>
+                     <Space wrap size={[4, 8]}>
+                       {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`wp-area-${index}`}>{item}</Tag>)}
+                     </Space>
+                   </>
+                 )}
+                 {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
+                    <> 
+                      <Title level={5} style={{ marginTop: '16px', marginBottom: '8px' }}>Specific Findings:</Title>
+                      {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
+                        <div key={`wp-find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
+                          <Text strong>{category}:</Text>
+                          {findings?.strengths && findings.strengths.length > 0 && (
+                            <div style={{ marginTop: '4px' }}>
+                              <Text>Strengths:</Text>
+                              <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
+                                {findings.strengths.map((item, index) => <li key={`wp-str-${catIndex}-${index}`}>{item}</li>)}
+                              </ul>
+                            </div>
+                          )}
+                          {findings?.weaknesses && findings.weaknesses.length > 0 && (
+                            <div style={{ marginTop: '4px' }}>
+                              <Text>Weaknesses:</Text>
+                              <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
+                                {findings.weaknesses.map((item, index) => <li key={`wp-weak-${catIndex}-${index}`}>{item}</li>)}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                 )}
+                 {analysis?.feedback && (
+                   <>
+                     <Text strong>Feedback:</Text>
+                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                       {analysis.feedback}
+                     </Paragraph>
+                   </>
+                 )}
 
-                {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
-                  <Text strong>Score: {analysis.completion_score}</Text>
-                )}
-                
-                {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
-                  <>
-                    <Text strong>Criteria Met:</Text>
-                    <Space wrap size={[4, 8]}>
-                      {analysis.criteria_met.map((item, index) => <Tag color="green" key={`crit-${index}`}>{item}</Tag>)}
-                    </Space>
-                  </>
-                )}
+                 {/* Add Analyzed Content Here */}
+                 {selectedWorkProduct.analyzed_content && (
+                    <>
+                        <Text strong>Analyzed Content:</Text>
+                        <div style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                           {renderAnalyzedContent(selectedWorkProduct.analyzed_content)}
+                        </div>
+                    </>
+                 )}
 
-                {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
-                  <>
-                    <Text strong>Areas for Improvement:</Text>
-                    <Space wrap size={[4, 8]}>
-                      {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`area-${index}`}>{item}</Tag>)}
-                    </Space>
-                  </>
-                )}
-                
-                {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
-                  <>
-                    <Title level={5} style={{ marginTop: '16px', marginBottom: '8px' }}>Specific Findings:</Title>
-                    {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
-                      <div key={`find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
-                        <Text strong>{category}:</Text>
-                        {findings?.strengths && findings.strengths.length > 0 && (
-                          <div style={{ marginTop: '4px' }}>
-                            <Text>Strengths:</Text>
-                            <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
-                              {findings.strengths.map((item, index) => <li key={`str-${catIndex}-${index}`}>{item}</li>)}
-                            </ul>
-                          </div>
-                        )}
-                        {findings?.weaknesses && findings.weaknesses.length > 0 && (
-                          <div style={{ marginTop: '4px' }}>
-                            <Text>Weaknesses:</Text>
-                            <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
-                              {findings.weaknesses.map((item, index) => <li key={`weak-${catIndex}-${index}`}>{item}</li>)}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
-                
-                {analysis?.feedback && (
-                  <>
-                    <Text strong>Feedback:</Text>
-                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                      {analysis.feedback}
-                    </Paragraph>
-                  </>
-                )}
+               </Space>
+             );
+           })()
+         )}
+      </Modal>
 
-              </Space>
-            );
-          })()
-        }
+      {/* Comprehension Details Modal */}
+      <Modal
+        title={`Comprehension Details - ${selectedComprehension?.task_title || 'Task'}`}
+        open={isComprehensionModalVisible}
+        onCancel={hideComprehensionDetails}
+        footer={[
+           <Button key="back" onClick={hideComprehensionDetails}>
+             Close
+           </Button>,
+         ]}
+        width={800}
+      >
+        {selectedComprehension && (
+           (() => {
+             const analysis = parseAnalysis(selectedComprehension.analysis);
+             // Check if analysis parsing failed
+             if (!analysis || analysis.feedback === 'Error parsing analysis data.') {
+                 return <Alert message="Error" description="Could not parse analysis data for this record." type="error" showIcon />;
+             }
+             return (
+              <Space direction="vertical" style={{ width: '100%' }}>
+                 <Title level={4}>{selectedComprehension.task_title || 'Task Details'}</Title>
+                 
+                 {/* Restore previous fields */}
+                 {analysis?.submission_summary && (
+                   <> 
+                     <Text strong>Submission Summary:</Text>
+                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                       {analysis.submission_summary}
+                     </Paragraph>
+                   </>
+                 )}
+                 {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
+                   <Text strong>Score: {analysis.completion_score}</Text>
+                 )}
+                 {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
+                   <>
+                     <Text strong>Criteria Met:</Text>
+                     <Space wrap size={[4, 8]}>
+                       {analysis.criteria_met.map((item, index) => <Tag color="green" key={`comp-crit-${index}`}>{item}</Tag>)}
+                     </Space>
+                   </>
+                 )}
+                 {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
+                   <>
+                     <Text strong>Areas for Improvement:</Text>
+                     <Space wrap size={[4, 8]}>
+                       {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`comp-area-${index}`}>{item}</Tag>)}
+                     </Space>
+                   </>
+                 )}
+                  {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
+                    <> 
+                      <Title level={5} style={{ marginTop: '16px', marginBottom: '8px' }}>Specific Findings:</Title>
+                      {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
+                        <div key={`comp-find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
+                          <Text strong>{category}:</Text>
+                          {findings?.strengths && findings.strengths.length > 0 && (
+                            <div style={{ marginTop: '4px' }}>
+                              <Text>Strengths:</Text>
+                              <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
+                                {findings.strengths.map((item, index) => <li key={`comp-str-${catIndex}-${index}`}>{item}</li>)}
+                              </ul>
+                            </div>
+                          )}
+                          {findings?.weaknesses && findings.weaknesses.length > 0 && (
+                            <div style={{ marginTop: '4px' }}>
+                              <Text>Weaknesses:</Text>
+                              <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
+                                {findings.weaknesses.map((item, index) => <li key={`comp-weak-${catIndex}-${index}`}>{item}</li>)}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                 )}
+                 {analysis?.feedback && (
+                   <>
+                     <Text strong>Feedback:</Text>
+                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                       {analysis.feedback}
+                     </Paragraph>
+                   </>
+                 )}
+
+                 {/* Add Analyzed Content Here */}
+                 {selectedComprehension.analyzed_content && (
+                    <>
+                        <Text strong>Analyzed Content:</Text>
+                        <div style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                           {renderAnalyzedContent(selectedComprehension.analyzed_content)}
+                        </div>
+                    </>
+                 )}
+
+               </Space>
+             );
+           })()
+         )}
       </Modal>
     </div>
   );

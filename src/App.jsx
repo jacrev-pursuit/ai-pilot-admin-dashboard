@@ -6,11 +6,13 @@ import {
   TeamOutlined,
   BarChartOutlined,
   SettingOutlined,
-  UserOutlined
+  UserOutlined,
+  BookOutlined
 } from '@ant-design/icons';
 import PilotOverview from './components/Dashboard';
 import BuilderView from './components/BuilderView';
 import BuilderDetailsPage from './components/BuilderDetailsPage';
+import CohortTaskDetailsPage from './components/CohortTaskDetailsPage';
 
 const { Header, Sider, Content } = Layout;
 
@@ -22,6 +24,29 @@ const Settings = () => <div>Settings Page</div>;
 const Navigation = () => {
   const location = useLocation();
   
+  const menuItems = [
+    {
+      key: '/',
+      icon: <DashboardOutlined />,
+      label: <Link to="/">Pilot Overview</Link>,
+    },
+    {
+      key: '/builders',
+      icon: <TeamOutlined />,
+      label: <Link to="/builders">Builders</Link>,
+    },
+    {
+      key: '/builder-details',
+      icon: <UserOutlined />,
+      label: <Link to="/builder-details">Builder Details</Link>,
+    },
+    {
+      key: '/tasks',
+      icon: <BookOutlined />,
+      label: <Link to="/tasks">Task Cohort View</Link>,
+    }
+  ];
+
   return (
     <Sider width={200} theme="light" style={{ borderRight: '1px solid #f0f0f0' }}>
       <div style={{ height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f0f0f0' }}>
@@ -31,17 +56,8 @@ const Navigation = () => {
         mode="inline"
         selectedKeys={[location.pathname]}
         style={{ height: '100%', borderRight: 0 }}
-      >
-        <Menu.Item key="/" icon={<DashboardOutlined />}>
-          <Link to="/">Pilot Overview</Link>
-        </Menu.Item>
-        <Menu.Item key="/builders" icon={<TeamOutlined />}>
-          <Link to="/builders">Builders</Link>
-        </Menu.Item>
-        <Menu.Item key="/builder-details" icon={<UserOutlined />}>
-          <Link to="/builder-details">Builder Details</Link>
-        </Menu.Item>
-      </Menu>
+        items={menuItems}
+      />
     </Sider>
   );
 };
@@ -58,6 +74,8 @@ function App() {
               <Route path="/builders" element={<BuilderView />} />
               <Route path="/builders/:builderId" element={<BuilderDetailsPage />} />
               <Route path="/builder-details" element={<BuilderDetailsPage />} />
+              <Route path="/tasks/" element={<CohortTaskDetailsPage />} />
+              <Route path="/tasks/:taskId" element={<CohortTaskDetailsPage />} />
             </Routes>
           </Content>
         </Layout>

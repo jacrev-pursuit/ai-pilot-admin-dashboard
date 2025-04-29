@@ -179,7 +179,9 @@ async function processFeedbackSentiment(dateFilter = null, limit = null, specifi
       
       const analysis = await analyzeFeedbackWithGPT(row.feedback_text);
       
-      // Use curriculum_date for the created_at field in the results
+      // Format the curriculum_date as a full timestamp string for BigQuery
+      const createdAtTimestamp = `${row.curriculum_date.value} 00:00:00`;
+
       results.push({
         id: row.id,
         from_user_id: row.from_user_id,
@@ -189,9 +191,8 @@ async function processFeedbackSentiment(dateFilter = null, limit = null, specifi
         sentiment_magnitude: analysis.sentiment.magnitude,
         sentiment_category: analysis.sentiment.category,
         summary: analysis.summary,
-        created_at: row.curriculum_date, // Use the date from curriculum_days
+        created_at: createdAtTimestamp, // Use the formatted timestamp string
         processed_at: new Date().toISOString()
-        // Removed day_number
       });
 
       logger.info('Analysis complete', {
@@ -260,26 +261,65 @@ async function processFeedbackSentiment(dateFilter = null, limit = null, specifi
   }
 }
 
+// Wrap the main execution in an async function to use await
+async function runManualAnalysis() {
+  const firstArg = process.argv[2];
+  const limitArg = process.argv[3] ? parseInt(process.argv[3], 10) : null;
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  const sincePrefix = '--since=';
+
+  if (firstArg && firstArg.startsWith(sincePrefix)) {
+    const startDate = firstArg.substring(sincePrefix.length);
+    if (dateRegex.test(startDate)) {
+      logger.info(`Processing feedback for all dates since: ${startDate}${limitArg ? ` with limit per day: ${limitArg}`: ''}`);
+      try {
+        const dateQuery = `
+          SELECT DISTINCT CAST(day_date AS STRING) as date 
+          FROM \`pursuit-ops.pilot_agent_public.curriculum_days\` 
+          WHERE DATE(day_date) > DATE('${startDate}') 
+          ORDER BY date ASC
+        `;
+        logger.info(`Querying for dates strictly after ${startDate}`);
+        const [dateRows] = await bigquery.query({ query: dateQuery });
+        
+        if (dateRows.length === 0) {
+          logger.info(`No curriculum dates found since ${startDate}.`);
+          return;
+        }
+
+        logger.info(`Found ${dateRows.length} dates to process.`);
+        for (const row of dateRows) {
+          const dateToProcess = row.date;
+          logger.info(`--- Processing feedback for date: ${dateToProcess} ---`);
+          await processFeedbackSentiment(dateToProcess, limitArg);
+          logger.info(`--- Finished processing for date: ${dateToProcess} ---`);
+        }
+        logger.info(`Finished processing all feedback since ${startDate}.`);
+      } catch (error) {
+        logger.error(`Error processing feedback since ${startDate}:`, error);
+      }
+    } else {
+      logger.error('Invalid start date format provided after --since=. Please use YYYY-MM-DD format.');
+    }
+  } else if (firstArg && dateRegex.test(firstArg)) {
+      // Process single specific date
+      logger.info(`Processing feedback manually for date: ${firstArg}${limitArg ? ` with limit: ${limitArg}`: ''}`);
+      await processFeedbackSentiment(firstArg, limitArg);
+  } else if (firstArg) {
+      // Provided argument is not null/undefined but doesn't match expected formats
+      logger.error('Invalid argument. Use YYYY-MM-DD format for a single date, or --since=YYYY-MM-DD for processing since a date.');
+  } else {
+      // Process latest date
+      logger.info('Processing feedback manually for the latest date found with feedback.');
+      await processFeedbackSentiment(null, limitArg);
+  }
+}
+
 // If running directly (not imported as a module)
 if (require.main === module) {
-  // Check if a date was provided as a command line argument (YYYY-MM-DD)
-  const dateArg = process.argv[2]; // Expects format like '2024-04-23'
-  const limitArg = process.argv[3] ? parseInt(process.argv[3], 10) : null; // Optional limit
-
-  // Basic validation for date format (can be improved)
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-
-  if (dateArg && dateRegex.test(dateArg)) {
-      logger.info(`Processing feedback manually for date: ${dateArg}${limitArg ? ` with limit: ${limitArg}`: ''}`);
-      processFeedbackSentiment(dateArg, limitArg);
-  } else if (process.argv[2]) {
-      // Provided argument is not null/undefined but doesn't match format
-      logger.error('Invalid date format provided. Please use YYYY-MM-DD format.');
-  } else {
-      logger.info('Processing feedback manually for the latest date found with feedback.');
-      // Process feedback for the latest date by default
-      processFeedbackSentiment(null, limitArg);
-  }
+  runManualAnalysis().catch(error => {
+    logger.error('Unhandled error during manual analysis execution:', error);
+  });
 }
 
 module.exports = { processFeedbackSentiment }; 
