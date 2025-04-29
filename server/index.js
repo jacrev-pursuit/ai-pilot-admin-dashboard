@@ -207,7 +207,8 @@ app.get('/api/builders/:userId/details', async (req, res) => {
     query = `
       SELECT 
         tar.task_id, t.task_title, tar.analysis, tar.curriculum_date as date,
-        tar.analyzed_content -- Added analyzed_content
+        tar.analyzed_content, -- Added analyzed_content
+        tar.auto_id -- Added auto_id
       FROM \`${taskAnalysisTable}\` tar
       LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
       WHERE tar.user_id = CAST(@userId AS INT64)
@@ -220,7 +221,8 @@ app.get('/api/builders/:userId/details', async (req, res) => {
     query = `
       SELECT 
         tar.task_id, t.task_title, tar.analysis, tar.curriculum_date as date,
-        tar.analyzed_content -- Added analyzed_content
+        tar.analyzed_content, -- Added analyzed_content
+        tar.auto_id -- Added auto_id
       FROM \`${taskAnalysisTable}\` tar
       LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
       WHERE tar.user_id = CAST(@userId AS INT64)
@@ -530,7 +532,6 @@ app.get('/api/tasks/:taskId/cohort-details', async (req, res) => {
       CONCAT(u.first_name, ' ', u.last_name) as user_name,
       tar.curriculum_date AS date, -- Alias curriculum_date to 'date'
       tar.analysis -- Select the full analysis JSON string
-      -- tar.grading_timestamp -- Can add if needed
     FROM \`${taskAnalysisTable}\` tar
     LEFT JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
     LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
@@ -664,8 +665,7 @@ app.get('/api/tasks/all-analysis', async (req, res) => {
       CONCAT(u.first_name, ' ', u.last_name) as user_name,
       tar.curriculum_date AS date,
       tar.analysis, -- Select the full analysis JSON string
-      tar.learning_type,
-      tar.grading_timestamp
+      tar.learning_type
     FROM \`${taskAnalysisTable}\` tar
     LEFT JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
     LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
@@ -685,6 +685,55 @@ app.get('/api/tasks/all-analysis', async (req, res) => {
     console.error(`Error in ${req.path}:`, error);
     logger.error('Error executing BigQuery all task analysis query', { error: error.message, stack: error.stack, query: options.query });
     res.status(500).json({ error: 'Failed to fetch all task analysis results' });
+  }
+});
+
+// --- NEW Endpoint: Fetch Single Task Analysis Result by auto_id ---
+app.get('/api/submission/:autoId', async (req, res) => {
+  console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
+  const { autoId } = req.params;
+
+  if (!autoId) {
+    return res.status(400).json({ error: 'Missing required parameter: autoId' });
+  }
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  const query = `
+    SELECT 
+      tar.auto_id, -- Include auto_id itself if needed
+      tar.task_id,
+      t.task_title,
+      tar.user_id,
+      CONCAT(u.first_name, ' ', u.last_name) as user_name,
+      tar.curriculum_date AS date,
+      tar.analysis,
+      tar.analyzed_content,
+      tar.learning_type
+    FROM \`${taskAnalysisTable}\` tar
+    LEFT JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
+    LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
+    WHERE tar.auto_id = @autoId -- Filter by auto_id
+    LIMIT 1 -- Expecting only one result
+  `;
+
+  // Assuming auto_id is a STRING, pass it directly. Adjust param type if it's INT64.
+  const options = { query, location: BIGQUERY_LOCATION, params: { autoId } }; 
+
+  try {
+    console.log(`Executing BigQuery query for ${req.path} (Auto ID: ${autoId})...`);
+    const [rows] = await bigquery.query(options);
+    console.log(`Query for ${req.path} finished. Row count: ${rows.length}`);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Submission details not found for this ID' });
+    }
+
+    res.json(rows[0]); // Return the single submission object
+
+  } catch (error) {
+    console.error(`Error in ${req.path} (Auto ID: ${autoId}):`, error);
+    logger.error(`Error executing BigQuery single submission query (Auto ID: ${autoId})`, { error: error.message, stack: error.stack, query: options.query });
+    res.status(500).json({ error: 'Failed to fetch submission details' });
   }
 });
 

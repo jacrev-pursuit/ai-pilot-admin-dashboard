@@ -1560,45 +1560,77 @@ const BuilderDetailsPage = () => {
         {selectedWorkProduct && (
            (() => {
              const analysis = parseAnalysis(selectedWorkProduct.analysis);
-             // Check if analysis parsing failed
              if (!analysis || analysis.feedback === 'Error parsing analysis data.') {
                  return <Alert message="Error" description="Could not parse analysis data for this record." type="error" showIcon />;
              }
              return (
               <Space direction="vertical" style={{ width: '100%' }}>
-                 <Title level={4}>{selectedWorkProduct.task_title || 'Task Details'}</Title>
-                 
-                 {/* Restore previous fields */}
+                 <Title level={4} style={{ marginBottom: 0 }}>{selectedWorkProduct.task_title || 'Task Details'}</Title>
+                 <Text type="secondary" style={{ display: 'block', marginBottom: '16px' }}>
+                    Date: {selectedWorkProduct.date ? dayjs(selectedWorkProduct.date?.value || selectedWorkProduct.date).format('MMMM D, YYYY') : 'N/A'}
+                 </Text>
+
+                 {/* Score */}
+                 {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
+                   <div style={{ marginTop: '16px' }}>
+                     <Text strong>Score:</Text> <Text>{analysis.completion_score} ({getLetterGrade(analysis.completion_score)})</Text>
+                   </div>
+                 )}
+
+                 {/* Analyzed Content */}
+                 {selectedWorkProduct.analyzed_content && (
+                    <div style={{ marginTop: '16px' }}>
+                        <Text strong style={{ display: 'block' }}>Analyzed Content:</Text>
+                        <div style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px', maxHeight: '300px', overflowY: 'auto' }}>
+                           {renderAnalyzedContent(selectedWorkProduct.analyzed_content)}
+                        </div>
+                    </div>
+                 )}
+
+                 {/* Submission Summary */}
                  {analysis?.submission_summary && (
-                   <> 
-                     <Text strong>Submission Summary:</Text>
-                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                   <div style={{ marginTop: '16px' }}>
+                     <Text strong style={{ display: 'block' }}>Submission Summary:</Text>
+                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
                        {analysis.submission_summary}
                      </Paragraph>
-                   </>
+                   </div>
                  )}
-                 {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
-                   <Text strong>Score: {analysis.completion_score}</Text>
+
+                 {/* Feedback */}
+                 {analysis?.feedback && (
+                   <div style={{ marginTop: '16px' }}>
+                     <Text strong style={{ display: 'block' }}>Feedback:</Text>
+                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                       {analysis.feedback}
+                     </Paragraph>
+                   </div>
                  )}
+
+                 {/* Criteria Met */}
                  {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
-                   <>
-                     <Text strong>Criteria Met:</Text>
-                     <Space wrap size={[4, 8]}>
+                   <div style={{ marginTop: '16px' }}>
+                     <Text strong style={{ display: 'block' }}>Criteria Met:</Text>
+                     <Space wrap size={[4, 8]} style={{ marginTop: '4px' }}>
                        {analysis.criteria_met.map((item, index) => <Tag color="green" key={`wp-crit-${index}`}>{item}</Tag>)}
                      </Space>
-                   </>
+                   </div>
                  )}
+
+                 {/* Areas for Improvement */}
                  {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
-                   <>
-                     <Text strong>Areas for Improvement:</Text>
-                     <Space wrap size={[4, 8]}>
+                   <div style={{ marginTop: '16px' }}>
+                     <Text strong style={{ display: 'block' }}>Areas for Improvement:</Text>
+                     <Space wrap size={[4, 8]} style={{ marginTop: '4px' }}>
                        {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`wp-area-${index}`}>{item}</Tag>)}
                      </Space>
-                   </>
+                   </div>
                  )}
+
+                 {/* Specific Findings */}
                  {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
-                    <> 
-                      <Title level={5} style={{ marginTop: '16px', marginBottom: '8px' }}>Specific Findings:</Title>
+                    <div style={{ marginTop: '16px' }}>
+                      <Title level={5} style={{ marginBottom: '8px' }}>Specific Findings:</Title>
                       {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
                         <div key={`wp-find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
                           <Text strong>{category}:</Text>
@@ -1620,27 +1652,8 @@ const BuilderDetailsPage = () => {
                           )}
                         </div>
                       ))}
-                    </>
+                    </div>
                  )}
-                 {analysis?.feedback && (
-                   <>
-                     <Text strong>Feedback:</Text>
-                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                       {analysis.feedback}
-                     </Paragraph>
-                   </>
-                 )}
-
-                 {/* Add Analyzed Content Here */}
-                 {selectedWorkProduct.analyzed_content && (
-                    <>
-                        <Text strong>Analyzed Content:</Text>
-                        <div style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
-                           {renderAnalyzedContent(selectedWorkProduct.analyzed_content)}
-                        </div>
-                    </>
-                 )}
-
                </Space>
              );
            })()
@@ -1662,91 +1675,104 @@ const BuilderDetailsPage = () => {
         {selectedComprehension && (
            (() => {
              const analysis = parseAnalysis(selectedComprehension.analysis);
-             // Check if analysis parsing failed
              if (!analysis || analysis.feedback === 'Error parsing analysis data.') {
                  return <Alert message="Error" description="Could not parse analysis data for this record." type="error" showIcon />;
              }
              return (
               <Space direction="vertical" style={{ width: '100%' }}>
-                 <Title level={4}>{selectedComprehension.task_title || 'Task Details'}</Title>
-                 
-                 {/* Restore previous fields */}
-                 {analysis?.submission_summary && (
-                   <> 
-                     <Text strong>Submission Summary:</Text>
-                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                       {analysis.submission_summary}
-                     </Paragraph>
-                   </>
-                 )}
-                 {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
-                   <Text strong>Score: {analysis.completion_score}</Text>
-                 )}
-                 {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
-                   <>
-                     <Text strong>Criteria Met:</Text>
-                     <Space wrap size={[4, 8]}>
-                       {analysis.criteria_met.map((item, index) => <Tag color="green" key={`comp-crit-${index}`}>{item}</Tag>)}
-                     </Space>
-                   </>
-                 )}
-                 {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
-                   <>
-                     <Text strong>Areas for Improvement:</Text>
-                     <Space wrap size={[4, 8]}>
-                       {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`comp-area-${index}`}>{item}</Tag>)}
-                     </Space>
-                   </>
-                 )}
-                  {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
-                    <> 
-                      <Title level={5} style={{ marginTop: '16px', marginBottom: '8px' }}>Specific Findings:</Title>
-                      {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
-                        <div key={`comp-find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
-                          <Text strong>{category}:</Text>
-                          {findings?.strengths && findings.strengths.length > 0 && (
-                            <div style={{ marginTop: '4px' }}>
-                              <Text>Strengths:</Text>
-                              <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
-                                {findings.strengths.map((item, index) => <li key={`comp-str-${catIndex}-${index}`}>{item}</li>)}
-                              </ul>
-                            </div>
-                          )}
-                          {findings?.weaknesses && findings.weaknesses.length > 0 && (
-                            <div style={{ marginTop: '4px' }}>
-                              <Text>Weaknesses:</Text>
-                              <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
-                                {findings.weaknesses.map((item, index) => <li key={`comp-weak-${catIndex}-${index}`}>{item}</li>)}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </>
-                 )}
-                 {analysis?.feedback && (
-                   <>
-                     <Text strong>Feedback:</Text>
-                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                       {analysis.feedback}
-                     </Paragraph>
-                   </>
-                 )}
+                <Title level={4} style={{ marginBottom: 0 }}>{selectedComprehension.task_title || 'Task Details'}</Title>
+                <Text type="secondary" style={{ display: 'block', marginBottom: '16px' }}>
+                   Date: {selectedComprehension.date ? dayjs(selectedComprehension.date?.value || selectedComprehension.date).format('MMMM D, YYYY') : 'N/A'}
+                </Text>
 
-                 {/* Add Analyzed Content Here */}
+                {/* Score */}
+                {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
+                   <div style={{ marginTop: '16px' }}>
+                     <Text strong>Score:</Text> <Text>{analysis.completion_score} ({getLetterGrade(analysis.completion_score)})</Text>
+                   </div>
+                )}
+
+                 {/* Analyzed Content - Assuming it might exist for comprehension too */}
                  {selectedComprehension.analyzed_content && (
-                    <>
-                        <Text strong>Analyzed Content:</Text>
-                        <div style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                    <div style={{ marginTop: '16px' }}>
+                        <Text strong style={{ display: 'block' }}>Analyzed Content:</Text>
+                        <div style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px', maxHeight: '300px', overflowY: 'auto' }}>
                            {renderAnalyzedContent(selectedComprehension.analyzed_content)}
                         </div>
-                    </>
+                    </div>
                  )}
 
-               </Space>
-             );
-           })()
-         )}
+                {/* Submission Summary */}
+                {analysis?.submission_summary && (
+                  <div style={{ marginTop: '16px' }}>
+                    <Text strong style={{ display: 'block' }}>Submission Summary:</Text>
+                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                      {analysis.submission_summary}
+                    </Paragraph>
+                  </div>
+                )}
+
+                {/* Feedback */}
+                {analysis?.feedback && (
+                  <div style={{ marginTop: '16px' }}>
+                    <Text strong style={{ display: 'block' }}>Feedback:</Text>
+                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                      {analysis.feedback}
+                    </Paragraph>
+                  </div>
+                )}
+
+                {/* Criteria Met */}
+                {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <Text strong style={{ display: 'block' }}>Criteria Met:</Text>
+                    <Space wrap size={[4, 8]} style={{ marginTop: '4px' }}>
+                      {analysis.criteria_met.map((item, index) => <Tag color="green" key={`comp-crit-${index}`}>{item}</Tag>)}
+                    </Space>
+                  </div>
+                )}
+
+                {/* Areas for Improvement */}
+                {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <Text strong style={{ display: 'block' }}>Areas for Improvement:</Text>
+                    <Space wrap size={[4, 8]} style={{ marginTop: '4px' }}>
+                      {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`comp-area-${index}`}>{item}</Tag>)}
+                    </Space>
+                  </div>
+                )}
+
+                {/* Specific Findings */}
+                {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
+                   <div style={{ marginTop: '16px' }}>
+                     <Title level={5} style={{ marginBottom: '8px' }}>Specific Findings:</Title>
+                     {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
+                       <div key={`comp-find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
+                         <Text strong>{category}:</Text>
+                         {findings?.strengths && findings.strengths.length > 0 && (
+                           <div style={{ marginTop: '4px' }}>
+                             <Text>Strengths:</Text>
+                             <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
+                               {findings.strengths.map((item, index) => <li key={`comp-str-${catIndex}-${index}`}>{item}</li>)}
+                             </ul>
+                           </div>
+                         )}
+                         {findings?.weaknesses && findings.weaknesses.length > 0 && (
+                           <div style={{ marginTop: '4px' }}>
+                             <Text>Weaknesses:</Text>
+                             <ul style={{ margin: '4px 0 8px 20px', padding: 0, listStyleType: 'disc' }}>
+                               {findings.weaknesses.map((item, index) => <li key={`comp-weak-${catIndex}-${index}`}>{item}</li>)}
+                             </ul>
+                           </div>
+                         )}
+                       </div>
+                     ))}
+                   </div>
+                )}
+              </Space>
+            );
+          })()
+        )}
       </Modal>
     </div>
   );
