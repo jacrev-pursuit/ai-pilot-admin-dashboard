@@ -174,7 +174,7 @@ app.get('/api/builders', async (req, res) => {
     CROSS JOIN TotalEligibleTaskCount tetc -- Need total count for calculation
   `;
 
-  const options = { query, location: BIGQUERY_LOCATION, params: { startDate, endDate } };
+  const options = { query, params: { startDate, endDate } };
 
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
@@ -281,7 +281,7 @@ app.get('/api/builders/:userId/details', async (req, res) => {
     return res.status(400).json({ error: 'Invalid type specified' });
   }
 
-  const options = { query, location: BIGQUERY_LOCATION, params: { userId, startDate, endDate } };
+  const options = { query, params: { userId, startDate, endDate } };
 
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
@@ -310,7 +310,7 @@ app.get('/api/trends/prompts', async (req, res) => {
       AND DATE(cm.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
     GROUP BY 1 ORDER BY 1 ASC
   `;
-  const options = { query, location: BIGQUERY_LOCATION, params: { startDate, endDate } };
+  const options = { query, params: { startDate, endDate } };
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
     const [rows] = await bigquery.query(options);
@@ -336,7 +336,7 @@ app.get('/api/trends/sentiment', async (req, res) => {
       AND sentiment_category IS NOT NULL
     GROUP BY date, sentiment_category ORDER BY date ASC, sentiment_category ASC
   `;
-  const options = { query, location: BIGQUERY_LOCATION, params: { startDate, endDate } };
+  const options = { query, params: { startDate, endDate } };
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
     const [rows] = await bigquery.query(options);
@@ -362,7 +362,7 @@ app.get('/api/trends/peer-feedback', async (req, res) => {
       AND sentiment_category IS NOT NULL
     GROUP BY date, sentiment_category ORDER BY date ASC, sentiment_category ASC
   `;
-  const options = { query, location: BIGQUERY_LOCATION, params: { startDate, endDate } };
+  const options = { query, params: { startDate, endDate } };
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
     const [rows] = await bigquery.query(options);
@@ -397,7 +397,7 @@ app.get('/api/feedback/details', async (req, res) => {
       AND fsa.sentiment_category = @category
     ORDER BY pf.created_at DESC
   `;
-  const options = { query, location: BIGQUERY_LOCATION, params: { date, category } };
+  const options = { query, params: { date, category } };
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
     const [rows] = await bigquery.query(options);
@@ -428,7 +428,7 @@ app.get('/api/sentiment/details', async (req, res) => {
       AND sr.sentiment_category = @category
     ORDER BY sr.user_id
   `;
-  const options = { query, location: BIGQUERY_LOCATION, params: { date, category } };
+  const options = { query, params: { date, category } };
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
     const [rows] = await bigquery.query(options);
@@ -498,7 +498,7 @@ app.get('/api/overview/grade-distribution', async (req, res) => {
     -- ORDER BY t.task_title -- Optional ordering if needed
   `;
 
-  const options = { query, location: BIGQUERY_LOCATION, params: { startDate, endDate, learningType } }; // Pass learningType
+  const options = { query, params: { startDate, endDate, learningType } }; // Pass learningType
 
   try {
     console.log(`Executing BigQuery query for ${req.path} (Type: ${learningType})...`);
@@ -549,7 +549,7 @@ app.get('/api/tasks/:taskId/cohort-details', async (req, res) => {
     ORDER BY tar.curriculum_date DESC, user_name ASC -- Example ordering
   `;
 
-  const options = { query, location: BIGQUERY_LOCATION, params: { taskId } }; 
+  const options = { query, params: { taskId } }; 
 
   try {
     console.log(`Executing BigQuery query for ${req.path} (Task ID: ${taskId})...`);
@@ -583,7 +583,7 @@ app.get('/api/tasks/list', async (req, res) => {
     ORDER BY t.task_title ASC
   `;
 
-  const options = { query, location: BIGQUERY_LOCATION };
+  const options = { query };
 
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
@@ -619,7 +619,6 @@ app.get('/api/tasks/:taskId/submissions', async (req, res) => {
   // Remove date params
   const options = { 
     query, 
-    location: BIGQUERY_LOCATION, 
     params: { taskId, limit: sizeNum, offset }
   };
 
@@ -674,7 +673,7 @@ app.get('/api/tasks/all-analysis', async (req, res) => {
     -- LIMIT/OFFSET for pagination can be added here
   `;
 
-  const options = { query, location: BIGQUERY_LOCATION, params: {} }; // Params can be added for filtering
+  const options = { query };
 
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
@@ -717,7 +716,7 @@ app.get('/api/submission/:autoId', async (req, res) => {
   `;
 
   // Assuming auto_id is a STRING, pass it directly. Adjust param type if it's INT64.
-  const options = { query, location: BIGQUERY_LOCATION, params: { autoId } }; 
+  const options = { query, params: { autoId } }; 
 
   try {
     console.log(`Executing BigQuery query for ${req.path} (Auto ID: ${autoId})...`);
@@ -734,6 +733,102 @@ app.get('/api/submission/:autoId', async (req, res) => {
     console.error(`Error in ${req.path} (Auto ID: ${autoId}):`, error);
     logger.error(`Error executing BigQuery single submission query (Auto ID: ${autoId})`, { error: error.message, stack: error.stack, query: options.query });
     res.status(500).json({ error: 'Failed to fetch submission details' });
+  }
+});
+
+// Endpoint to get ALL peer feedback within a date range
+app.get('/api/feedback/all', async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const usersTable = '`pursuit-ops.pilot_agent_public.users`';
+  const feedbackTable = '`pursuit-ops.pilot_agent_public.peer_feedback`';
+  const analysisTable = '`pursuit-ops.pilot_agent_public.feedback_sentiment_analysis`';
+
+  // Basic validation for dates
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Both startDate and endDate are required.' });
+  }
+
+  // TODO: Add more robust date validation if needed
+
+  const query = `
+    SELECT
+      pf.id AS feedback_id,
+      pf.created_at AS timestamp,
+      CONCAT(reviewer.first_name, ' ', reviewer.last_name) AS reviewer_name,
+      CONCAT(recipient.first_name, ' ', recipient.last_name) AS recipient_name,
+      pf.feedback_text AS feedback,
+      fsa.summary,
+      fsa.sentiment_category AS sentiment_label,
+      fsa.sentiment_score,
+      pf.from_user_id,
+      pf.to_user_id
+    FROM ${feedbackTable} pf
+    LEFT JOIN ${analysisTable} fsa ON CAST(pf.id AS STRING) = CAST(fsa.id AS STRING)
+    LEFT JOIN ${usersTable} reviewer ON pf.from_user_id = reviewer.user_id
+    LEFT JOIN ${usersTable} recipient ON pf.to_user_id = recipient.user_id
+    WHERE DATE(pf.created_at) >= DATE(@startDate)
+      AND DATE(pf.created_at) <= DATE(@endDate)
+    ORDER BY pf.created_at DESC;
+  `;
+
+  const options = {
+    query: query,
+    params: { startDate, endDate },
+  };
+
+  try {
+    const [rows] = await bigquery.query(options);
+    res.json(rows);
+  } catch (error) {
+    console.error('BigQuery Error fetching all peer feedback:', error);
+    res.status(500).json({ error: 'Failed to fetch peer feedback data', details: error.message });
+  }
+});
+
+// Endpoint to get ALL task analysis results within a date range
+app.get('/api/analysis/all', async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const usersTable = '`pursuit-ops.pilot_agent_public.users`';
+  const tasksTable = '`pursuit-ops.pilot_agent_public.tasks`';
+  const analysisTable = '`pursuit-ops.pilot_agent_public.task_analysis_results`';
+
+  // Basic validation for dates
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Both startDate and endDate are required.' });
+  }
+
+  // TODO: Add more robust date validation if needed
+
+  const query = `
+    SELECT
+      tar.auto_id,
+      tar.curriculum_date AS date,
+      CONCAT(u.first_name, ' ', u.last_name) AS user_name,
+      t.task_title AS task_title,
+      tar.learning_type,
+      tar.analysis,
+      tar.analyzed_content,
+      tar.user_id,
+      tar.task_id
+    FROM ${analysisTable} tar
+    LEFT JOIN ${usersTable} u ON tar.user_id = u.user_id
+    LEFT JOIN ${tasksTable} t ON tar.task_id = t.id
+    WHERE DATE(tar.curriculum_date) >= DATE(@startDate)
+      AND DATE(tar.curriculum_date) <= DATE(@endDate)
+    ORDER BY tar.curriculum_date DESC, user_name ASC;
+  `;
+
+  const options = {
+    query: query,
+    params: { startDate, endDate },
+  };
+
+  try {
+    const [rows] = await bigquery.query(options);
+    res.json(rows);
+  } catch (error) {
+    console.error('BigQuery Error fetching all task analysis:', error);
+    res.status(500).json({ error: 'Failed to fetch task analysis data', details: error.message });
   }
 });
 

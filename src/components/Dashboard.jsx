@@ -1,15 +1,43 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, Row, Col, DatePicker, Spin, Alert, Typography, Modal, List, Space, Tag } from 'antd';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Card, Row, Col, DatePicker, Spin, Alert, Typography, Modal, List, Space, Tag, Table, Button } from 'antd';
 import { Line, Bar } from 'react-chartjs-2';
 import { getElementAtEvent, getDatasetAtEvent } from 'react-chartjs-2';
 import dayjs from 'dayjs';
+import { Link, useNavigate } from 'react-router-dom';
 import BuilderMetricsTable from './BuilderMetricsTable';
 // Import chart styles
 import { chartContainer, baseChartOptions } from './ChartStyles';
 import { getLetterGrade, getGradeColor } from '../utils/gradingUtils'; // Import grading util
+// Import new fetch functions
+import {
+  fetchBuilderData,
+  fetchBuilderDetails,
+  fetchAllPeerFeedback, 
+  fetchAllTaskAnalysis
+} from '../services/builderService';
 
 const { RangePicker } = DatePicker;
-const { Text, Title } = Typography;
+const { Text, Title, Paragraph } = Typography;
+
+// Helper function to parse the 'analysis' JSON string (copied from BuilderDetailsPage)
+const parseAnalysis = (analysisString) => {
+  if (!analysisString) return null;
+  try {
+    const cleanedString = analysisString
+      .replace(/\n/g, '\n') // Keep newlines
+      .replace(/\t/g, '\t') // Keep tabs
+      .replace(/\\"/g, '"'); // Replace escaped quotes
+    return JSON.parse(cleanedString);
+  } catch (error) {
+    console.error("Failed to parse analysis JSON:", error, "String:", analysisString);
+    return {
+        completion_score: null,
+        criteria_met: [],
+        areas_for_improvement: [],
+        feedback: 'Error parsing analysis data.'
+    };
+  }
+};
 
 // Utility to fetch data
 const fetchData = async (endpoint, params) => {
@@ -140,6 +168,7 @@ const gradeColors = {
 };
 
 const PilotOverview = () => {
+  const navigate = useNavigate(); // Initialize useNavigate
   const [trendDateRange, setTrendDateRange] = useState([
     dayjs().subtract(30, 'days'),
     dayjs(),
@@ -149,6 +178,14 @@ const PilotOverview = () => {
   const [peerFeedbackTrendData, setPeerFeedbackTrendData] = useState(null);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendsError, setTrendsError] = useState(null);
+
+  // State for NEW tables
+  const [allPeerFeedbackData, setAllPeerFeedbackData] = useState([]);
+  const [allTaskAnalysisData, setAllTaskAnalysisData] = useState([]);
+  const [peerFeedbackLoading, setPeerFeedbackLoading] = useState(false);
+  const [taskAnalysisLoading, setTaskAnalysisLoading] = useState(false);
+  const [peerFeedbackError, setPeerFeedbackError] = useState(null);
+  const [taskAnalysisError, setTaskAnalysisError] = useState(null);
 
   // State for feedback details modal
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
@@ -173,6 +210,35 @@ const PilotOverview = () => {
   const [comprehensionGradeDistData, setComprehensionGradeDistData] = useState(null); 
   const [gradeDistLoading, setGradeDistLoading] = useState(false);
   const [gradeDistError, setGradeDistError] = useState(null);
+
+  // Helper to get unique values for table filters
+  const getUniqueFilterValues = (data, key) => {
+    if (!data || data.length === 0) return [];
+    const uniqueValues = [...new Set(data.map(item => item[key]).filter(Boolean))];
+    return uniqueValues.sort().map(value => ({ text: value, value: value }));
+  };
+
+  // Helper to get unique grades for filtering
+  const getUniqueGradeFilterValues = (data) => {
+    if (!data || data.length === 0) return [];
+    const uniqueGrades = [...new Set(data.map(item => {
+        const analysis = parseAnalysis(item.analysis);
+        if (!analysis) return null;
+        const score = analysis.completion_score;
+        return getLetterGrade(score);
+    }).filter(Boolean))]; // Filter out null/undefined grades
+    return uniqueGrades.sort().map(grade => ({ text: grade, value: grade }));
+  };
+
+  // Generate filter options dynamically
+  const reviewerFilters = useMemo(() => getUniqueFilterValues(allPeerFeedbackData, 'reviewer_name'), [allPeerFeedbackData]);
+  const recipientFilters = useMemo(() => getUniqueFilterValues(allPeerFeedbackData, 'recipient_name'), [allPeerFeedbackData]);
+  const sentimentFilters = useMemo(() => getUniqueFilterValues(allPeerFeedbackData, 'sentiment_label'), [allPeerFeedbackData]);
+
+  const builderFilters = useMemo(() => getUniqueFilterValues(allTaskAnalysisData, 'user_name'), [allTaskAnalysisData]);
+  const taskTitleFilters = useMemo(() => getUniqueFilterValues(allTaskAnalysisData, 'task_title'), [allTaskAnalysisData]);
+  const learningTypeFilters = useMemo(() => getUniqueFilterValues(allTaskAnalysisData, 'learning_type'), [allTaskAnalysisData]);
+  const gradeFilters = useMemo(() => getUniqueGradeFilterValues(allTaskAnalysisData), [allTaskAnalysisData]);
 
   useEffect(() => {
     const fetchTrends = async () => {
@@ -224,6 +290,44 @@ const PilotOverview = () => {
     };
 
     fetchTrends();
+  }, [trendDateRange]);
+
+  // Fetch data for NEW tables (separate useEffect)
+  useEffect(() => {
+    const fetchTableData = async () => {
+      if (!trendDateRange || trendDateRange.length !== 2) return;
+
+      const startDate = trendDateRange[0].format('YYYY-MM-DD');
+      const endDate = trendDateRange[1].format('YYYY-MM-DD');
+
+      // Fetch All Peer Feedback
+      setPeerFeedbackLoading(true);
+      setPeerFeedbackError(null);
+      try {
+        const feedbackData = await fetchAllPeerFeedback(startDate, endDate);
+        setAllPeerFeedbackData(feedbackData);
+      } catch (err) {
+        console.error("Failed to fetch all peer feedback:", err);
+        setPeerFeedbackError(err.message);
+      } finally {
+        setPeerFeedbackLoading(false);
+      }
+
+      // Fetch All Task Analysis
+      setTaskAnalysisLoading(true);
+      setTaskAnalysisError(null);
+      try {
+        const analysisData = await fetchAllTaskAnalysis(startDate, endDate);
+        setAllTaskAnalysisData(analysisData);
+      } catch (err) {
+        console.error("Failed to fetch all task analysis:", err);
+        setTaskAnalysisError(err.message);
+      } finally {
+        setTaskAnalysisLoading(false);
+      }
+    };
+
+    fetchTableData();
   }, [trendDateRange]);
 
   // useEffect for Grade Distribution (Fetch separately)
@@ -409,6 +513,145 @@ const PilotOverview = () => {
     }
   };
 
+  // --- Table Column Definitions --- 
+
+  const overviewPeerFeedbackColumns = [
+    { 
+      title: 'Date', 
+      dataIndex: 'timestamp', 
+      key: 'timestamp', 
+      width: '15%',
+      render: (ts) => ts ? dayjs(ts?.value || ts).format('MMM D, YYYY') : 'N/A', 
+      sorter: (a, b) => dayjs(a.timestamp?.value || a.timestamp).unix() - dayjs(b.timestamp?.value || b.timestamp).unix(), 
+      sortDirections: ['descend', 'ascend']
+    },
+    { 
+      title: 'Reviewer',
+      dataIndex: 'reviewer_name',
+      key: 'reviewer_name',
+      width: '15%',
+      render: (text, record) => (
+        record.from_user_id ? (
+          <Link to={`/builders/${record.from_user_id}`}>{text || 'Unknown'}</Link>
+        ) : ( text || 'Unknown' )
+      ),
+      sorter: (a, b) => (a.reviewer_name || '').localeCompare(b.reviewer_name || ''),
+      filters: reviewerFilters,
+      onFilter: (value, record) => (record.reviewer_name || '').indexOf(value) === 0,
+    },
+     { 
+      title: 'Recipient',
+      dataIndex: 'recipient_name',
+      key: 'recipient_name',
+      width: '15%',
+      render: (text, record) => (
+        record.to_user_id ? (
+          <Link to={`/builders/${record.to_user_id}`}>{text || 'Unknown'}</Link>
+        ) : ( text || 'Unknown' )
+      ),
+       sorter: (a, b) => (a.recipient_name || '').localeCompare(b.recipient_name || ''),
+       filters: recipientFilters,
+       onFilter: (value, record) => (record.recipient_name || '').indexOf(value) === 0,
+    },
+    { 
+      title: 'Sentiment', 
+      dataIndex: 'sentiment_label',
+      key: 'sentiment_label', 
+      width: '15%',
+      sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
+      sortDirections: ['descend', 'ascend'],
+      render: (label) => { 
+        const sentimentColorMap = {
+          'Very Positive': 'green',
+          'Positive': 'cyan',
+          'Neutral': 'default', 
+          'Negative': 'orange',
+          'Very Negative': 'red'
+        };
+        const color = sentimentColorMap[label] || 'default';
+        return <Tag color={color}>{label || 'N/A'}</Tag>;
+      },
+      filters: sentimentFilters,
+      onFilter: (value, record) => record.sentiment_label === value,
+    },
+    { 
+      title: 'Feedback', 
+      dataIndex: 'feedback', 
+      key: 'feedback', 
+      width: '40%',
+      render: (text) => <div style={{ whiteSpace: 'pre-wrap' }}>{text || '-'}</div> 
+    },
+  ];
+
+  const overviewTaskAnalysisColumns = [
+    { 
+      title: 'Date', 
+      dataIndex: 'date', 
+      key: 'date', 
+      render: (d) => d ? dayjs(d?.value || d).format('MMM D, YYYY') : 'N/A',
+      sorter: (a, b) => dayjs(a.date?.value || a.date).unix() - dayjs(b.date?.value || b.date).unix(),
+      sortDirections: ['descend', 'ascend']
+    },
+    {
+      title: 'Builder',
+      dataIndex: 'user_name',
+      key: 'user_name',
+      render: (text, record) => (
+        record.user_id ? (
+          <Link to={`/builders/${record.user_id}`}>{text || 'Unknown'}</Link>
+        ) : ( text || 'Unknown' )
+      ),
+       sorter: (a, b) => (a.user_name || '').localeCompare(b.user_name || ''),
+       filters: builderFilters,
+       onFilter: (value, record) => (record.user_name || '').indexOf(value) === 0,
+    },
+    { 
+      title: 'Task Title', 
+      dataIndex: 'task_title', 
+      key: 'task_title',
+      filters: taskTitleFilters,
+      onFilter: (value, record) => (record.task_title || '').indexOf(value) === 0,
+    },
+    { 
+      title: 'Type', 
+      dataIndex: 'learning_type', 
+      key: 'learning_type',
+      filters: learningTypeFilters,
+      onFilter: (value, record) => record.learning_type === value,
+    },
+    { 
+      title: 'Grade', 
+      key: 'grade', 
+      render: (_, record) => { 
+        const analysis = parseAnalysis(record.analysis);
+        if (!analysis) return '-'; 
+        const score = analysis.completion_score;
+        const grade = getLetterGrade(score);
+        return <Tag color={getGradeColor(grade)}>{grade}</Tag>; 
+      },
+      filters: gradeFilters,
+      onFilter: (value, record) => {
+        const analysis = parseAnalysis(record.analysis);
+        if (!analysis) return false;
+        const score = analysis.completion_score;
+        return getLetterGrade(score) === value;
+      },
+    },
+     {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Button 
+          size="small" 
+          onClick={() => navigate(`/submission/${record.auto_id}`)} 
+          disabled={!record.auto_id}
+        >
+          View Details
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div>
       <div style={{
@@ -510,6 +753,36 @@ const PilotOverview = () => {
                   </div>
               </Col>
             </Row>
+         )}
+      </Card>
+
+      {/* NEW Peer Feedback Table Section */}
+      <Card style={{ marginBottom: '24px' }} title="Peer Feedback Details">
+         {peerFeedbackLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
+         {peerFeedbackError && <Alert message="Error loading peer feedback" description={peerFeedbackError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
+         {!peerFeedbackLoading && !peerFeedbackError && (
+            <Table
+              columns={overviewPeerFeedbackColumns}
+              dataSource={allPeerFeedbackData}
+              rowKey="feedback_id"
+              pagination={{ pageSize: 10, position: ['bottomCenter'] }}
+              scroll={{ y: 400 }}
+            />
+         )}
+      </Card>
+
+      {/* NEW Task Analysis Table Section */}
+       <Card style={{ marginBottom: '24px' }} title="Task Analysis">
+         {taskAnalysisLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
+         {taskAnalysisError && <Alert message="Error loading task analysis" description={taskAnalysisError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
+         {!taskAnalysisLoading && !taskAnalysisError && (
+            <Table
+              columns={overviewTaskAnalysisColumns}
+              dataSource={allTaskAnalysisData}
+              rowKey="auto_id"
+              pagination={{ pageSize: 10, position: ['bottomCenter'] }}
+              scroll={{ x: 'max-content', y: 400 }}
+            />
          )}
       </Card>
 
