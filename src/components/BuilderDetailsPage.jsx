@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Card, Typography, DatePicker, Table, Tabs, Spin, message, Button, Select, Space, Row, Col, Tag, Modal, Descriptions, Alert } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -21,6 +21,7 @@ import { baseChartOptions, chartContainer, chartColors } from './ChartStyles';
 import { Bar } from 'react-chartjs-2';
 // Import the correct grading utils
 import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
+import { parseAnalysis } from '../utils/parsingUtils'; // Import the utility function
 
 // Add/Update CSS for highlighting - More specific selector
 const styleSheet = document.styleSheets[0];
@@ -60,17 +61,6 @@ const { Title, Text, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 const { Option } = Select;
-
-// Add parseAnalysis helper function here (needed for WP/Comp processing)
-const parseAnalysis = (analysisString) => {
-  if (!analysisString || typeof analysisString !== 'string') return null;
-  try {
-    return JSON.parse(analysisString);
-  } catch (error) {
-    // console.error("Failed to parse analysis JSON:", error, "String:", analysisString);
-    return null;
-  }
-};
 
 // Helper function to map score to a sentiment label
 const mapScoreToLabel = (score) => {
@@ -1552,9 +1542,9 @@ const BuilderDetailsPage = () => {
         onCancel={hideWorkProductDetails}
         footer={[
            <Button key="back" onClick={hideWorkProductDetails}>
-             Close
-           </Button>,
-         ]}
+            Close
+          </Button>,
+        ]}
         width={800}
       >
         {selectedWorkProduct && (
@@ -1574,7 +1564,7 @@ const BuilderDetailsPage = () => {
                  {analysis?.completion_score !== null && analysis?.completion_score !== undefined && (
                    <div style={{ marginTop: '16px' }}>
                      <Text strong>Score:</Text> <Text>{analysis.completion_score} ({getLetterGrade(analysis.completion_score)})</Text>
-                   </div>
+          </div>
                  )}
 
                  {/* Analyzed Content */}
@@ -1657,7 +1647,7 @@ const BuilderDetailsPage = () => {
                </Space>
              );
            })()
-         )}
+        )}
       </Modal>
 
       {/* Comprehension Details Modal */}

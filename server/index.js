@@ -832,6 +832,190 @@ app.get('/api/analysis/all', async (req, res) => {
   }
 });
 
+// NEW Endpoint: Task Summary (Title, Counts, etc.)
+app.get('/api/tasks/summary', async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const tasksTable = '`pursuit-ops.pilot_agent_public.tasks`';
+  const analysisTable = '`pursuit-ops.pilot_agent_public.task_analysis_results`';
+  const timeBlocksTable = '`pursuit-ops.pilot_agent_public.time_blocks`';
+  const curriculumDaysTable = '`pursuit-ops.pilot_agent_public.curriculum_days`'; 
+  // Add submission/progress tables
+  const submissionsTable = '`pursuit-ops.pilot_agent_public.task_submissions`';
+  const progressTable = '`pursuit-ops.pilot_agent_public.user_task_progress`';
+
+  // Basic validation for dates
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Both startDate and endDate are required.' });
+  }
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  const query = `
+    WITH TaskBase AS (
+      -- Get basic task info and date
+      SELECT 
+        t.id as task_id,
+        t.task_title,
+        t.learning_type,
+        t.deliverable_type,
+        cd.day_date
+      FROM ${tasksTable} t
+      LEFT JOIN ${timeBlocksTable} tb ON t.block_id = tb.id
+      LEFT JOIN ${curriculumDaysTable} cd ON tb.day_id = cd.id
+      WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate) -- Filter tasks by date range here
+    ),
+    LinkSubmissions AS (
+      -- Count distinct users for link tasks
+      SELECT 
+        task_id,
+        COUNT(DISTINCT user_id) as link_submission_count
+      FROM ${submissionsTable}
+      WHERE task_id IN (SELECT task_id FROM TaskBase WHERE deliverable_type = 'link')
+      GROUP BY task_id
+    ),
+    TextCompletions AS (
+      -- Count distinct users for completed text tasks
+      SELECT 
+        task_id,
+        COUNT(DISTINCT user_id) as text_completion_count
+      FROM ${progressTable}
+      WHERE task_id IN (SELECT task_id FROM TaskBase WHERE deliverable_type = 'text')
+        AND status = 'completed'
+      GROUP BY task_id
+    ),
+    AnalysisCounts AS (
+      -- Count analysis records for tasks within the date range 
+      -- (Note: Analysis date might differ slightly from task curriculum date)
+      SELECT
+        task_id,
+        COUNT(auto_id) as analysis_count
+      FROM ${analysisTable}
+      WHERE DATE(curriculum_date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+       AND task_id IN (SELECT task_id FROM TaskBase)
+      GROUP BY task_id
+    )
+    -- Final Select joining all CTEs
+    SELECT 
+      tb.task_id,
+      tb.task_title,
+      tb.learning_type,
+      tb.day_date,
+      COALESCE(ac.analysis_count, 0) as analysis_count,
+      -- Combine submission counts based on deliverable type
+      CASE tb.deliverable_type
+        WHEN 'link' THEN COALESCE(ls.link_submission_count, 0)
+        WHEN 'text' THEN COALESCE(tc.text_completion_count, 0)
+        ELSE 0 -- Or handle other types if necessary
+      END as submission_count
+    FROM TaskBase tb
+    LEFT JOIN LinkSubmissions ls ON tb.task_id = ls.task_id
+    LEFT JOIN TextCompletions tc ON tb.task_id = tc.task_id
+    LEFT JOIN AnalysisCounts ac ON tb.task_id = ac.task_id
+    -- Filter out tasks with zero submissions OR zero analyses --
+    WHERE COALESCE(ac.analysis_count, 0) > 0 
+      OR 
+      CASE tb.deliverable_type
+        WHEN 'link' THEN COALESCE(ls.link_submission_count, 0)
+        WHEN 'text' THEN COALESCE(tc.text_completion_count, 0)
+        ELSE 0 
+      END > 0
+    ORDER BY tb.day_date DESC, tb.task_title ASC;
+  `;
+
+  const options = {
+    query: query,
+    params: { startDate, endDate },
+  };
+
+  try {
+    const [rows] = await bigquery.query(options);
+    res.json(rows);
+  } catch (error) {
+    console.error('BigQuery Error fetching task summary:', error);
+    res.status(500).json({ error: 'Failed to fetch task summary data', details: error.message });
+  }
+});
+
+// NEW Endpoint: Grade Distribution for a Specific Task
+app.get('/api/tasks/:taskId/grade-distribution', async (req, res) => {
+  const { taskId } = req.params;
+  const { startDate, endDate } = req.query; // Keep date optional for now
+  const analysisTable = '`pursuit-ops.pilot_agent_public.task_analysis_results`';
+  const tasksTable = '`pursuit-ops.pilot_agent_public.tasks`'; // Needed for task_title
+
+  if (!taskId) {
+    return res.status(400).json({ error: 'Missing required parameter: taskId' });
+  }
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  // Build the query, similar to the overview one but filtered by taskId
+  const query = `
+    WITH ValidAnalyses AS (
+      SELECT
+        SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score
+      FROM ${analysisTable}
+      WHERE task_id = CAST(@taskId AS INT64)
+        -- Optional date filtering --
+        ${startDate && endDate ? `AND DATE(curriculum_date) BETWEEN DATE(@startDate) AND DATE(@endDate)` : ''}
+        -- Filter out invalid tasks --
+        AND SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) IS NOT NULL
+        AND SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) != 0
+        AND NOT (
+            JSON_EXTRACT_ARRAY(analysis, '$.criteria_met') IS NOT NULL AND 
+            ARRAY_LENGTH(JSON_EXTRACT_ARRAY(analysis, '$.criteria_met')) = 1 AND 
+            JSON_VALUE(JSON_EXTRACT_ARRAY(analysis, '$.criteria_met')[OFFSET(0)]) = 'Submission received'
+        )
+    ),
+    GradedAnalyses AS (
+      -- Assign letter grades based on 0-100 score (ensure consistency with utils)
+      SELECT
+        CASE 
+          WHEN completion_score >= 93 THEN 'A+'
+          WHEN completion_score >= 85 THEN 'A'
+          WHEN completion_score >= 80 THEN 'A-'
+          WHEN completion_score >= 70 THEN 'B+'
+          WHEN completion_score >= 60 THEN 'B'
+          WHEN completion_score >= 50 THEN 'B-'
+          WHEN completion_score >= 40 THEN 'C+'
+          ELSE 'C'
+        END as grade
+      FROM ValidAnalyses
+    )
+    -- Final count aggregation by grade --
+    SELECT 
+      grade,
+      COUNT(*) as count
+    FROM GradedAnalyses
+    GROUP BY grade
+    ORDER BY grade; -- Order ensures consistent chart rendering
+  `;
+
+  // Add date params only if they exist
+  const params = { taskId };
+  if (startDate && endDate) {
+    params.startDate = startDate;
+    params.endDate = endDate;
+  }
+
+  const options = {
+    query: query,
+    params: params,
+  };
+
+  try {
+    const [rows] = await bigquery.query(options);
+    // We also need the task title, let's fetch it separately (or join in main query if preferred)
+    const taskTitleQuery = `SELECT task_title FROM ${tasksTable} WHERE id = CAST(@taskId AS INT64) LIMIT 1`;
+    const [taskTitleRows] = await bigquery.query({ query: taskTitleQuery, params: { taskId } });
+    const taskTitle = taskTitleRows.length > 0 ? taskTitleRows[0].task_title : 'Unknown Task';
+    
+    // Combine results
+    res.json({ task_id: taskId, task_title: taskTitle, gradeDistribution: rows });
+  } catch (error) {
+    console.error(`BigQuery Error fetching grade distribution for task ${taskId}:`, error);
+    res.status(500).json({ error: 'Failed to fetch grade distribution data', details: error.message });
+  }
+});
+
 // Restore static serving and fallback
 const frontendDistPath = path.resolve(__dirname, '../dist');
 app.use(express.static(frontendDistPath));

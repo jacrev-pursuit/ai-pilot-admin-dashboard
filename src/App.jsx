@@ -12,7 +12,10 @@ import {
 import PilotOverview from './components/Dashboard';
 import BuilderView from './components/BuilderView';
 import BuilderDetailsPage from './components/BuilderDetailsPage';
-import CohortTaskDetailsPage from './components/CohortTaskDetailsPage';
+import AllTaskAnalysisView from './components/AllTaskAnalysisView';
+import TaskSubmissionDetailPage from './pages/TaskSubmissionDetailPage';
+import TaskOverviewPage from './pages/TaskOverviewPage';
+import TaskDetailPage from './pages/TaskDetailPage';
 
 const { Header, Sider, Content } = Layout;
 
@@ -43,7 +46,7 @@ const Navigation = () => {
     {
       key: '/tasks',
       icon: <BookOutlined />,
-      label: <Link to="/tasks">Task Cohort View</Link>,
+      label: <Link to="/tasks">Tasks Overview</Link>,
     }
   ];
 
@@ -74,8 +77,13 @@ function App() {
               <Route path="/builders" element={<BuilderView />} />
               <Route path="/builders/:builderId" element={<BuilderDetailsPage />} />
               <Route path="/builder-details" element={<BuilderDetailsPage />} />
-              <Route path="/tasks/" element={<CohortTaskDetailsPage />} />
-              <Route path="/tasks/:taskId" element={<CohortTaskDetailsPage />} />
+              {/* Removed Task Cohort View routes */}
+              {/* <Route path="/tasks/" element={<CohortTaskDetailsPage />} /> */}
+              {/* <Route path="/tasks/:taskId" element={<CohortTaskDetailsPage />} /> */}
+              <Route path="/all-analysis" element={<AllTaskAnalysisView />} />
+              <Route path="/submission/:autoId" element={<TaskSubmissionDetailPage />} />
+              <Route path="/tasks" element={<TaskOverviewPage />} />
+              <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
             </Routes>
           </Content>
         </Layout>

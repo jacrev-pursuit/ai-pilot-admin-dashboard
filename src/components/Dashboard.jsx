@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Card, Row, Col, DatePicker, Spin, Alert, Typography, Modal, List, Space, Tag, Table, Button } from 'antd';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Card, Row, Col, DatePicker, Spin, Alert, Typography, Modal, List, Space, Tag, Table, Button, Select } from 'antd';
 import { Line, Bar } from 'react-chartjs-2';
 import { getElementAtEvent, getDatasetAtEvent } from 'react-chartjs-2';
 import dayjs from 'dayjs';
@@ -13,31 +13,14 @@ import {
   fetchBuilderData,
   fetchBuilderDetails,
   fetchAllPeerFeedback, 
-  fetchAllTaskAnalysis
+  fetchAllTaskAnalysis,
+  fetchTaskSummary,
+  fetchTaskGradeDistribution
 } from '../services/builderService';
+import { parseAnalysis } from '../utils/parsingUtils'; // Import the utility function
 
 const { RangePicker } = DatePicker;
 const { Text, Title, Paragraph } = Typography;
-
-// Helper function to parse the 'analysis' JSON string (copied from BuilderDetailsPage)
-const parseAnalysis = (analysisString) => {
-  if (!analysisString) return null;
-  try {
-    const cleanedString = analysisString
-      .replace(/\n/g, '\n') // Keep newlines
-      .replace(/\t/g, '\t') // Keep tabs
-      .replace(/\\"/g, '"'); // Replace escaped quotes
-    return JSON.parse(cleanedString);
-  } catch (error) {
-    console.error("Failed to parse analysis JSON:", error, "String:", analysisString);
-    return {
-        completion_score: null,
-        criteria_met: [],
-        areas_for_improvement: [],
-        feedback: 'Error parsing analysis data.'
-    };
-  }
-};
 
 // Utility to fetch data
 const fetchData = async (endpoint, params) => {
@@ -764,7 +747,7 @@ const PilotOverview = () => {
             <Table
               columns={overviewPeerFeedbackColumns}
               dataSource={allPeerFeedbackData}
-              rowKey="feedback_id"
+              rowKey={(record, index) => record.feedback_id ?? `pf-${index}`}
               pagination={{ pageSize: 10, position: ['bottomCenter'] }}
               scroll={{ y: 400 }}
             />
@@ -779,7 +762,7 @@ const PilotOverview = () => {
             <Table
               columns={overviewTaskAnalysisColumns}
               dataSource={allTaskAnalysisData}
-              rowKey="auto_id"
+              rowKey={(record, index) => record.auto_id ?? `ta-${index}`}
               pagination={{ pageSize: 10, position: ['bottomCenter'] }}
               scroll={{ x: 'max-content', y: 400 }}
             />

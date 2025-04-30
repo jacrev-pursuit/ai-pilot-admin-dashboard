@@ -3,22 +3,14 @@ import { Modal, Table, Typography, Card, Space, Tag, Spin, Button } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { parseAnalysis } from '../utils/parsingUtils';
 
 const { Title, Text } = Typography;
 
-// Restore parseAnalysis function
-const parseAnalysis = (analysisString) => {
-  if (!analysisString) return null;
-  try {
-    return JSON.parse(analysisString);
-  } catch (error) {
-    console.error("Failed to parse analysis JSON:", error, "String:", analysisString);
-    return null;
-  }
-};
+const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder }) => {
+  const navigate = useNavigate();
 
-const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder, onShowMoreDetails }) => {
   console.log('BuilderDetailsModal rendering:', { visible, type, dataLength: data?.length });
   
   // Restore Work Product Columns to use parseAnalysis
@@ -28,6 +20,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder, o
       dataIndex: 'task_title',
       key: 'task_title',
       width: '15%',
+      ellipsis: true, 
     },
     {
       title: 'Date',
@@ -105,11 +98,17 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder, o
       title: 'Actions',
       key: 'actions',
       width: '10%',
-      render: (_, record) => (
-        <Button size="small" onClick={() => onShowMoreDetails(record, 'workProduct')}> 
-          View Details
-        </Button>
-      ),
+      render: (_, record) => {
+        return (
+          <Button 
+            size="small" 
+            onClick={() => navigate(`/submission/${record.auto_id}`)}
+            disabled={!record.auto_id}
+          >
+            View Details
+          </Button>
+        );
+      },
     },
   ];
 
@@ -120,6 +119,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder, o
       dataIndex: 'task_title',
       key: 'task_title',
       width: '20%',
+      ellipsis: true, 
     },
     {
       title: 'Date',
@@ -194,11 +194,17 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder, o
       title: 'Actions',
       key: 'actions',
       width: '10%',
-      render: (_, record) => (
-        <Button size="small" onClick={() => onShowMoreDetails(record, 'comprehension')}> 
-          View Details
-        </Button>
-      ),
+      render: (_, record) => {
+        return (
+          <Button 
+            size="small" 
+            onClick={() => navigate(`/submission/${record.auto_id}`)}
+            disabled={!record.auto_id}
+          >
+            View Details
+          </Button>
+        );
+      },
     },
   ];
 
