@@ -14,10 +14,9 @@ import BuilderView from './components/BuilderView';
 import BuilderDetailsPage from './components/BuilderDetailsPage';
 import AllTaskAnalysisView from './components/AllTaskAnalysisView';
 import TaskSubmissionDetailPage from './pages/TaskSubmissionDetailPage';
-import TaskOverviewPage from './pages/TaskOverviewPage';
 import TaskDetailPage from './pages/TaskDetailPage';
 
-const { Header, Sider, Content } = Layout;
+const { Header, Content } = Layout;
 
 // Placeholder components for other pages
 // const Dashboard = () => <div>Dashboard Page</div>; // Can remove or keep as reference
@@ -43,25 +42,43 @@ const Navigation = () => {
       icon: <UserOutlined />,
       label: <Link to="/builder-details">Builder Details</Link>,
     },
-    {
-      key: '/tasks',
-      icon: <BookOutlined />,
-      label: <Link to="/tasks">Tasks Overview</Link>,
-    }
+    // { // Removed Tasks Overview link
+    //   key: '/tasks',
+    //   icon: <BookOutlined />,
+    //   label: <Link to="/tasks">Tasks Overview</Link>,
+    // }
   ];
 
   return (
-    <Sider width={200} theme="light" style={{ borderRight: '1px solid #f0f0f0' }}>
-      <div style={{ height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f0f0f0' }}>
-        <h1 style={{ margin: 0, fontSize: '20px', color: '#4f46e5' }}>AI Pilot Admin</h1>
+    <Header style={{ 
+      background: '#fff', 
+      padding: '0 24px', 
+      display: 'flex', 
+      alignItems: 'center',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      position: 'sticky',
+      top: 0,
+      zIndex: 1000
+    }}>
+      <div style={{ 
+        marginRight: '48px', 
+        fontSize: '20px', 
+        fontWeight: 'bold',
+        color: '#4f46e5'
+      }}>
+        AI Pilot Admin
       </div>
       <Menu
-        mode="inline"
+        mode="horizontal"
         selectedKeys={[location.pathname]}
-        style={{ height: '100%', borderRight: 0 }}
+        style={{ 
+          flex: 1,
+          border: 'none',
+          background: 'transparent'
+        }}
         items={menuItems}
       />
-    </Sider>
+    </Header>
   );
 };
 
@@ -70,23 +87,21 @@ function App() {
     <Router>
       <Layout style={{ minHeight: '100vh' }}>
         <Navigation />
-        <Layout>
-          <Content style={{ margin: '24px 16px', padding: 24, minHeight: 280 }}>
-            <Routes>
-              <Route path="/" element={<PilotOverview />} />
-              <Route path="/builders" element={<BuilderView />} />
-              <Route path="/builders/:builderId" element={<BuilderDetailsPage />} />
-              <Route path="/builder-details" element={<BuilderDetailsPage />} />
-              {/* Removed Task Cohort View routes */}
-              {/* <Route path="/tasks/" element={<CohortTaskDetailsPage />} /> */}
-              {/* <Route path="/tasks/:taskId" element={<CohortTaskDetailsPage />} /> */}
-              <Route path="/all-analysis" element={<AllTaskAnalysisView />} />
-              <Route path="/submission/:autoId" element={<TaskSubmissionDetailPage />} />
-              <Route path="/tasks" element={<TaskOverviewPage />} />
-              <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
-            </Routes>
-          </Content>
-        </Layout>
+        <Content style={{ margin: '24px 16px', padding: 24, minHeight: 280 }}>
+          <Routes>
+            <Route path="/" element={<PilotOverview />} />
+            <Route path="/builders" element={<BuilderView />} />
+            <Route path="/builders/:builderId" element={<BuilderDetailsPage />} />
+            <Route path="/builder-details" element={<BuilderDetailsPage />} />
+            {/* Removed Task Cohort View routes */}
+            {/* <Route path="/tasks/" element={<CohortTaskDetailsPage />} /> */}
+            {/* <Route path="/tasks/:taskId" element={<CohortTaskDetailsPage />} /> */}
+            <Route path="/all-analysis" element={<AllTaskAnalysisView />} />
+            <Route path="/submission/:autoId" element={<TaskSubmissionDetailPage />} />
+            {/* <Route path="/tasks" element={<TaskOverviewPage />} /> */} {/* Removed Tasks Overview route */}
+            <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
+          </Routes>
+        </Content>
       </Layout>
     </Router>
   );

@@ -102,64 +102,86 @@ Respond in JSON format:
   }
 }
 
-async function processFeedbackSentiment(dateFilter = null, limit = null, specificIds = null) {
+async function processFeedbackSentiment(dateFilter = null, limit = null, specificIds = null, processAllUnprocessed = false) {
   try {
     logger.info('Starting feedback sentiment analysis');
 
-    let targetDate = dateFilter;
+    let query = '';
+    let logDetails = '';
 
-    // If no specific date is provided, find the latest date in curriculum_days with feedback
-    if (!targetDate && !specificIds) {
-      const latestDateQuery = `
-        SELECT CAST(MAX(cd.day_date) AS STRING) as latest_date
+    if (processAllUnprocessed) {
+      // --- Logic for processing all unprocessed --- 
+      logger.info('Mode: Processing all unprocessed feedback.');
+      logDetails = 'all unprocessed feedback';
+      query = `
+        SELECT 
+          pf.id, 
+          pf.from_user_id, 
+          pf.to_user_id, 
+          pf.feedback_text, 
+          cd.day_date AS curriculum_date,
+          pf.created_at AS original_created_at
+        FROM \`pursuit-ops.pilot_agent_public.peer_feedback\` pf
+        LEFT JOIN \`pursuit-ops.pilot_agent_public.curriculum_days\` cd ON pf.day_number = cd.id
+        WHERE pf.feedback_text IS NOT NULL 
+          AND CAST(pf.id AS STRING) NOT IN (
+            SELECT DISTINCT id FROM \`pursuit-ops.pilot_agent_public.feedback_sentiment_analysis\` WHERE id IS NOT NULL
+          )
+      `;
+      // --- End Logic for all unprocessed ---
+    } else if (specificIds) {
+      // --- Logic for specific IDs --- 
+      logger.info(`Mode: Processing specific IDs: ${specificIds.join(',')}`);
+      logDetails = `specific IDs: ${specificIds.join(',')}`;
+      query = `
+        SELECT pf.id, pf.from_user_id, pf.to_user_id, pf.feedback_text, cd.day_date AS curriculum_date, pf.created_at AS original_created_at
+        FROM \`pursuit-ops.pilot_agent_public.peer_feedback\` pf
+        LEFT JOIN \`pursuit-ops.pilot_agent_public.curriculum_days\` cd ON pf.day_number = cd.id
+        WHERE pf.feedback_text IS NOT NULL
+          AND pf.id IN (${specificIds.map(id => `'${id}'`).join(',')})
+      `;
+      // --- End Logic for specific IDs ---
+    } else {
+      // --- Logic for specific date or latest date --- 
+      let targetDate = dateFilter;
+      if (!targetDate) {
+        const latestDateQuery = `
+          SELECT CAST(MAX(cd.day_date) AS STRING) as latest_date
+          FROM \`pursuit-ops.pilot_agent_public.peer_feedback\` pf
+          JOIN \`pursuit-ops.pilot_agent_public.curriculum_days\` cd ON pf.day_number = cd.id
+          WHERE cd.day_date IS NOT NULL
+        `;
+        logger.info('Querying for the latest date in curriculum_days with associated peer feedback');
+        const [latestDateRows] = await bigquery.query({ query: latestDateQuery });
+        if (latestDateRows.length > 0 && latestDateRows[0].latest_date !== null) {
+          targetDate = latestDateRows[0].latest_date;
+          logger.info(`Found latest date with feedback: ${targetDate}`);
+        } else {
+          logger.warn('Could not determine the latest date with feedback. No feedback will be processed.');
+          return; 
+        }
+      }
+      
+      logger.info(`Mode: Processing feedback for date: ${targetDate}`);
+      logDetails = `date: ${targetDate}`;
+      query = `
+        SELECT pf.id, pf.from_user_id, pf.to_user_id, pf.feedback_text, cd.day_date AS curriculum_date, pf.created_at AS original_created_at
         FROM \`pursuit-ops.pilot_agent_public.peer_feedback\` pf
         JOIN \`pursuit-ops.pilot_agent_public.curriculum_days\` cd ON pf.day_number = cd.id
-        WHERE cd.day_date IS NOT NULL
+        WHERE pf.feedback_text IS NOT NULL
+          AND DATE(cd.day_date) = DATE('${targetDate}')
       `;
-      logger.info('Querying for the latest date in curriculum_days with associated peer feedback');
-      const [latestDateRows] = await bigquery.query({ query: latestDateQuery });
-      if (latestDateRows.length > 0 && latestDateRows[0].latest_date !== null) {
-        targetDate = latestDateRows[0].latest_date;
-        logger.info(`Found latest date with feedback: ${targetDate}`);
-      } else {
-        logger.warn('Could not determine the latest date with feedback. No feedback will be processed.');
-        return; // Exit if no date is found or specified
-      }
+      // --- End Logic for specific date or latest date ---
     }
 
-    // Build the main query with JOIN and DATE filter
-    let query = `
-      SELECT 
-        pf.id, 
-        pf.from_user_id, 
-        pf.to_user_id, 
-        pf.feedback_text, 
-        cd.day_date AS curriculum_date, -- Select the date from curriculum_days
-        pf.created_at AS original_created_at -- Keep original timestamp if needed for logs, but not for results table
-      FROM \`pursuit-ops.pilot_agent_public.peer_feedback\` pf
-      JOIN \`pursuit-ops.pilot_agent_public.curriculum_days\` cd ON pf.day_number = cd.id
-      WHERE pf.feedback_text IS NOT NULL
-    `;
-
-    // Add specific IDs filter if provided (overrides date filter)
-    if (specificIds) {
-      query += ` AND pf.id IN (${specificIds.map(id => `'${id}'`).join(',')})`; 
-    }
-    // Add date filter if determined or provided
-    else if (targetDate) {
-      query += ` AND DATE(cd.day_date) = DATE('${targetDate}')`;
-    } else if (!specificIds) {
-       logger.warn('No date specified or found, and no specific IDs provided. Aborting.');
-       return;
-    }
-
-    // Add limit if provided
+    // Add limit if provided (applies to all modes)
     if (limit) {
       query += ` LIMIT ${limit}`;
+      logDetails += ` (limited to ${limit} rows)`
     }
 
-    // Updated log message
-    logger.info(`Querying feedback data${specificIds ? ` for IDs: ${specificIds.join(',')}` : targetDate ? ` for date: ${targetDate}` : ''}${limit ? ` (limited to ${limit} rows)` : ''}`);
+    // Query execution
+    logger.info(`Querying feedback data for ${logDetails}`);
     const [rows] = await bigquery.query({ query });
     logger.info(`Found ${rows.length} feedback entries to analyze`);
 
@@ -267,18 +289,19 @@ async function runManualAnalysis() {
   const limitArg = process.argv[3] ? parseInt(process.argv[3], 10) : null;
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   const sincePrefix = '--since=';
+  const allUnprocessedFlag = '--all-unprocessed';
 
-  if (firstArg && firstArg.startsWith(sincePrefix)) {
+  if (firstArg === allUnprocessedFlag) {
+    // --- New: Handle --all-unprocessed flag --- 
+    logger.info(`Processing all unprocessed feedback${limitArg ? ` with limit: ${limitArg}`: ''}`);
+    await processFeedbackSentiment(null, limitArg, null, true); // Pass true for processAllUnprocessed
+  } else if (firstArg && firstArg.startsWith(sincePrefix)) {
+    // Existing --since logic (consider if still needed or how it interacts)
     const startDate = firstArg.substring(sincePrefix.length);
     if (dateRegex.test(startDate)) {
       logger.info(`Processing feedback for all dates since: ${startDate}${limitArg ? ` with limit per day: ${limitArg}`: ''}`);
       try {
-        const dateQuery = `
-          SELECT DISTINCT CAST(day_date AS STRING) as date 
-          FROM \`pursuit-ops.pilot_agent_public.curriculum_days\` 
-          WHERE DATE(day_date) > DATE('${startDate}') 
-          ORDER BY date ASC
-        `;
+        const dateQuery = `\n          SELECT DISTINCT CAST(day_date AS STRING) as date \n          FROM \`pursuit-ops.pilot_agent_public.curriculum_days\` \n          WHERE DATE(day_date) > DATE('${startDate}') \n          ORDER BY date ASC\n        `;
         logger.info(`Querying for dates strictly after ${startDate}`);
         const [dateRows] = await bigquery.query({ query: dateQuery });
         
@@ -291,7 +314,8 @@ async function runManualAnalysis() {
         for (const row of dateRows) {
           const dateToProcess = row.date;
           logger.info(`--- Processing feedback for date: ${dateToProcess} ---`);
-          await processFeedbackSentiment(dateToProcess, limitArg);
+          // Call original function without the new flag for date-based processing
+          await processFeedbackSentiment(dateToProcess, limitArg, null, false); 
           logger.info(`--- Finished processing for date: ${dateToProcess} ---`);
         }
         logger.info(`Finished processing all feedback since ${startDate}.`);
@@ -304,14 +328,14 @@ async function runManualAnalysis() {
   } else if (firstArg && dateRegex.test(firstArg)) {
       // Process single specific date
       logger.info(`Processing feedback manually for date: ${firstArg}${limitArg ? ` with limit: ${limitArg}`: ''}`);
-      await processFeedbackSentiment(firstArg, limitArg);
+      await processFeedbackSentiment(firstArg, limitArg, null, false);
   } else if (firstArg) {
-      // Provided argument is not null/undefined but doesn't match expected formats
-      logger.error('Invalid argument. Use YYYY-MM-DD format for a single date, or --since=YYYY-MM-DD for processing since a date.');
+      // Invalid argument
+      logger.error('Invalid argument. Use YYYY-MM-DD, --since=YYYY-MM-DD, or --all-unprocessed.');
   } else {
-      // Process latest date
+      // Default: Process latest date
       logger.info('Processing feedback manually for the latest date found with feedback.');
-      await processFeedbackSentiment(null, limitArg);
+      await processFeedbackSentiment(null, limitArg, null, false);
   }
 }
 
