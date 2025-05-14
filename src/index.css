@@ -30,6 +30,45 @@ body {
   background-color: #f8f9fa; /* Ensure content background is light */
 }
 
+/* Header styles */
+.ant-layout-header {
+  background: #fff !important;
+  padding: 0 24px !important;
+  height: 64px !important;
+  line-height: 64px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  width: 100vw !important;
+}
+
+.ant-layout-content {
+  margin-top: 64px !important; /* Add margin to account for fixed header */
+}
+
+.ant-menu-horizontal {
+  border-bottom: none !important;
+  line-height: 64px !important;
+  width: 100% !important;
+}
+
+.ant-menu-horizontal > .ant-menu-item {
+  padding: 0 20px !important;
+}
+
+.ant-menu-horizontal > .ant-menu-item-selected {
+  color: #4f46e5 !important;
+  border-bottom: 2px solid #4f46e5 !important;
+}
+
+.ant-menu-horizontal > .ant-menu-item:hover {
+  color: #4f46e5 !important;
+  border-bottom: 2px solid #4f46e5 !important;
+}
+
 /* Builder View Container */
 .builder-view-container {
   padding: 24px;
