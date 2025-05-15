@@ -19,7 +19,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       title: 'Task',
       dataIndex: 'task_title',
       key: 'task_title',
-      width: '15%',
+      width: '20%',
       ellipsis: true, 
     },
     {
@@ -32,7 +32,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     {
       title: 'Score',
       key: 'score',
-      width: '10%',
+      width: '8%',
       render: (_, record) => { 
         const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
@@ -78,7 +78,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     {
       title: 'Feedback',
       key: 'feedback',
-      width: '40%',
+      width: '25%',
       render: (_, record) => {
         const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
@@ -97,7 +97,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     {
       title: 'Actions',
       key: 'actions',
-      width: '10%',
+      width: '12%',
       render: (_, record) => {
         return (
           <Button 
@@ -131,7 +131,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     {
       title: 'Score',
       key: 'score',
-      width: '10%',
+      width: '8%',
       render: (_, record) => {
         const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
@@ -146,7 +146,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
      {
       title: 'Assessment', // Restore Assessment column
       key: 'assessment',
-      width: '30%',
+      width: '25%',
       render: (_, record) => {
         const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
@@ -174,7 +174,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     {
       title: 'Feedback', // Restore Feedback column
       key: 'feedback',
-      width: '30%',
+      width: '25%',
       render: (_, record) => {
         const analysis = parseAnalysis(record.analysis); // Parse analysis field
         const score = analysis?.completion_score;
@@ -193,7 +193,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     {
       title: 'Actions',
       key: 'actions',
-      width: '10%',
+      width: '12%',
       render: (_, record) => {
         return (
           <Button 
@@ -314,7 +314,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
 
   return (
     <Modal
-      title={`${type === 'workProduct' ? 'Work Product' : type === 'comprehension' ? 'Comprehension' : 'Peer Feedback'} Details for ${selectedBuilder?.name || 'Builder'}`}
+      title={<Typography.Text style={{ color: 'white' }}>{`${type === 'workProduct' ? 'Work Product' : type === 'comprehension' ? 'Comprehension' : 'Peer Feedback'} Details for ${selectedBuilder?.name || 'Builder'}`}</Typography.Text>}
       open={visible}
       onCancel={onClose}
       width={1200}

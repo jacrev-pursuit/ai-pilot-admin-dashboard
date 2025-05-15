@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Table, Input, DatePicker, Spin, Alert, Tag, Space } from 'antd';
+import { Table, Input, DatePicker, Spin, Alert, Tag, Space, Modal } from 'antd';
 import dayjs from 'dayjs';
 import { executeQuery } from '../services/bigqueryService';
+import { getLetterGrade, getGradeTagClass } from '../utils/gradingUtils.js';
+import BuilderDetailsModal from './BuilderDetailsModal.jsx';
+import { fetchBuilderDetails } from '../services/builderService.js';
 
 const { RangePicker } = DatePicker;
 const { Search } = Input;
@@ -37,6 +40,9 @@ const BuilderMetricsTable = () => {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
   const [sorter, setSorter] = useState({});
 
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalData, setModalData] = useState(null);
+
   const fetchData = async (currentPagination = pagination, currentSorter = sorter, currentSearch = searchTerm, currentDates = dateRange) => {
     setLoading(true);
     setError(null);
@@ -45,6 +51,7 @@ const BuilderMetricsTable = () => {
       const endDate = currentDates ? currentDates[1].format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
       
       const result = await executeQuery({ startDate, endDate });
+      console.log('BuilderMetricsTable fetchData result:', result);
 
       let filteredData = result.filter(row =>
         row.name && row.name.toLowerCase().includes(currentSearch.toLowerCase())
@@ -75,6 +82,28 @@ const BuilderMetricsTable = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleCellClick = async (record, metricType) => {
+    if (!record || !record.user_id) {
+      console.error("Builder user_id is missing in record:", record);
+      setError("Cannot fetch details: Builder ID is missing.");
+      return;
+    }
+
+    setModalData({ builder: record, type: metricType, data: [], loading: true });
+    setIsModalVisible(true);
+
+    try {
+      const startDate = dateRange && dateRange.length === 2 ? dateRange[0].format('YYYY-MM-DD') : dayjs().subtract(30, 'days').format('YYYY-MM-DD');
+      const endDate = dateRange && dateRange.length === 2 ? dateRange[1].format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
+      
+      const details = await fetchBuilderDetails(record.user_id, metricType, startDate, endDate);
+      setModalData({ builder: record, type: metricType, data: details, loading: false });
+    } catch (err) {
+      console.error(`Error fetching ${metricType} details for ${record.name}:`, err);
+      setModalData({ builder: record, type: metricType, data: [], loading: false, error: err.message });
+    }
+  };
 
   const handleTableChange = (newPagination, filters, newSorter) => {
     setPagination(newPagination);
@@ -143,8 +172,8 @@ const BuilderMetricsTable = () => {
       title: 'Peer Feedback Sentiment',
       dataIndex: 'peer_feedback_sentiment',
       key: 'peer_feedback_sentiment',
-      render: (text) => (
-          <Tag color={{
+      render: (text, record) => (
+          <Tag style={{cursor: 'pointer'}} color={{
               'Very Positive': 'green',
               'Positive': 'cyan',
               'Neutral': 'blue',
@@ -153,7 +182,47 @@ const BuilderMetricsTable = () => {
           }[text] || 'default'}>
               {text || 'N/A'}
           </Tag>
-      )
+      ),
+      onCell: (record) => ({
+        onClick: (event) => {
+          event.stopPropagation();
+          handleCellClick(record, 'peer_feedback');
+        },
+      }),
+    },
+    {
+      title: 'Work Product Score',
+      dataIndex: 'work_product_score',
+      key: 'work_product_score',
+      sorter: true,
+      align: 'center',
+      render: (score, record) => { 
+        const grade = getLetterGrade(score);
+        return <Tag style={{cursor: 'pointer'}} className={getGradeTagClass(grade)}>{grade || 'N/A'}</Tag>; 
+      },
+      onCell: (record) => ({
+        onClick: (event) => {
+          event.stopPropagation();
+          handleCellClick(record, 'workProduct');
+        },
+      }),
+    },
+    {
+      title: 'Comprehension Score',
+      dataIndex: 'comprehension_score',
+      key: 'comprehension_score',
+      sorter: true,
+      align: 'center',
+      render: (score, record) => { 
+        const grade = getLetterGrade(score);
+        return <Tag style={{cursor: 'pointer'}} className={getGradeTagClass(grade)}>{grade || 'N/A'}</Tag>; 
+      },
+      onCell: (record) => ({
+        onClick: (event) => {
+          event.stopPropagation();
+          handleCellClick(record, 'comprehension');
+        },
+      }),
     },
   ];
 
@@ -187,6 +256,17 @@ const BuilderMetricsTable = () => {
         onChange={handleTableChange}
         scroll={{ x: 'max-content' }}
       />
+
+      {isModalVisible && modalData && (
+        <BuilderDetailsModal
+          visible={isModalVisible}
+          onClose={() => setIsModalVisible(false)}
+          builder={modalData.builder}
+          type={modalData.type}
+          data={modalData.data}
+          loading={modalData.loading}
+        />
+      )}
     </Space>
   );
 };

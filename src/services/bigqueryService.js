@@ -2,7 +2,7 @@
 
 export const executeQuery = async () => {
   try {
-    console.log('Fetching builder metrics from API...');
+    console.log('bigqueryService.js: Fetching /api/builders...');
     // Get date range for last 30 days
     const endDate = new Date().toISOString().split('T')[0];
     const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -16,7 +16,7 @@ export const executeQuery = async () => {
     }
     
     const data = await response.json();
-    console.log('API response:', data);
+    console.log('bigqueryService.js: API response for /api/builders:', data);
     
     return data;
   } catch (error) {

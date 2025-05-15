@@ -119,13 +119,17 @@ const BuilderView = () => {
       dataIndex: 'peer_feedback_sentiment',
       key: 'peer_feedback_sentiment',
       width: '20%',
-      render: (text, record) => (
-        text !== null && text !== undefined ? (
-          <Tag className={renderPeerFeedbackSentiment(text, record).props.className}>{renderPeerFeedbackSentiment(text, record).props.children}</Tag>
-        ) : (
-          <span>-</span>
-        )
-      ),
+      render: (text, record) => {
+        if (text === null || text === undefined) {
+          return <span>-</span>;
+        }
+        const sentimentTag = renderPeerFeedbackSentiment(text, record);
+        return (
+          <div onClick={() => handleExpand('peer_feedback', record)} style={{ cursor: 'pointer' }}>
+            {sentimentTag}
+          </div>
+        );
+      },
     },
     {
       title: (
@@ -141,9 +145,14 @@ const BuilderView = () => {
           return <span>No task assessments</span>;
         }
         const grade = getLetterGrade(text);
-        const color = getGradeColor(grade);
         return (
-          <Tag className={getGradeTagClass(grade)}>{grade}</Tag>
+          <Tag 
+            className={getGradeTagClass(grade)} 
+            onClick={() => handleExpand('workProduct', record)}
+            style={{ cursor: 'pointer' }}
+          >
+            {grade}
+          </Tag>
         );
       },
     },
@@ -162,7 +171,13 @@ const BuilderView = () => {
         }
         const grade = getLetterGrade(text);
         return (
-          <Tag className={getGradeTagClass(grade)}>{grade}</Tag>
+          <Tag 
+            className={getGradeTagClass(grade)} 
+            onClick={() => handleExpand('comprehension', record)}
+            style={{ cursor: 'pointer' }}
+          >
+            {grade}
+          </Tag>
         );
       },
     },
