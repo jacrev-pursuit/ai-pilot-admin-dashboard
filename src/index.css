@@ -1,42 +1,54 @@
 @import 'antd/dist/reset.css';
 
-/* Base styles */
-html { /* Add base background to HTML element */
-  background-color: #f8f9fa;
+/* === Dark Theme Variables === */
+:root {
+  --color-bg-main: #0a0f1a;
+  --color-bg-sidebar: #181f2a;
+  --color-bg-card: #1a2233;
+  --color-bg-header: #181f2a;
+  --color-bg-table: #181f2a;
+  --color-bg-hover: #232b3b;
+  --color-border: #232b3b;
+  --color-border-light: #2d3748;
+  --color-primary: #1976d2;
+  --color-primary-hover: #1565c0;
+  --color-text-main: #ffffff;
+  --color-text-secondary: #bfc9d1;
+  --color-text-muted: #7b8a99;
+  --color-btn-bg: #1976d2;
+  --color-btn-bg-hover: #1565c0;
+  --color-btn-text: #ffffff;
+  --color-danger: #e53935;
 }
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f8f9fa; /* Light grey background */
-  color: #212529; /* Dark text */
+/* Base styles */
+html, body {
+  background: var(--color-bg-main) !important;
+  color: var(--color-text-main) !important;
+  min-height: 100vh;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  overflow-x: hidden !important;
 }
 
 #root {
   min-height: 100vh;
-  background-color: #f8f9fa;
+  background: var(--color-bg-main);
 }
 
 .ant-layout {
   min-height: 100vh;
-  background-color: #f8f9fa; /* Ensure layout background is light */
-}
-
-.ant-layout-content {
-  background-color: #f8f9fa; /* Ensure content background is light */
+  background: var(--color-bg-main) !important;
 }
 
 /* Header styles */
 .ant-layout-header {
-  background: #fff !important;
+  background: var(--color-bg-header) !important;
+  color: var(--color-text-main) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  border-bottom: 1px solid var(--color-border-light);
   padding: 0 24px !important;
   height: 64px !important;
   line-height: 64px !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   position: fixed !important;
   top: 0;
   left: 0;
@@ -45,239 +57,101 @@ body {
   width: 100vw !important;
 }
 
+/* Content styles */
 .ant-layout-content {
-  margin-top: 64px !important; /* Add margin to account for fixed header */
-}
-
-.ant-menu-horizontal {
-  border-bottom: none !important;
-  line-height: 64px !important;
+  background: var(--color-bg-main) !important;
+  margin-top: 64px !important;
+  padding: 24px 0 24px 0 !important;
+  min-height: calc(100vh - 64px) !important;
   width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box;
+  overflow-x: hidden !important;
 }
 
-.ant-menu-horizontal > .ant-menu-item {
-  padding: 0 20px !important;
+/* Page container styles */
+.builder-view-container,
+.individual-builder-view,
+.dashboard-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box;
 }
 
-.ant-menu-horizontal > .ant-menu-item-selected {
-  color: #4f46e5 !important;
-  border-bottom: 2px solid #4f46e5 !important;
+/* Card styles */
+.ant-card {
+  background: var(--color-bg-card) !important;
+  color: var(--color-text-main) !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 0 24px 0 !important;
 }
 
-.ant-menu-horizontal > .ant-menu-item:hover {
-  color: #4f46e5 !important;
-  border-bottom: 2px solid #4f46e5 !important;
+.ant-card-head {
+  background: var(--color-bg-card) !important;
+  color: var(--color-text-main) !important;
+  border-bottom: 1px solid var(--color-border-light) !important;
 }
 
-/* Builder View Container */
-.builder-view-container {
-  padding: 24px;
-  max-width: 1600px;
-  margin: 0 auto;
+.ant-card-body {
+  color: var(--color-text-main) !important;
 }
 
-.builder-view-header {
-  margin-bottom: 24px;
+/* Table styles */
+.ant-table-wrapper,
+.ant-table {
+  background: var(--color-bg-table) !important;
+  color: var(--color-text-main) !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--color-border-light) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
 }
 
-.builder-view-header h2 {
-  color: #212529; /* Dark text for header */
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
+.ant-table-thead > tr > th {
+  background: var(--color-bg-card) !important;
+  color: var(--color-text-secondary) !important;
+  border-bottom: 1px solid var(--color-border-light) !important;
 }
 
-/* Content areas like Cards */
-.builder-view-content,
-.filter-card,
-.builder-table,
-.error-card,
-.ant-card { /* Target Ant Design cards globally */
-  background-color: #ffffff; /* White background for content blocks */
-  border: 1px solid #dee2e6; /* Light border */
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Softer shadow */
+.ant-table-tbody > tr > td {
+  background: var(--color-bg-table) !important;
+  color: var(--color-text-main) !important;
+  border-bottom: 1px solid var(--color-border) !important;
 }
 
-.filter-card {
-  margin-bottom: 24px;
-  padding: 24px; /* Ensure padding if Ant Card is not used directly */
+.ant-table-tbody > tr:hover > td {
+  background: var(--color-bg-hover) !important;
 }
 
-.error-card {
-   border-color: #dc3545; /* Standard error color */
-   margin-bottom: 24px;
+/* Remove old sider-related styles */
+.ant-layout-sider,
+.ant-layout-sider ~ .ant-layout,
+.ant-layout-has-sider {
+  display: none !important;
 }
 
-.filter-space {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-
-/* Date Range Picker */
-.date-range-picker,
-.ant-picker { /* Target Ant Design DatePicker */
-  background-color: #ffffff;
-  border: 1px solid #ced4da; /* Standard input border */
-  border-radius: 6px;
-}
-
-.date-range-picker:hover,
-.ant-picker:hover {
-  border-color: #4f46e5; /* Accent color on hover */
-}
-
-.ant-picker-input > input {
-  color: #212529; /* Dark text */
-}
-
-.ant-picker-separator,
-.ant-picker-suffix,
-.ant-picker-clear {
-  color: #6c757d; /* Secondary text color */
-}
-
-.ant-picker-clear:hover {
-  color: #212529;
-}
-
-.ant-picker-focused {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
-}
-
-/* Select Dropdown */
-.builder-select .ant-select-selector,
-.ant-select-selector { /* Target Ant Design Select */
-  background-color: #ffffff !important;
-  border: 1px solid #ced4da !important;
-}
-
-.builder-select .ant-select-selection-item,
-.ant-select-selection-item {
-  color: #212529;
-}
-
-/* Table Styles */
-.builder-table {
-  border: 1px solid #dee2e6; /* Add border to table container */
-  overflow: hidden; /* Keep rounded corners */
-}
-
-.builder-table .ant-table {
-  background-color: #ffffff; /* White table background */
-}
-
-.builder-table .ant-table-thead > tr > th {
-  background-color: #f8f9fa; /* Light grey header */
-  color: #495057; /* Slightly muted header text */
-  font-weight: 600;
-  padding: 16px;
-  border-bottom: 1px solid #dee2e6; /* Light border */
-}
-
-.builder-table .ant-table-tbody > tr > td {
-  background-color: #ffffff; /* White cell background */
-  color: #212529; /* Dark text */
-  padding: 16px;
-  border-bottom: 1px solid #e9ecef; /* Lighter border for rows */
-}
-
-.builder-table .ant-table-tbody > tr:hover > td {
-  background-color: #f1f3f5; /* Light hover background */
-}
-
-.builder-table .ant-table-row {
-  transition: background-color 0.3s;
-}
-
-/* Pagination */
-.builder-table .ant-pagination {
-  margin-top: 24px;
-  padding: 0 16px; /* Add some padding */
-}
-
-.builder-table .ant-pagination-item,
-.ant-pagination-item {
-  background-color: #ffffff;
-  border-color: #dee2e6;
-}
-
-.builder-table .ant-pagination-item a,
-.ant-pagination-item a {
-  color: #4f46e5; /* Accent color for links */
-}
-.builder-table .ant-pagination-item:hover,
-.ant-pagination-item:hover {
-  border-color: #4f46e5;
-}
-.builder-table .ant-pagination-item:hover a,
-.ant-pagination-item:hover a {
-  color: #4f46e5;
-}
-
-.builder-table .ant-pagination-item-active,
-.ant-pagination-item-active {
-  background-color: #4f46e5;
-  border-color: #4f46e5;
-}
-.builder-table .ant-pagination-item-active a,
-.ant-pagination-item-active a {
-  color: #ffffff; /* White text on active */
-}
-.builder-table .ant-pagination-item-active:hover a,
-.ant-pagination-item-active:hover a {
-  color: #ffffff; /* Keep text white on hover */
-}
-
-.builder-table .ant-pagination-prev button,
-.builder-table .ant-pagination-next button,
-.ant-pagination-prev .ant-btn,
-.ant-pagination-next .ant-btn {
-  background-color: #ffffff;
-  border-color: #dee2e6;
-  color: #4f46e5;
-}
-.builder-table .ant-pagination-prev button:hover,
-.builder-table .ant-pagination-next button:hover,
-.ant-pagination-prev .ant-btn:hover,
-.ant-pagination-next .ant-btn:hover {
-    color: #3c33b8;
-    border-color: #3c33b8;
-}
-
-/* Tags - Ant Design defaults are usually okay for light themes */
-.ant-tag {
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-weight: 500;
-}
-
-/* Buttons */
-.ant-btn-link {
-  color: #4f46e5;
-  padding: 4px 8px;
-}
-
-.ant-btn-link:hover {
-  color: #3c33b8; /* Darker accent on hover */
-  background-color: rgba(79, 70, 229, 0.05); /* Lighter background */
-}
-
-/* Responsive Adjustments */
+/* Responsive adjustments */
 @media (max-width: 768px) {
-  .builder-view-container {
-    padding: 16px;
+  .ant-layout-content {
+    padding: 8px 0 !important;
   }
-
-  .filter-space {
-    flex-direction: column;
-    align-items: stretch;
+  
+  .builder-view-container,
+  .individual-builder-view,
+  .dashboard-container {
+    padding: 0 !important;
   }
-
-  .builder-table {
-    overflow-x: auto;
+  .ant-card {
+    padding: 0 !important;
   }
 }
 
@@ -319,6 +193,9 @@ body {
   bottom: 0;
   overflow: auto; /* Allow scrolling within the sider if content overflows */
   z-index: 10; /* Keep sider above content */
+  background: var(--color-bg-sidebar) !important;
+  color: var(--color-text-main) !important;
+  border-right: 1px solid var(--color-border-light);
 }
 
 /* Add padding to the main layout to offset the fixed sider */
@@ -341,4 +218,118 @@ body {
 .ant-layout-content {
   /* The padding-left might not be needed here if applied to the parent Layout */
   /* padding-left: 200px; */ 
+}
+
+/* Buttons */
+.ant-btn-primary, .ant-btn-link, .ant-btn {
+  background: var(--color-btn-bg) !important;
+  color: var(--color-btn-text) !important;
+  border: none !important;
+  border-radius: 6px !important;
+  font-weight: 500;
+}
+.ant-btn-primary:hover, .ant-btn-link:hover, .ant-btn:hover {
+  background: var(--color-btn-bg-hover) !important;
+  color: var(--color-btn-text) !important;
+}
+
+/* Inputs, Selects, Pickers */
+.ant-input, .ant-select-selector, .ant-picker {
+  background: var(--color-bg-card) !important;
+  color: var(--color-text-main) !important;
+  border: 1px solid var(--color-border-light) !important;
+}
+.ant-input::placeholder, .ant-select-selection-placeholder, .ant-picker-input > input::placeholder {
+  color: var(--color-text-muted) !important;
+}
+
+/* Menu (for nav) */
+.ant-menu {
+  background: var(--color-bg-header) !important;
+  color: var(--color-text-secondary) !important;
+  border-bottom: none !important;
+}
+.ant-menu-item-selected, .ant-menu-item-active {
+  color: var(--color-primary) !important;
+  background: rgba(25, 118, 210, 0.12) !important;
+  border-bottom: 2px solid var(--color-primary) !important;
+}
+.ant-menu-item:hover {
+  color: var(--color-primary) !important;
+  background: rgba(25, 118, 210, 0.08) !important;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6, .ant-typography {
+  color: var(--color-text-main) !important;
+}
+.ant-typography-secondary {
+  color: var(--color-text-secondary) !important;
+}
+
+/* Tags */
+.ant-tag {
+  background: var(--color-bg-hover) !important;
+  color: var(--color-text-main) !important;
+  border: 1px solid var(--color-border-light) !important;
+}
+
+/* Modals */
+.ant-modal-content {
+  background: var(--color-bg-card) !important;
+  color: var(--color-text-main) !important;
+  border-radius: 10px !important;
+}
+.ant-modal-header {
+  background: var(--color-bg-card) !important;
+  color: var(--color-text-main) !important;
+  border-bottom: 1px solid var(--color-border-light) !important;
+}
+
+/* Misc */
+::-webkit-scrollbar {
+  width: 8px;
+  background: var(--color-bg-sidebar);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-light);
+  border-radius: 4px;
+}
+
+/* Nav bar/header/menu improvements */
+.ant-layout-header, .ant-menu {
+  background: #101624 !important;
+  color: #fff !important;
+}
+.ant-menu-item, .ant-menu-submenu-title {
+  color: #fff !important;
+}
+.ant-menu-item-selected, .ant-menu-item-active {
+  color: #1976d2 !important;
+  background: rgba(25, 118, 210, 0.18) !important;
+  border-bottom: 2px solid #1976d2 !important;
+}
+.ant-menu-item:hover {
+  color: #1976d2 !important;
+  background: rgba(25, 118, 210, 0.10) !important;
+}
+
+/* Grade tag color coding for saturated backgrounds and black text */
+.grade-tag-Aplus, .grade-tag-A, .grade-tag-Aminus { background: #38761d !important; color: #ffffff !important; font-weight: bold !important; }
+.grade-tag-Bplus, .grade-tag-B, .grade-tag-Bminus { background: #bf9002 !important; color: #ffffff !important; font-weight: bold !important; }
+.grade-tag-Cplus, .grade-tag-C, .grade-tag-Cminus { background: #b45f06 !important; color: #ffffff !important; font-weight: bold !important; }
+.grade-tag-F { background: #990000 !important; color: #ffffff !important; font-weight: bold !important; }
+
+/* Sentiment tag color coding for saturated backgrounds and black text */
+.sentiment-tag-very-positive { background: #38761d !important; color: #ffffff !important; font-weight: bold !important; }
+.sentiment-tag-positive { background: #38761d !important; color: #ffffff !important; font-weight: bold !important; } /* Assuming Very Positive and Positive use the same green */
+.sentiment-tag-neutral { background: #808080 !important; color: #ffffff !important; font-weight: bold !important; } /* Changed to grey */
+.sentiment-tag-negative { background: #b45f06 !important; color: #ffffff !important; font-weight: bold !important; } /* Assuming Negative maps to orange */
+.sentiment-tag-very-negative { background: #990000 !important; color: #ffffff !important; font-weight: bold !important; }
+
+/* Chart dark background utility */
+.chart-dark-bg {
+  background: #181f2a !important;
+  border-radius: 12px;
+  padding: 16px;
 }

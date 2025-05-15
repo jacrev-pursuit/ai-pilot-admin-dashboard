@@ -6,8 +6,8 @@ import dayjs from 'dayjs';
 import { Link, useNavigate } from 'react-router-dom';
 import BuilderMetricsTable from './BuilderMetricsTable';
 // Import chart styles
-import { chartContainer, baseChartOptions } from './ChartStyles';
-import { getLetterGrade, getGradeColor } from '../utils/gradingUtils'; // Import grading util
+import { chartContainer, baseChartOptions, chartColors } from './ChartStyles';
+import { getLetterGrade, getGradeColor, getGradeTagClass } from '../utils/gradingUtils'; // Import grading util
 // Import new fetch functions
 import {
   fetchBuilderData,
@@ -44,6 +44,7 @@ const sentimentBarOptions = (title, onClickHandler) => ({
   plugins: {
     legend: {
       position: 'right',
+      labels: { color: chartColors.text }
     },
     tooltip: {
       mode: 'index',
@@ -51,7 +52,8 @@ const sentimentBarOptions = (title, onClickHandler) => ({
     },
     title: {
         display: true,
-        text: title // Dynamic title
+        text: title,
+        color: chartColors.text
     }
   },
   scales: {
@@ -60,18 +62,24 @@ const sentimentBarOptions = (title, onClickHandler) => ({
       ticks: {
         maxTicksLimit: 10,
         autoSkip: true,
+        color: chartColors.text
       },
       title: {
         display: true,
-        text: 'Date'
+        text: 'Date',
+        color: chartColors.text
       }
     },
     y: {
       stacked: true,
       beginAtZero: true,
+      ticks: {
+        color: chartColors.text
+      },
       title: {
         display: true,
-        text: 'Number of Entries' // Generic Y-axis title
+        text: 'Number of Entries',
+        color: chartColors.text
       }
     }
   }
@@ -87,11 +95,11 @@ const getSentimentCategory = (score) => {
 
 // Define colors for the 5 sentiment categories
 const sentimentCategoryColors = {
-  'Very Positive': 'rgba(16, 185, 129, 0.6)',  // Brighter Green
-  'Positive': 'rgba(75, 192, 192, 0.6)',     // Greenish/Cyan
-  'Neutral': 'rgba(201, 203, 207, 0.6)',    // Grey
-  'Negative': 'rgba(245, 158, 11, 0.6)',     // Orange
-  'Very Negative': 'rgba(255, 99, 132, 0.6)'     // Reddish
+  'Very Positive': '#38761d',  // Green from tags
+  'Positive': '#38761d',     // Green from tags
+  'Neutral': '#808080',    // Grey from tags
+  'Negative': '#b45f06',     // Orange from tags
+  'Very Negative': '#990000'     // Red from tags
 };
 
 // Renamed function to process sentiment data with category counts
@@ -139,15 +147,16 @@ const processSentimentCountsForBarChart = (rawData) => {
 // Define possible grades and colors for the distribution charts
 const gradeCategories = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'F'];
 const gradeColors = {
-  'A+': '#2f9e44',
-  'A': '#40c057',
-  'A-': '#69db7c',
-  'B+': '#3bc9db',
-  'B': '#66d9e8',
-  'B-': '#99e9f2',
-  'C+': '#ff922b',
-  'C': '#ffa94d',
-  'F': '#ff6b6b'
+  'A+': '#38761d',
+  'A': '#38761d',
+  'A-': '#38761d',
+  'B+': '#bf9002',
+  'B': '#bf9002',
+  'B-': '#bf9002',
+  'C+': '#b45f06',
+  'C': '#b45f06',
+  // C- is not in gradeCategories, but if it were: '#b45f06'
+  'F': '#990000'
 };
 
 const PilotOverview = () => {
@@ -251,7 +260,7 @@ const PilotOverview = () => {
           datasets: [{
             label: 'Prompts Sent',
             data: promptsResponse.map(d => d.prompt_count),
-            borderColor: 'rgb(75, 192, 192)',
+            borderColor: '#ffffff',
             tension: 0.1
           }]
         });
@@ -386,25 +395,44 @@ const PilotOverview = () => {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'right' },
-        title: { display: true, text: title },
+        legend: { 
+          position: 'right',
+          labels: { color: chartColors.text }
+        },
+        title: { 
+          display: true, 
+          text: title,
+          color: chartColors.text
+        },
         tooltip: { mode: 'index', intersect: false }
       },
       scales: {
         x: {
             stacked: true, // Enable stacking
-            title: { display: true, text: 'Task Title' },
+            title: { 
+              display: true, 
+              text: 'Task Title',
+              color: chartColors.text
+            },
              ticks: { // Optional: shorten labels
                callback: function(value, index, values) {
                   const label = this.getLabelForValue(value);
                   return label.length > 25 ? label.substring(0, 22) + '...' : label;
-              }
+              },
+              color: chartColors.text
           }
         },
         y: {
             stacked: true, // Enable stacking
             beginAtZero: true,
-            title: { display: true, text: 'Number of Assessments' }
+            title: { 
+              display: true, 
+              text: 'Number of Assessments',
+              color: chartColors.text
+            },
+            ticks: {
+              color: chartColors.text
+            }
         }
       }
   });
@@ -544,15 +572,15 @@ const PilotOverview = () => {
       sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
       sortDirections: ['descend', 'ascend'],
       render: (label) => { 
-        const sentimentColorMap = {
-          'Very Positive': 'green',
-          'Positive': 'cyan',
-          'Neutral': 'default', 
-          'Negative': 'orange',
-          'Very Negative': 'red'
+        const sentimentClassMap = {
+          'Very Positive': 'sentiment-tag-very-positive',
+          'Positive': 'sentiment-tag-positive',
+          'Neutral': 'sentiment-tag-neutral',
+          'Negative': 'sentiment-tag-negative',
+          'Very Negative': 'sentiment-tag-very-negative'
         };
-        const color = sentimentColorMap[label] || 'default';
-        return <Tag color={color}>{label || 'N/A'}</Tag>;
+        const sentimentClass = sentimentClassMap[label] || 'sentiment-tag-neutral'; // Default to neutral
+        return <Tag className={sentimentClass}>{label || 'N/A'}</Tag>;
       },
       filters: sentimentFilters,
       onFilter: (value, record) => record.sentiment_label === value,
@@ -610,7 +638,7 @@ const PilotOverview = () => {
         if (!analysis) return '-'; 
         const score = analysis.completion_score;
         const grade = getLetterGrade(score);
-        return <Tag color={getGradeColor(grade)}>{grade}</Tag>; 
+        return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>; 
       },
       filters: gradeFilters,
       onFilter: (value, record) => {

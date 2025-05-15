@@ -87,21 +87,21 @@ function App() {
     <Router>
       <Layout style={{ minHeight: '100vh' }}>
         <Navigation />
-        <Content style={{ margin: '24px 16px', padding: 24, minHeight: 280 }}>
-          <Routes>
-            <Route path="/" element={<PilotOverview />} />
-            <Route path="/builders" element={<BuilderView />} />
-            <Route path="/builders/:builderId" element={<BuilderDetailsPage />} />
-            <Route path="/builder-details" element={<BuilderDetailsPage />} />
-            {/* Removed Task Cohort View routes */}
-            {/* <Route path="/tasks/" element={<CohortTaskDetailsPage />} /> */}
-            {/* <Route path="/tasks/:taskId" element={<CohortTaskDetailsPage />} /> */}
-            <Route path="/all-analysis" element={<AllTaskAnalysisView />} />
-            <Route path="/submission/:autoId" element={<TaskSubmissionDetailPage />} />
-            {/* <Route path="/tasks" element={<TaskOverviewPage />} /> */} {/* Removed Tasks Overview route */}
-            <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
-          </Routes>
-        </Content>
+          <Content style={{ margin: '24px 16px', padding: 24, minHeight: 280 }}>
+            <Routes>
+              <Route path="/" element={<PilotOverview />} />
+              <Route path="/builders" element={<BuilderView />} />
+              <Route path="/builders/:builderId" element={<BuilderDetailsPage />} />
+              <Route path="/builder-details" element={<BuilderDetailsPage />} />
+              {/* Removed Task Cohort View routes */}
+              {/* <Route path="/tasks/" element={<CohortTaskDetailsPage />} /> */}
+              {/* <Route path="/tasks/:taskId" element={<CohortTaskDetailsPage />} /> */}
+              <Route path="/all-analysis" element={<AllTaskAnalysisView />} />
+              <Route path="/submission/:autoId" element={<TaskSubmissionDetailPage />} />
+              {/* <Route path="/tasks" element={<TaskOverviewPage />} /> */} {/* Removed Tasks Overview route */}
+              <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
+            </Routes>
+          </Content>
       </Layout>
     </Router>
   );

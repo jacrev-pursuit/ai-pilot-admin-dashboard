@@ -23,6 +23,7 @@ import CompletionRateChart from './CompletionRateChart';
 import UserPromptsChart from './UserPromptsChart';
 import SentimentChart from './SentimentChart';
 import './IndividualBuilderView.css';
+import { getGradeTagClass } from '../utils/gradingUtils';
 
 const { Title, Text, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
@@ -259,7 +260,7 @@ const IndividualBuilderView = () => {
       key: 'scores',
       render: (text) => {
         const grade = getLetterGrade(text);
-        return <Tag color={getGradeColor(grade)}>{grade}</Tag>;
+        return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>;
       },
     },
     {
@@ -287,7 +288,7 @@ const IndividualBuilderView = () => {
       key: 'score',
       render: (text) => {
         const grade = getLetterGrade(text);
-        return <Tag color={getGradeColor(grade)}>{grade}</Tag>;
+        return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>;
       },
     },
     {

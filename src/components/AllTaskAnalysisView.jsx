@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Spin, Alert, Tag, Space, Typography, message } from 'antd';
 import dayjs from 'dayjs';
 import { Link } from 'react-router-dom';
-import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
+import { getLetterGrade, getGradeColor, getGradeTagClass } from '../utils/gradingUtils';
 
 const { Text } = Typography;
 
@@ -124,7 +124,7 @@ const AllTaskAnalysisView = () => {
         if (grade === 'Document Access Error' || (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received')) {
           return '-'; // Don't show a grade tag
         }
-        return <Tag color={getGradeColor(grade)}>{grade}</Tag>;
+        return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>;
       },
        sorter: (a, b) => {
            const scoreA = parseAnalysis(a.analysis)?.completion_score ?? -Infinity;

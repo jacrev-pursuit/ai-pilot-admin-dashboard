@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1037,
+    "from_user_id": 98,
+    "to_user_id": 54,
+    "feedback_text": "your professionalism, creativity, and thoughtful contributions consistently elevate the work around you. Great job!",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Professionalism that sets a high standard for others. Creativity that brings fresh perspectives to projects. Thoughful contributions that enhance the overall work.",
+    "created_at": "2025-05-07 00:00:00",
+    "processed_at": "2025-05-08T14:09:11.669Z"
+  },
+  {
+    "id": 1036,
+    "from_user_id": 98,
+    "to_user_id": 57,
+    "feedback_text": "Keep pushing forward—your growth mindset and passion for excellence are laying the foundation for incredible achievements ahead. Keep up the great work.",
+    "sentiment_score": 0.9,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Growth mindset that is driving incredible achievements. Passion for excellence.\n\nAdditional Comments: Encouragement to keep pushing forward and maintaining the great work.",
+    "created_at": "2025-05-07 00:00:00",
+    "processed_at": "2025-05-08T14:09:12.866Z"
+  },
+  {
+    "id": 1038,
+    "from_user_id": 25,
+    "to_user_id": 19,
+    "feedback_text": "Ethan was very helpful. He has a little notebook that he carries around.  When you mention something that's come up for him before, he makes reference to it from his notes and can give you information or a solution to a problem based on his notes. ",
+    "sentiment_score": 0.4,
+    "sentiment_magnitude": 0.6,
+    "sentiment_category": "Positive",
+    "summary": "Strengths: Organized with a helpful approach. Utilizes notes effectively for problem-solving.",
+    "created_at": "2025-05-06 00:00:00",
+    "processed_at": "2025-05-08T14:09:13.940Z"
+  },
+  {
+    "id": 1035,
+    "from_user_id": 91,
+    "to_user_id": 68,
+    "feedback_text": "ALWAYS HAVE GREAT IDEAS , VERY INTELLIGENT AND READY TO LEARN AT ANYTIME ",
+    "sentiment_score": 0.8,
+    "sentiment_magnitude": 0.9,
+    "sentiment_category": "Very Positive",
+    "summary": "Strengths: Great ideas that contribute positively. High intelligence evident in their work. Readiness to learn anytime.",
+    "created_at": "2025-05-06 00:00:00",
+    "processed_at": "2025-05-08T14:09:15.001Z"
+  },
+  {
+    "id": 1034,
+    "from_user_id": 66,
+    "to_user_id": 69,
+    "feedback_text": "Sat with Erica and went over her website and looked at new features. I also suggested that the name college compass is really a tongue twister and needs to be one syllable for the ease of everyone. Even helped her with prompt.",
+    "sentiment_score": 0.3,
+    "sentiment_magnitude": 0.8,
+    "sentiment_category": "Neutral",
+    "summary": "Strengths: Engaged in providing website feedback. Offered suggestions for improvement.\n\nOpportunities: Consider simplifying the name 'College Compass' for better memorability.\n\nAdditional Comments: Helped Erica with website prompt, showing support and collaboration.",
+    "created_at": "2025-05-07 00:00:00",
+    "processed_at": "2025-05-08T14:09:17.681Z"
+  }
+]

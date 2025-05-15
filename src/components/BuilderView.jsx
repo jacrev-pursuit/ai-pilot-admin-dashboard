@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import { Link } from 'react-router-dom';
 import { fetchBuilderData, fetchBuilderDetails } from '../services/builderService';
 import BuilderDetailsModal from './BuilderDetailsModal';
-import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
+import { getLetterGrade, getGradeColor, getGradeTagClass } from '../utils/gradingUtils';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -121,13 +121,7 @@ const BuilderView = () => {
       width: '20%',
       render: (text, record) => (
         text !== null && text !== undefined ? (
-          <Button 
-            type="link" 
-            icon={<ExpandOutlined />}
-            onClick={(e) => { e.stopPropagation(); handleExpand('peer_feedback', record); }}
-          >
-            {renderPeerFeedbackSentiment(text, record)} 
-          </Button>
+          <Tag className={renderPeerFeedbackSentiment(text, record).props.className}>{renderPeerFeedbackSentiment(text, record).props.children}</Tag>
         ) : (
           <span>-</span>
         )
@@ -149,13 +143,7 @@ const BuilderView = () => {
         const grade = getLetterGrade(text);
         const color = getGradeColor(grade);
         return (
-          <Button 
-            type="link" 
-            icon={<ExpandOutlined />}
-            onClick={(e) => { e.stopPropagation(); handleExpand('workProduct', record); }}
-          >
-            <Tag color={color}>{grade}</Tag>
-          </Button>
+          <Tag className={getGradeTagClass(grade)}>{grade}</Tag>
         );
       },
     },
@@ -174,13 +162,7 @@ const BuilderView = () => {
         }
         const grade = getLetterGrade(text);
         return (
-          <Button 
-            type="link" 
-            icon={<ExpandOutlined />}
-            onClick={(e) => { e.stopPropagation(); handleExpand('comprehension', record); }}
-          >
-            <Tag color={getGradeColor(grade)}>{grade}</Tag>
-          </Button>
+          <Tag className={getGradeTagClass(grade)}>{grade}</Tag>
         );
       },
     },
@@ -249,29 +231,29 @@ const BuilderView = () => {
     if (!record.prompts_sent || record.prompts_sent === 0) return <span>No data</span>;
     if (!sentiment || sentiment === 'null' || sentiment === 'undefined' || sentiment === '') return <span>No data</span>;
     
-    const sentimentMap = {
-      'Very Positive': { color: 'green', text: 'Very Positive' },
-      'Positive': { color: 'green', text: 'Positive' },
-      'Neutral': { color: 'blue', text: 'Neutral' },
-      'Negative': { color: 'orange', text: 'Negative' },
-      'Very Negative': { color: 'red', text: 'Very Negative' }
+    const sentimentClassMap = {
+      'Very Positive': 'sentiment-tag-very-positive',
+      'Positive': 'sentiment-tag-positive',
+      'Neutral': 'sentiment-tag-neutral',
+      'Negative': 'sentiment-tag-negative',
+      'Very Negative': 'sentiment-tag-very-negative'
     };
-    const sentimentInfo = sentimentMap[sentiment] || { color: 'default', text: sentiment };
-    return <Tag color={sentimentInfo.color}>{sentimentInfo.text}</Tag>;
+    const sentimentClass = sentimentClassMap[sentiment] || 'sentiment-tag-neutral';
+    return <Tag className={sentimentClass}>{sentiment}</Tag>;
   };
 
   const renderPeerFeedbackSentiment = (sentiment, record) => {
     if (sentiment === null || sentiment === undefined || sentiment === '') return <span>-</span>;
     
-    const sentimentMap = {
-      'Very Positive': { color: 'green', text: 'Very Positive' },
-      'Positive': { color: 'cyan', text: 'Positive' },
-      'Neutral': { color: 'default', text: 'Neutral' },
-      'Negative': { color: 'orange', text: 'Negative' },
-      'Very Negative': { color: 'red', text: 'Very Negative' }
+    const sentimentClassMap = {
+      'Very Positive': 'sentiment-tag-very-positive',
+      'Positive': 'sentiment-tag-positive',
+      'Neutral': 'sentiment-tag-neutral',
+      'Negative': 'sentiment-tag-negative',
+      'Very Negative': 'sentiment-tag-very-negative'
     };
-    const sentimentInfo = sentimentMap[sentiment] || { color: 'default', text: sentiment };
-    return <Tag color={sentimentInfo.color}>{sentimentInfo.text}</Tag>;
+    const sentimentClass = sentimentClassMap[sentiment] || 'sentiment-tag-neutral';
+    return <Tag className={sentimentClass}>{sentiment}</Tag>;
   };
 
   const renderWorkProductScore = (score) => {

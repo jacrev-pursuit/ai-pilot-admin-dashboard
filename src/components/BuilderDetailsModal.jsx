@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Table, Typography, Card, Space, Tag, Spin, Button } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
+import { getLetterGrade, getGradeColor, getGradeTagClass } from '../utils/gradingUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { parseAnalysis } from '../utils/parsingUtils';
 
@@ -41,7 +41,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         if (grade === 'Document Access Error' || (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received')) {
           return '-';
         }
-        return <Tag color={getGradeColor(grade)}>{grade}</Tag>;
+        return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>;
       }
     },
     {
@@ -140,7 +140,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         if (grade === 'Document Access Error' || (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received')) {
           return '-';
         }
-        return <Tag color={getGradeColor(grade)}>{grade}</Tag>;
+        return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>;
       }
     },
      {

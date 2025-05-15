@@ -20,7 +20,7 @@ import annotationPlugin from 'chartjs-plugin-annotation'; // Import the plugin
 import { baseChartOptions, chartContainer, chartColors } from './ChartStyles';
 import { Bar } from 'react-chartjs-2';
 // Import the correct grading utils
-import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
+import { getLetterGrade, getGradeColor, getGradeTagClass } from '../utils/gradingUtils';
 import { parseAnalysis } from '../utils/parsingUtils'; // Import the utility function
 
 // Add/Update CSS for highlighting - More specific selector
@@ -39,7 +39,8 @@ try {
 // Insert the new, more specific rule
 styleSheet.insertRule(`
   .ant-table-row.highlighted-row > td {
-    background-color: #fff1b8 !important; /* Slightly darker yellow */
+    background-color: #2D3748 !important; /* Lighter blue highlight */
+    /* color: #000000 !important; */ /* Removed to keep text white */
     transition: background-color 0.3s ease-in-out !important;
   }
 `, styleSheet.cssRules.length);
@@ -77,17 +78,17 @@ const mapScoreToLabel = (score) => {
 
 // Helper function to map score to just a color name for Ant Design Tags
 const mapScoreToColor = (score) => {
-  if (score === null || score === undefined) return 'default'; // Default Antd color
+  if (score === null || score === undefined) return '#CCCCCC'; // Brighter Neutral Grey for N/A
 
   const numScore = parseFloat(score);
-  if (isNaN(numScore)) return 'default'; // Default Antd color
+  if (isNaN(numScore)) return '#CCCCCC'; // Brighter Neutral Grey for NaN
 
-  // Use Ant Design Tag color names
-  if (numScore >= 0.6) return 'green'; // Very Positive
-  if (numScore >= 0.2) return 'cyan';  // Positive
-  if (numScore > -0.2) return 'default'; // Neutral
-  if (numScore >= -0.6) return 'orange';// Negative
-  return 'red';   // Very Negative
+  // Use brighter standardized hex colors for points
+  if (numScore >= 0.6) return '#54D654'; // Very Positive (Brighter Green)
+  if (numScore >= 0.2) return '#54D654';  // Positive (Brighter Green)
+  if (numScore > -0.2) return '#CCCCCC'; // Neutral (Lighter Grey)
+  if (numScore >= -0.6) return '#FFAA44';// Negative (Brighter Orange)
+  return '#dc3545';   // Very Negative (Brighter Red, matches chartColors.secondary)
 };
 
 // --- Data Processing Functions for Charts ---
@@ -166,18 +167,10 @@ const processScoreBasedLineChartData = (data, dateField, valueField, keyField, l
       {
         label: label,
         data: values,
-        borderColor: '#000000', 
-        backgroundColor: 'rgba(0, 0, 0, 0.1)', 
+        borderColor: '#ffffff', // Changed to white
+        backgroundColor: 'rgba(255, 255, 255, 0.1)', // Light transparent white for fill
         pointBackgroundColor: pointColors,
-        pointBorderColor: pointColors.map(color => {
-          if (typeof color === 'string') {
-            if (color.includes('rgba') && color.includes('0.6')) { 
-              return color.replace('0.6', '1'); 
-            }
-            return color; 
-          }
-          return chartColors.borderColor || '#000000';
-        }),
+        pointBorderColor: pointColors, // Set border color same as fill color from pointColors
         pointBorderWidth: 2,
         pointRadius: 3, 
         pointHoverRadius: 10, 
@@ -228,10 +221,10 @@ const processPromptCountData = (data, startDate, endDate) => {
       {
         label: 'Prompts Sent',
         data: values,
-        borderColor: '#000000',
-        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+        borderColor: '#ffffff', // Changed to white
+        backgroundColor: 'rgba(255, 255, 255, 0.1)', // Light transparent white for fill
         tension: 0.1,
-        fill: false, // This might be irrelevant for Bar chart, but keep for consistency if type changes
+        fill: false, 
       },
     ],
   };
@@ -264,14 +257,18 @@ const SentimentChart = ({ data, onPointClick, highlightedRowKey, highlightedRowT
     if (index === highlightedIndex) return 3;
     return 1; // Default border width
   });
+
+  // Use original dataset colors as default
   const pointBorderColor = labels.map((_, index) => {
     if (index === highlightedIndex) return '#e65100'; // Highlight color
-    return '#000000'; // Default border color
+    // Default to the color from the original dataset (from mapScoreToColor via processScoreBasedLineChartData)
+    return originalDatasets[0]?.pointBorderColor?.[index] || '#000000'; 
   });
   const pointBackgroundColor = labels.map((_, index) => {
     if (index === highlightedIndex) return '#ffb74d'; // Highlight fill
     if (index === hoveredPointIndex && hoveredChartType === 'sentiment') return '#bbdefb'; // Hover fill (light blue)
-    return 'rgba(0, 0, 0, 0.1)'; // Default
+    // Default to the color from the original dataset (from mapScoreToColor via processScoreBasedLineChartData)
+    return originalDatasets[0]?.pointBackgroundColor?.[index] || 'rgba(0, 0, 0, 0.1)'; 
   });
 
   // Create the final dataset with dynamic styles
@@ -402,14 +399,16 @@ const PeerFeedbackChart = ({ data, onPointClick, highlightedRowKey, highlightedR
     if (index === highlightedIndex) return 3;
     return 1; // Default border width
   });
+
+  // Use original dataset colors as default
   const pointBorderColor = labels.map((_, index) => {
     if (index === highlightedIndex) return '#e65100'; // Highlight color
-    return '#000000'; // Default border color
+    return originalDatasets[0]?.pointBorderColor?.[index] || '#000000';
   });
   const pointBackgroundColor = labels.map((_, index) => {
     if (index === highlightedIndex) return '#ffb74d'; // Highlight fill
     if (index === hoveredPointIndex && hoveredChartType === 'peerFeedback') return '#bbdefb'; // Hover fill (light blue)
-    return 'rgba(0, 0, 0, 0.1)'; // Default
+    return originalDatasets[0]?.pointBackgroundColor?.[index] || 'rgba(0, 0, 0, 0.1)';
   });
 
   // Create the final dataset with dynamic styles
@@ -541,14 +540,16 @@ const WorkProductChart = ({ data, onPointClick, highlightedRowKey, highlightedRo
     if (index === highlightedIndex) return 3;
     return 1; // Default border width
   });
+
+  // Use original dataset colors as default
   const pointBorderColor = labels.map((_, index) => {
     if (index === highlightedIndex) return '#e65100'; // Highlight color
-    return '#000000'; // Default border color
+    return originalDatasets[0]?.pointBorderColor?.[index] || '#000000';
   });
   const pointBackgroundColor = labels.map((_, index) => {
     if (index === highlightedIndex) return '#ffb74d'; // Highlight fill
     if (index === hoveredPointIndex && hoveredChartType === 'workProduct') return '#bbdefb'; // Hover fill (light blue)
-    return 'rgba(0, 0, 0, 0.1)'; // Default
+    return originalDatasets[0]?.pointBackgroundColor?.[index] || 'rgba(0, 0, 0, 0.1)';
   });
 
   // Create the final dataset with dynamic styles
@@ -626,14 +627,16 @@ const ComprehensionChart = ({ data, onPointClick, highlightedRowKey, highlighted
     if (index === highlightedIndex) return 3;
     return 1;
   });
+
+  // Use original dataset colors as default
   const pointBorderColor = labels.map((_, index) => {
     if (index === highlightedIndex) return '#e65100'; // Use same highlight color
-    return '#000000';
+    return originalDatasets[0]?.pointBorderColor?.[index] || '#000000';
   });
   const pointBackgroundColor = labels.map((_, index) => {
     if (index === highlightedIndex) return '#ffb74d'; // Use same highlight fill
     if (index === hoveredPointIndex && hoveredChartType === 'comprehension') return '#bbdefb';
-    return 'rgba(0, 0, 0, 0.1)';
+    return originalDatasets[0]?.pointBackgroundColor?.[index] || 'rgba(0, 0, 0, 0.1)';
   });
 
   // Create the final dataset with dynamic styles
@@ -701,32 +704,43 @@ const PromptsChart = ({ data, dateRange }) => {
           minRotation: 45,
           callback: function(value, index, values) {
             return this.getLabelForValue(value); // Use the label generated by processPromptCountData
-          }
+          },
+          color: chartColors.text // Ensure X-axis ticks are white
         },
         grid: {
-          display: false // Keep grid display setting if it was there before
+          display: false 
+        },
+        title: {
+          // No x-axis title for this chart by default, can be added if needed
         }
       },
       y: {
         beginAtZero: true,
         title: {
           display: true,
-          text: 'Number of Prompts'
+          text: 'Number of Prompts',
+          color: chartColors.text // Ensure Y-axis title is white
         },
         grid: {
-          color: chartColors.grid // Keep grid color if needed
+          color: chartColors.grid 
+        },
+        ticks: {
+          color: chartColors.text // Ensure Y-axis ticks are white
         }
       }
     },
     plugins: {
-      title: { display: true, text: 'Prompts Sent Over Time (Daily)', color: chartColors.text }, // Restore title
+      title: { 
+        display: true, 
+        text: 'Prompts Sent Over Time (Daily)', 
+        color: chartColors.text 
+      },
       legend: {
-        display: false
+        display: false // Remove the legend
       },
       tooltip: {
         callbacks: {
           title: function(tooltipItems) {
-            // Format the date in the tooltip title to MM-DD
             return dayjs(tooltipItems[0].label, 'MM-DD').format('MM-DD');
           },
           label: function(context) {
@@ -737,8 +751,8 @@ const PromptsChart = ({ data, dateRange }) => {
     }
   };
 
-  // Change back to Bar chart
-  return <div style={chartContainer}><Bar ref={chartRef} options={options} data={chartData} /></div>;
+  // Change back to Line chart
+  return <div style={chartContainer}><Line ref={chartRef} options={options} data={chartData} /></div>;
 };
 
 const BuilderDetailsPage = () => {
@@ -1063,7 +1077,7 @@ const BuilderDetailsPage = () => {
         const grade = getLetterGrade(score);
 
         // Only return the Tag if it's not a special case handled above
-        return <Tag color={getGradeColor(grade)}>{grade}</Tag>; 
+        return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>; 
       }
     },
     {
@@ -1095,7 +1109,7 @@ const BuilderDetailsPage = () => {
         const analysis = parseAnalysis(record.analysis);
         const score = analysis?.completion_score;
         const grade = getLetterGrade(score);
-        return <Tag color={getGradeColor(grade)}>{grade}</Tag>; 
+        return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>; 
       }
     },
     { 
@@ -1159,22 +1173,20 @@ const BuilderDetailsPage = () => {
       dataIndex: 'sentiment_label', // Use the label from the API for display
       key: 'sentiment_label', 
       width: '15%', 
-      // Still sort by the numeric score
       sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
       sortDirections: ['descend', 'ascend'],
-      render: (label) => { // Render function now receives the label
-        // Define color mapping based on the label text
-        const sentimentColorMap = {
-          'Very Positive': 'green',
-          'Positive': 'cyan',
-          'Neutral': 'default', // Or 'blue' if you prefer
-          'Negative': 'orange',
-          'Very Negative': 'red'
+      render: (label) => {
+        const sentimentClassMap = {
+          'Very Positive': 'sentiment-tag-very-positive',
+          'Positive': 'sentiment-tag-positive',
+          'Neutral': 'sentiment-tag-neutral',
+          'Negative': 'sentiment-tag-negative',
+          'Very Negative': 'sentiment-tag-very-negative'
         };
-        const color = sentimentColorMap[label] || 'default'; // Fallback color
+        const sentimentClass = sentimentClassMap[label] || 'sentiment-tag-neutral';
         return (
-          <Tag color={color}>
-            {label || 'N/A'} {/* Display the label directly */}
+          <Tag className={sentimentClass}>
+            {label || 'N/A'}
           </Tag>
         );
       }
@@ -1198,12 +1210,18 @@ const BuilderDetailsPage = () => {
         width: '15%', // Adjusted width
         sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
         sortDirections: ['descend', 'ascend'],
-        render: (score, record) => { // Access full record if needed (for category fallback)
-          // Use category from data if available, otherwise map from score
-          const label = record.sentiment_category || mapScoreToLabel(score);
-          const color = mapScoreToColor(score);
+        render: (score, record) => {
+          const label = record.sentiment_category || mapScoreToLabel(score); // Use category from record, fallback to score mapping
+          const sentimentClassMap = {
+            'Very Positive': 'sentiment-tag-very-positive',
+            'Positive': 'sentiment-tag-positive',
+            'Neutral': 'sentiment-tag-neutral',
+            'Negative': 'sentiment-tag-negative',
+            'Very Negative': 'sentiment-tag-very-negative'
+          };
+          const sentimentClass = sentimentClassMap[label] || 'sentiment-tag-neutral';
           return (
-            <Tag color={color}>
+            <Tag className={sentimentClass}>
               {label}
             </Tag>
           );
@@ -1332,7 +1350,7 @@ const BuilderDetailsPage = () => {
                   <Col span={24}> 
                     <Card title="Sentiment Trend & Details" bordered={true}>
                 <Row gutter={[16, 16]}> 
-                  <Col xs={24} md={12}>
+                  <Col xs={24} md={8}> {/* Chart: 1/3 width */}
                           <SentimentChart 
                             ref={sentimentChartRef}
                             data={sentimentData} 
@@ -1345,7 +1363,7 @@ const BuilderDetailsPage = () => {
                             dateRange={dateRange}
                           /> 
                   </Col>
-                  <Col xs={24} md={12}>
+                  <Col xs={24} md={16}> {/* Table: 2/3 width */}
                           <div ref={sentimentTableRef} style={{ height: '290px', overflow: 'hidden' }}>
                             <Table 
                               dataSource={
@@ -1378,7 +1396,7 @@ const BuilderDetailsPage = () => {
                    <Col span={24}> 
                      <Card title="Peer Feedback Trend & Details" bordered={true}>
                       <Row gutter={[16, 16]}> 
-                  <Col xs={24} md={12}>
+                  <Col xs={24} md={8}> {/* Chart: 1/3 width */}
                           <PeerFeedbackChart 
                             ref={peerFeedbackChartRef}
                             data={peerFeedbackData} 
@@ -1391,7 +1409,7 @@ const BuilderDetailsPage = () => {
                             dateRange={dateRange}
                           /> 
                   </Col>
-                  <Col xs={24} md={12}>
+                  <Col xs={24} md={16}> {/* Table: 2/3 width */}
                           <div ref={peerFeedbackTableRef} style={{ height: '290px', overflow: 'hidden' }}>
                             <Table
                               dataSource={
@@ -1425,7 +1443,7 @@ const BuilderDetailsPage = () => {
                    <Col span={24}> 
                      <Card title="Work Product Trend & Details" bordered={true}>
                       <Row gutter={[16, 16]}> 
-                        <Col xs={24} md={12}> 
+                        <Col xs={24} md={8}> {/* Chart: 1/3 width */}
                           <WorkProductChart 
                             ref={workProductChartRef}
                             data={workProductData} 
@@ -1438,7 +1456,7 @@ const BuilderDetailsPage = () => {
                             dateRange={dateRange}
                           /> 
                         </Col>
-                        <Col xs={24} md={12}> 
+                        <Col xs={24} md={16}> {/* Table: 2/3 width */}
                            <div ref={workProductTableRef} style={{ height: '290px', overflow: 'hidden' }}>
                              <Table 
                                 dataSource={
@@ -1470,7 +1488,7 @@ const BuilderDetailsPage = () => {
                    <Col span={24}> 
                      <Card title="Comprehension Trend & Details" bordered={true}>
                       <Row gutter={[16, 16]}> 
-                        <Col xs={24} md={12}> 
+                        <Col xs={24} md={8}> {/* Chart: 1/3 width */}
                           <ComprehensionChart 
                             ref={comprehensionChartRef} // Assign ref
                             data={comprehensionData} 
@@ -1483,7 +1501,7 @@ const BuilderDetailsPage = () => {
                             dateRange={dateRange}
                           /> 
                         </Col>
-                        <Col xs={24} md={12}> 
+                        <Col xs={24} md={16}> {/* Table: 2/3 width */}
                            <div ref={comprehensionTableRef} style={{ height: '290px', overflow: 'hidden' }}> // Assign ref
                              <Table 
                                 dataSource={ 
@@ -1514,13 +1532,13 @@ const BuilderDetailsPage = () => {
                   <Col span={24}> 
                     <Card title="Prompts Sent Over Time (Daily)" bordered={true}>
                       <Row gutter={[16, 16]}> 
-                         <Col xs={24} md={12}> 
+                         <Col xs={24} md={8}> {/* Chart: 1/3 width */}
                            <PromptsChart 
                              data={promptsData}
                              dateRange={dateRange} 
                            /> 
                          </Col>
-                         <Col xs={24} md={12}> 
+                         <Col xs={24} md={16}> {/* Table: 2/3 width (placeholder) */}
                            {/* Maybe add prompt details table here later? */}
                            <div style={{ height: '290px', display: 'flex', alignItems:'center', justifyContent:'center' }}>
                              <Text type="secondary">(Prompt details table placeholder)</Text>

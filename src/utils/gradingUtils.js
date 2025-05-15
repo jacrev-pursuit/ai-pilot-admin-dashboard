@@ -35,3 +35,20 @@ export const getGradeColor = (grade) => {
 
   return 'default'; // Fallback color
 }; 
+
+// Helper function to get CSS class for grade tag (dark theme)
+export const getGradeTagClass = (grade) => {
+  if (!grade) return '';
+  const normalized = grade.replace('+', 'plus').replace('-', 'minus').replace(/\s/g, '').toUpperCase();
+  if (normalized === 'APLUS') return 'grade-tag-Aplus';
+  if (normalized === 'A') return 'grade-tag-A';
+  if (normalized === 'AMINUS') return 'grade-tag-Aminus';
+  if (normalized === 'BPLUS') return 'grade-tag-Bplus';
+  if (normalized === 'B') return 'grade-tag-B';
+  if (normalized === 'BMINUS') return 'grade-tag-Bminus';
+  if (normalized === 'CPLUS') return 'grade-tag-Cplus';
+  if (normalized === 'C') return 'grade-tag-C';
+  if (normalized === 'CMINUS') return 'grade-tag-Cminus';
+  if (normalized === 'F') return 'grade-tag-F';
+  return '';
+}; 

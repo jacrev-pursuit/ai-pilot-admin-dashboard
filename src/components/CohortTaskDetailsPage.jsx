@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Typography, DatePicker, Spin, message, List, Tag, Select, Space, Table, Button, Divider } from 'antd';
 import dayjs from 'dayjs';
 import { fetchCohortTaskDetails, fetchTaskList, fetchTaskSubmissions } from '../services/taskService';
-import { getLetterGrade, getGradeColor } from '../utils/gradingUtils';
+import { getLetterGrade, getGradeColor, getGradeTagClass } from '../utils/gradingUtils';
 // TODO: Import a chart library (e.g., Chart.js with react-chartjs-2) and the chart component
 
 const { Title, Text, Paragraph } = Typography;
@@ -191,7 +191,7 @@ const CohortTaskDetailsPage = () => {
             if (grade === 'Document Access Error' || (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received')) {
                 return '-';
             }
-            return <Tag color={getGradeColor(grade)}>{grade}</Tag>;
+            return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>;
         },
         sorter: (a, b) => {
             const scoreA = parseAnalysis(a.analysis)?.completion_score ?? -1;
@@ -309,7 +309,7 @@ const CohortTaskDetailsPage = () => {
                 {avgScore !== null && avgScore !== undefined ? (
                   <Space direction="vertical">
                       <Text>Average Score: {avgScore.toFixed(1)}</Text>
-                      <Text>Overall Grade: <Tag color={gradeColor}>{grade}</Tag></Text>
+                      <Text>Overall Grade: <Tag className={getGradeTagClass(grade)}>{grade}</Tag></Text>
                   </Space>
                 ) : (
                     <Text>No average score data available for this period.</Text>
