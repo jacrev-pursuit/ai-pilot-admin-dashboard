@@ -201,11 +201,60 @@ async function processFeedbackSentiment(dateFilter = null, limit = null, specifi
       
       const analysis = await analyzeFeedbackWithGPT(row.feedback_text);
       
-      // Format the curriculum_date as a full timestamp string for BigQuery
-      const createdAtTimestamp = `${row.curriculum_date.value} 00:00:00`;
+      let createdAtForTable;
+
+      // Attempt to use curriculum_date first
+      if (row.curriculum_date && typeof row.curriculum_date.value === 'string') {
+        createdAtForTable = new Date(row.curriculum_date.value + 'T00:00:00Z');
+        if (isNaN(createdAtForTable.getTime())) {
+          logger.warn(`Feedback ID ${row.id}: Invalid date from curriculum_date.value '${row.curriculum_date.value}'. Will attempt to use original_created_at.`);
+          createdAtForTable = null; // Mark as null to try the next block
+        }
+      }
+
+      // If curriculum_date was not valid or not present, try original_created_at
+      if (!createdAtForTable && row.original_created_at !== null && row.original_created_at !== undefined) {
+        let potentialDateValue = row.original_created_at;
+        
+        // Check if original_created_at is a Date object itself
+        if (potentialDateValue instanceof Date) {
+          // It's already a Date object, no need to re-parse potentialDateValue, new Date() will clone it.
+        } else if (typeof potentialDateValue === 'object' && 'value' in potentialDateValue) {
+          // It's an object with a 'value' property, like BigQuery's Date/Datetime objects
+          potentialDateValue = potentialDateValue.value;
+        }
+        // Otherwise, potentialDateValue remains as is (e.g., a string or number)
+
+        createdAtForTable = new Date(potentialDateValue);
+
+        if (isNaN(createdAtForTable.getTime())) {
+          const valForLog = (typeof row.original_created_at === 'object' && row.original_created_at !== null) ? JSON.stringify(row.original_created_at) : row.original_created_at;
+          logger.error(`Feedback ID ${row.id}: Invalid date from original_created_at '${valForLog}'. Using current time as fallback.`);
+          createdAtForTable = new Date(); // Fallback to current date
+        } else {
+          // Check if curriculum_date was initially present and validly parsed
+          let curriculumDateWasValidAndUsed = false;
+          if (row.curriculum_date && typeof row.curriculum_date.value === 'string') {
+            const tempCurriculumDate = new Date(row.curriculum_date.value + 'T00:00:00Z');
+            if (!isNaN(tempCurriculumDate.getTime())) {
+              // If the initial createdAtForTable (from curriculum_date) was valid, this path shouldn't have been taken unless it was null/undefined.
+              // This log is for when original_created_at is the primary source or a fallback from an *invalid/missing* curriculum_date.
+              curriculumDateWasValidAndUsed = true; // It means curriculum_date was processed first.
+            }
+          }
+          // Log if original_created_at is being used because curriculum_date was not available or invalid
+          if (!curriculumDateWasValidAndUsed || !(row.curriculum_date && typeof row.curriculum_date.value === 'string') ) { // curriculum_date was not initially used or was invalid
+             logger.warn(`Feedback ID ${row.id}: Using original_created_at: ${createdAtForTable.toISOString()} (curriculum_date was not available, invalid, or not used).`);
+          }
+        }
+      } else if (!createdAtForTable) {
+        // If still no valid date (e.g. curriculum_date was invalid AND original_created_at was missing/null/undefined)
+        logger.error(`Feedback ID ${row.id}: No valid curriculum_date and no original_created_at. Using current time as fallback.`);
+        createdAtForTable = new Date();
+      }
 
       results.push({
-        id: row.id,
+        id: String(row.id), // Ensure ID is a string for the results table
         from_user_id: row.from_user_id,
         to_user_id: row.to_user_id,
         feedback_text: row.feedback_text,
@@ -213,7 +262,7 @@ async function processFeedbackSentiment(dateFilter = null, limit = null, specifi
         sentiment_magnitude: analysis.sentiment.magnitude,
         sentiment_category: analysis.sentiment.category,
         summary: analysis.summary,
-        created_at: createdAtTimestamp, // Use the formatted timestamp string
+        created_at: createdAtForTable, // Use the determined JS Date object
         processed_at: new Date().toISOString()
       });
 

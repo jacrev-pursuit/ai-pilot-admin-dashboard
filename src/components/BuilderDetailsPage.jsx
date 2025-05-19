@@ -84,8 +84,8 @@ const mapScoreToColor = (score) => {
   if (isNaN(numScore)) return '#CCCCCC'; // Brighter Neutral Grey for NaN
 
   // Use brighter standardized hex colors for points
-  if (numScore >= 0.6) return '#54D654'; // Very Positive (Brighter Green)
-  if (numScore >= 0.2) return '#54D654';  // Positive (Brighter Green)
+  if (numScore >= 0.6) return '#2E7D32'; // Very Positive (Darker Brighter Green, e.g., Material UI Green 800)
+  if (numScore >= 0.2) return '#54D654';  // Positive (Original Brighter Green)
   if (numScore > -0.2) return '#CCCCCC'; // Neutral (Lighter Grey)
   if (numScore >= -0.6) return '#FFAA44';// Negative (Brighter Orange)
   return '#dc3545';   // Very Negative (Brighter Red, matches chartColors.secondary)

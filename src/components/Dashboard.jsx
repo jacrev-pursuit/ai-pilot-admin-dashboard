@@ -95,8 +95,8 @@ const getSentimentCategory = (score) => {
 
 // Define colors for the 5 sentiment categories
 const sentimentCategoryColors = {
-  'Very Positive': '#38761d',  // Green from tags
-  'Positive': '#38761d',     // Green from tags
+  'Very Positive': '#1e4d28',  // Darker Green
+  'Positive': '#38761d',     // Original Green
   'Neutral': '#808080',    // Grey from tags
   'Negative': '#b45f06',     // Orange from tags
   'Very Negative': '#990000'     // Red from tags
@@ -145,18 +145,12 @@ const processSentimentCountsForBarChart = (rawData) => {
 };
 
 // Define possible grades and colors for the distribution charts
-const gradeCategories = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'F'];
+const gradeCategories = ['A', 'B', 'C', 'F']; // Simplified categories
 const gradeColors = {
-  'A+': '#38761d',
-  'A': '#38761d',
-  'A-': '#38761d',
-  'B+': '#bf9002',
-  'B': '#bf9002',
-  'B-': '#bf9002',
-  'C+': '#b45f06',
-  'C': '#b45f06',
-  // C- is not in gradeCategories, but if it were: '#b45f06'
-  'F': '#990000'
+  'A': '#38761d', // Green for all A grades
+  'B': '#bf9002', // Yellow/Gold for all B grades
+  'C': '#b45f06', // Orange for all C grades
+  'F': '#990000'  // Red for F grades
 };
 
 const PilotOverview = () => {
@@ -202,6 +196,22 @@ const PilotOverview = () => {
   const [comprehensionGradeDistData, setComprehensionGradeDistData] = useState(null); 
   const [gradeDistLoading, setGradeDistLoading] = useState(false);
   const [gradeDistError, setGradeDistError] = useState(null);
+
+  // Define specific options for the Prompt Trend Chart
+  const promptTrendChartOptions = {
+    ...baseChartOptions, // Start with base options
+    plugins: {
+      ...baseChartOptions.plugins,
+      legend: {
+        display: false, // Remove the legend
+      },
+      title: {
+        display: true,
+        text: 'Prompts Sent Over Time', // Add the title
+        color: chartColors.text, // Ensure title color matches theme
+      },
+    },
+  };
 
   // Helper to get unique values for table filters
   const getUniqueFilterValues = (data, key) => {
@@ -359,29 +369,44 @@ const PilotOverview = () => {
 
   // Helper function to process grade distribution data for STACKED bar chart
   const processGradeDistributionData = (apiData) => {
-    // Group counts by task_title, then by grade
+    // Helper function to map detailed grade to a primary letter grade
+    const mapToPrimaryGrade = (detailedGrade) => {
+      if (!detailedGrade) return 'F'; // Or handle as N/A if preferred
+      if (detailedGrade.startsWith('A')) return 'A';
+      if (detailedGrade.startsWith('B')) return 'B';
+      if (detailedGrade.startsWith('C')) return 'C';
+      if (detailedGrade === 'F') return 'F';
+      return 'F'; // Default or unmapped
+    };
+
+    // Group counts by task_title (with date), then by primary grade
     const gradesByTask = apiData.reduce((acc, item) => {
-      const taskTitle = item.task_title || 'Unknown Task';
-      const grade = item.grade;
+      const dateStr = item.date ? dayjs(item.date?.value || item.date).format('YYYY-MM-DD') : '';
+      const taskLabel = dateStr ? `${item.task_title || 'Unknown Task'} (${dateStr})` : (item.task_title || 'Unknown Task');
+      const primaryGrade = mapToPrimaryGrade(item.grade); // Map to A, B, C, F
       const count = item.count || 0;
 
-      if (!acc[taskTitle]) {
-        acc[taskTitle] = {};
-        gradeCategories.forEach(g => { acc[taskTitle][g] = 0; }); // Initialize all grades for the task
+      if (!acc[taskLabel]) {
+        acc[taskLabel] = {};
+        gradeCategories.forEach(g => { acc[taskLabel][g] = 0; }); // Initialize all primary grades for the task
       }
-      if (gradeCategories.includes(grade)) {
-         acc[taskTitle][grade] = count; // Assign the count received from API
+      // Accumulate counts for the primary grade
+      if (gradeCategories.includes(primaryGrade)) {
+         acc[taskLabel][primaryGrade] = (acc[taskLabel][primaryGrade] || 0) + count;
       }
       return acc;
     }, {});
 
     const taskLabels = Object.keys(gradesByTask).sort(); // Sort task titles alphabetically
 
-    // Create a dataset for each grade category
+    // Create a dataset for each primary grade category
     const datasets = gradeCategories.map(grade => ({
       label: grade,
-      data: taskLabels.map(task => gradesByTask[task][grade] || 0), // Get count for this task/grade
-      backgroundColor: gradeColors[grade] || '#adb5bd'
+      data: taskLabels.map(task => gradesByTask[task][grade] || 0),
+      backgroundColor: gradeColors[grade] || '#adb5bd',
+      categoryPercentage: 1.0, // Fill the category space
+      barPercentage: 1.0,      // Fill the bar space
+      maxBarThickness: 48      // Ensure bars are thick enough for 5 bars in 300px
     }));
 
     return {
@@ -394,6 +419,12 @@ const PilotOverview = () => {
   const gradeDistributionBarOptions = (title) => ({
       responsive: true,
       maintainAspectRatio: false,
+      indexAxis: 'y', // Make it a horizontal bar chart
+      layout: {
+        padding: {
+          left: 50 // Added padding to give more space for Y-axis labels
+        }
+      },
       plugins: {
         legend: { 
           position: 'right',
@@ -401,29 +432,17 @@ const PilotOverview = () => {
         },
         title: { 
           display: true, 
-          text: title,
+          text: title, // User wants to wrap this if long, but Chart.js doesn't auto-wrap titles.
           color: chartColors.text
         },
-        tooltip: { mode: 'index', intersect: false }
+        tooltip: { 
+          mode: 'y', // Changed from 'index' to 'y' for horizontal bar chart
+          intersect: false 
+        }
       },
       scales: {
-        x: {
-            stacked: true, // Enable stacking
-            title: { 
-              display: true, 
-              text: 'Task Title',
-              color: chartColors.text
-            },
-             ticks: { // Optional: shorten labels
-               callback: function(value, index, values) {
-                  const label = this.getLabelForValue(value);
-                  return label.length > 25 ? label.substring(0, 22) + '...' : label;
-              },
-              color: chartColors.text
-          }
-        },
-        y: {
-            stacked: true, // Enable stacking
+        x: { // X-axis is now 'Number of Assessments'
+            stacked: true, 
             beginAtZero: true,
             title: { 
               display: true, 
@@ -433,6 +452,41 @@ const PilotOverview = () => {
             ticks: {
               color: chartColors.text
             }
+        },
+        y: { // Y-axis is now 'Task Title' (categories)
+            stacked: true, 
+            title: { 
+              display: false, // Remove Y-axis title
+              text: 'Task Title',
+              color: chartColors.text
+            },
+             ticks: { 
+               autoSkip: false, // Ensure all labels are attempted to be shown
+               callback: function(value, index, values) {
+                  const label = this.getLabelForValue(value);
+                  if (typeof label === 'string' && label.length > 25) {
+                    const words = label.split(' ');
+                    const lines = [];
+                    let currentLine = '';
+                    for (const word of words) {
+                      if (currentLine.length === 0) {
+                        currentLine = word;
+                      } else if ((currentLine + ' ' + word).length <= 22) { // Max length per line
+                        currentLine += ' ' + word;
+                      } else {
+                        lines.push(currentLine);
+                        currentLine = word;
+                      }
+                    }
+                    if (currentLine.length > 0) {
+                        lines.push(currentLine);
+                    }
+                    return lines.length > 0 ? lines : label; // Return array or original label
+                  }
+                  return label;
+              },
+              color: chartColors.text
+          }
         }
       }
   });
@@ -692,7 +746,7 @@ const PilotOverview = () => {
             <Col xs={24} md={12} lg={12}>
               <div style={{ ...chartContainer, height: '400px' }}>
                 {promptTrendData ? (
-                  <Line options={baseChartOptions} data={promptTrendData} />
+                  <Line options={promptTrendChartOptions} data={promptTrendData} />
                 ) : (
                   <div style={{ textAlign: 'center', paddingTop: '50px', color: '#888' }}>No prompt data</div>
                 )}
@@ -739,7 +793,7 @@ const PilotOverview = () => {
            <Row gutter={[16, 16]}>
               {/* Work Product Grade Chart */}
               <Col xs={24} md={12}>
-                <div style={{ ...chartContainer, height: '400px' }}>
+                <div style={{ ...chartContainer, height: '300px', overflowY: 'auto' }}> {/* Show 5 bars at a time */}
                   {workProductGradeDistData && workProductGradeDistData.labels.length > 0 ? (
                       <Bar 
                         options={gradeDistributionBarOptions('Work Product Grades')} 
@@ -752,7 +806,7 @@ const PilotOverview = () => {
               </Col>
               {/* Comprehension Grade Chart */}
               <Col xs={24} md={12}>
-                 <div style={{ ...chartContainer, height: '400px' }}>
+                 <div style={{ ...chartContainer, height: '300px', overflowY: 'auto' }}> {/* Show 5 bars at a time */}
                    {comprehensionGradeDistData && comprehensionGradeDistData.labels.length > 0 ? (
                       <Bar 
                         options={gradeDistributionBarOptions('Comprehension Grades')} 
@@ -873,4 +927,4 @@ const PilotOverview = () => {
   );
 };
 
-export default PilotOverview; 
+export default PilotOverview;

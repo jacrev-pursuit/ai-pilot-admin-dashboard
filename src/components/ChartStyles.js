@@ -10,7 +10,7 @@ export const chartColors = {
   background: '#181f2a',
   tooltipText: '#fff',
   // Sentiment band colors (use light transparency, aligned with tags)
-  veryPositiveBg: 'rgba(56, 118, 29, 0.2)',
+  veryPositiveBg: 'rgba(30, 77, 40, 0.2)',
   positiveBg: 'rgba(56, 118, 29, 0.2)',
   neutralBg: 'rgba(128, 128, 128, 0.2)',
   negativeBg: 'rgba(180, 95, 6, 0.2)',

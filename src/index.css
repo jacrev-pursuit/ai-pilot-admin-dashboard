@@ -321,10 +321,10 @@ h1, h2, h3, h4, h5, h6, .ant-typography {
 .grade-tag-F { background: #990000 !important; color: #ffffff !important; font-weight: bold !important; }
 
 /* Sentiment tag color coding for saturated backgrounds and black text */
-.sentiment-tag-very-positive { background: #38761d !important; color: #ffffff !important; font-weight: bold !important; }
-.sentiment-tag-positive { background: #38761d !important; color: #ffffff !important; font-weight: bold !important; } /* Assuming Very Positive and Positive use the same green */
-.sentiment-tag-neutral { background: #808080 !important; color: #ffffff !important; font-weight: bold !important; } /* Changed to grey */
-.sentiment-tag-negative { background: #b45f06 !important; color: #ffffff !important; font-weight: bold !important; } /* Assuming Negative maps to orange */
+.sentiment-tag-very-positive { background: #1e4d28 !important; color: #ffffff !important; font-weight: bold !important; }
+.sentiment-tag-positive { background: #38761d !important; color: #ffffff !important; font-weight: bold !important; }
+.sentiment-tag-neutral { background: #808080 !important; color: #ffffff !important; font-weight: bold !important; }
+.sentiment-tag-negative { background: #b45f06 !important; color: #ffffff !important; font-weight: bold !important; }
 .sentiment-tag-very-negative { background: #990000 !important; color: #ffffff !important; font-weight: bold !important; }
 
 /* Chart dark background utility */
