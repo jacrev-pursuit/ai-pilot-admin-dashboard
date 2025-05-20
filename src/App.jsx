@@ -53,7 +53,11 @@ const Navigation = () => {
     <Header style={{ 
       display: 'flex',
       alignItems: 'center',
-      padding: '0 24px'
+      padding: '0 24px',
+      position: 'fixed',
+      top: 0,
+      width: '100%',
+      zIndex: 1000
     }}>
       <div style={{
         display: 'flex',
@@ -97,7 +101,8 @@ function App() {
           maxWidth: '1200px', 
           width: '100%', 
           margin: '0 auto',
-          padding: '0 16px'
+          padding: '0 16px',
+          marginTop: '64px'
         }}>
           <Content style={{ 
             padding: '24px 0', 
