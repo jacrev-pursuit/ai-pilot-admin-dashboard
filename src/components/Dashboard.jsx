@@ -1,7 +1,19 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Card, Row, Col, DatePicker, Spin, Alert, Typography, Modal, List, Space, Tag, Table, Button, Select } from 'antd';
-import { Line, Bar } from 'react-chartjs-2';
+import { Line, Bar, Pie } from 'react-chartjs-2';
 import { getElementAtEvent, getDatasetAtEvent } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title as ChartTitle,
+  Tooltip,
+  Legend
+} from 'chart.js';
 import dayjs from 'dayjs';
 import { Link, useNavigate } from 'react-router-dom';
 import BuilderMetricsTable from './BuilderMetricsTable';
@@ -18,6 +30,19 @@ import {
   fetchTaskGradeDistribution
 } from '../services/builderService';
 import { parseAnalysis } from '../utils/parsingUtils'; // Import the utility function
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,  // Required for Pie charts
+  ChartTitle,
+  Tooltip,
+  Legend
+);
 
 const { RangePicker } = DatePicker;
 const { Text, Title, Paragraph } = Typography;
@@ -182,15 +207,6 @@ const PilotOverview = () => {
   const [selectedFeedbackCategory, setSelectedFeedbackCategory] = useState('');
   const peerFeedbackChartRef = React.useRef(); // Ref for the peer feedback chart
 
-  // State for daily sentiment details modal
-  const [dailySentModalVisible, setDailySentModalVisible] = useState(false);
-  const [dailySentDetails, setDailySentDetails] = useState([]);
-  const [dailySentDetailsLoading, setDailySentDetailsLoading] = useState(false);
-  const [dailySentDetailsError, setDailySentDetailsError] = useState(null);
-  const [selectedDailySentDate, setSelectedDailySentDate] = useState('');
-  const [selectedDailySentCategory, setSelectedDailySentCategory] = useState('');
-  const dailySentimentChartRef = React.useRef(); // Ref for the daily sentiment chart
-
   // State for Grade Distribution Charts (Separate states again)
   const [workProductGradeDistData, setWorkProductGradeDistData] = useState(null); 
   const [comprehensionGradeDistData, setComprehensionGradeDistData] = useState(null); 
@@ -256,10 +272,6 @@ const PilotOverview = () => {
         const promptsResponse = await fetchData('trends/prompts', { startDate, endDate });
         if (!promptsResponse) throw new Error('No data returned from prompts fetch');
 
-        // Fetch general sentiment data
-        const sentimentResponse = await fetchData('trends/sentiment', { startDate, endDate });
-        if (!sentimentResponse) throw new Error('No data returned from sentiment fetch');
-
         // Fetch peer feedback sentiment data
         const peerFeedbackResponse = await fetchData('trends/peer-feedback', { startDate, endDate });
         if (!peerFeedbackResponse) throw new Error('No data returned from peer feedback fetch');
@@ -274,9 +286,6 @@ const PilotOverview = () => {
             tension: 0.1
           }]
         });
-
-        // Process general sentiment data using the counts processor
-        setSentimentTrendData(processSentimentCountsForBarChart(sentimentResponse));
 
         // Process peer feedback sentiment data using the counts processor
         const processedPeerData = processSentimentCountsForBarChart(peerFeedbackResponse);
@@ -349,12 +358,18 @@ const PilotOverview = () => {
         // Fetch Work Product Grades using the correct endpoint
         const wpResponse = await fetchData('overview/grade-distribution', { startDate, endDate, learningType: 'Work product' });
         if (!wpResponse) throw new Error('No data returned for Work Product grade distribution');
-        setWorkProductGradeDistData(processGradeDistributionData(wpResponse));
+        const wpProcessedData = processGradeDistributionData(wpResponse);
+        // Store the original API data for the pie chart
+        wpProcessedData._apiData = wpResponse;
+        setWorkProductGradeDistData(wpProcessedData);
 
         // Fetch Comprehension Grades using the correct endpoint
         const compResponse = await fetchData('overview/grade-distribution', { startDate, endDate, learningType: 'Key concept' });
         if (!compResponse) throw new Error('No data returned for Comprehension grade distribution');
-        setComprehensionGradeDistData(processGradeDistributionData(compResponse));
+        const compProcessedData = processGradeDistributionData(compResponse);
+        // Store the original API data for the pie chart
+        compProcessedData._apiData = compResponse;
+        setComprehensionGradeDistData(compProcessedData);
 
       } catch (error) {
         console.error("Failed to fetch grade distribution data:", error);
@@ -414,6 +429,113 @@ const PilotOverview = () => {
       datasets: datasets
     };
   };
+
+  // Process data for pie charts - aggregates all grades regardless of task
+  const processGradeDistributionForPieChart = (apiData) => {
+    // Handle empty or undefined data
+    if (!apiData || !Array.isArray(apiData) || apiData.length === 0) {
+      return {
+        labels: ['No Data'],
+        datasets: [{
+          label: 'No Data Available',
+          data: [1],
+          backgroundColor: ['#808080'],
+          borderWidth: 0
+        }]
+      };
+    }
+    
+    // Initialize counts for each grade category
+    const gradeCounts = {
+      'A': 0,
+      'B': 0,
+      'C': 0,
+      'F': 0
+    };
+    
+    // Aggregate all grades
+    apiData.forEach(item => {
+      const grade = item.grade || '';
+      const count = parseInt(item.count, 10) || 0;
+      
+      if (grade.startsWith('A')) gradeCounts['A'] += count;
+      else if (grade.startsWith('B')) gradeCounts['B'] += count;
+      else if (grade.startsWith('C')) gradeCounts['C'] += count;
+      else if (grade === 'F') gradeCounts['F'] += count;
+    });
+    
+    // Check if we have any data after processing
+    const total = Object.values(gradeCounts).reduce((sum, count) => sum + count, 0);
+    if (total === 0) {
+      return {
+        labels: ['No Data'],
+        datasets: [{
+          label: 'No Data Available',
+          data: [1],
+          backgroundColor: ['#808080'],
+          borderWidth: 0
+        }]
+      };
+    }
+    
+    return {
+      labels: Object.keys(gradeCounts),
+      datasets: [{
+        label: 'Grade Distribution',
+        data: Object.values(gradeCounts),
+        backgroundColor: [
+          gradeColors['A'],
+          gradeColors['B'],
+          gradeColors['C'], 
+          gradeColors['F']
+        ],
+        borderWidth: 0
+      }]
+    };
+  };
+  
+  // Options for pie charts
+  const pieChartOptions = (title) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: { 
+          color: chartColors.text,
+          font: {
+            size: 11
+          },
+          boxWidth: 15,
+          padding: 5
+        }
+      },
+      title: {
+        display: true,
+        text: title,
+        color: chartColors.text,
+        font: {
+          size: 14,
+          weight: 'bold'
+        },
+        padding: {
+          top: 5,
+          bottom: 5
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            const label = context.label || '';
+            const value = context.raw || 0;
+            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            const percentage = Math.round((value / total) * 100);
+            return `${label}: ${value} (${percentage}%)`;
+          }
+        }
+      }
+    }
+  });
 
   // Options for Stacked Bar Chart
   const gradeDistributionBarOptions = (title) => ({
@@ -492,43 +614,6 @@ const PilotOverview = () => {
   });
 
   // --- Click Handlers for Charts --- //
-  const handleDailySentimentChartClick = async (event, elements) => {
-    console.log('[Debug] Daily sentiment chart clicked!', event);
-    const chart = dailySentimentChartRef.current;
-    if (!chart || !elements || elements.length === 0) {
-      console.log('[Debug] No daily sentiment chart element found');
-      return;
-    }
-
-    const { datasetIndex, index } = elements[0];
-    const clickedDataset = chart.data.datasets[datasetIndex];
-    const clickedLabel = chart.data.labels[index]; // Date in 'MMM D' format
-    const clickedCategory = clickedDataset.label; // Sentiment category (Positive/Neutral/Negative)
-
-    const year = trendDateRange[1].year();
-    const dateForAPI = dayjs(`${clickedLabel} ${year}`, 'MMM D YYYY').format('YYYY-MM-DD');
-
-    console.log(`[Debug] Daily Sent Click: Date=${dateForAPI}, Category=${clickedCategory}`);
-
-    setDailySentDetailsLoading(true);
-    setDailySentDetailsError(null);
-    setSelectedDailySentDate(clickedLabel);
-    setSelectedDailySentCategory(clickedCategory);
-    setDailySentModalVisible(true);
-    setDailySentDetails([]);
-
-    try {
-      const response = await fetchData('sentiment/details', { date: dateForAPI, category: clickedCategory });
-      if (!response) throw new Error('No data returned from daily sentiment details fetch');
-      setDailySentDetails(response);
-    } catch (error) {
-      console.error("Failed to fetch daily sentiment details:", error);
-      setDailySentDetailsError(error.message);
-    } finally {
-      setDailySentDetailsLoading(false);
-    }
-  };
-
   const handlePeerFeedbackChartClick = async (event, elements) => {
     console.log('[Debug] Peer feedback chart clicked!', event);
     console.log('[Debug] Elements from handler:', elements);
@@ -729,7 +814,7 @@ const PilotOverview = () => {
       </div>
 
       {/* Trend Charts Section */}
-      <Card style={{ marginBottom: '24px' }}>
+      <Card style={{ marginBottom: '24px', borderRadius: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <Typography.Title level={4} style={{ margin: 0 }}>Overall Trends</Typography.Title>
           <RangePicker
@@ -741,42 +826,68 @@ const PilotOverview = () => {
         {trendsLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
         {trendsError && <Alert message="Error loading trends" description={trendsError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
         {!trendsLoading && !trendsError && (
-          <Row gutter={[16, 16]}>
+          <Row gutter={[24, 24]}>
             {/* Prompt Trend Chart */}
             <Col xs={24} md={12} lg={12}>
-              <div style={{ ...chartContainer, height: '400px' }}>
+              <div style={{ ...chartContainer, height: '300px', borderRadius: '8px' }}>
                 {promptTrendData ? (
-                  <Line options={promptTrendChartOptions} data={promptTrendData} />
+                  <Line 
+                    options={promptTrendChartOptions} 
+                    data={promptTrendData}
+                    key={`prompt-line-${trendDateRange[0].format('YYYYMMDD')}-${trendDateRange[1].format('YYYYMMDD')}`}
+                  />
                 ) : (
                   <div style={{ textAlign: 'center', paddingTop: '50px', color: '#888' }}>No prompt data</div>
                 )}
               </div>
             </Col>
-            {/* General Sentiment Chart */}
-            <Col xs={24} md={12} lg={12}>
-               <div style={{ ...chartContainer, height: '400px' }}>
-                {sentimentTrendData && sentimentTrendData.labels.length > 0 ? (
-                  <Bar
-                    ref={dailySentimentChartRef}
-                    options={sentimentBarOptions('Daily Sentiment Distribution', handleDailySentimentChartClick)}
-                    data={sentimentTrendData}
-                  />
-                ) : (
-                  <div style={{ textAlign: 'center', paddingTop: '50px', color: '#888' }}>No sentiment data</div>
-                )}
-              </div>
-            </Col>
             {/* Peer Feedback Sentiment Chart */}
             <Col xs={24} md={12} lg={12}>
-               <div style={{ ...chartContainer, height: '400px' }}>
+               <div style={{ ...chartContainer, height: '300px', borderRadius: '8px' }}>
                 {peerFeedbackTrendData && peerFeedbackTrendData.labels.length > 0 ? (
                   <Bar
                     ref={peerFeedbackChartRef}
                     options={sentimentBarOptions('Peer Feedback Sentiment Distribution', handlePeerFeedbackChartClick)}
                     data={peerFeedbackTrendData}
+                    key={`peer-bar-${trendDateRange[0].format('YYYYMMDD')}-${trendDateRange[1].format('YYYYMMDD')}`}
                   />
                 ) : (
                   <div style={{ textAlign: 'center', paddingTop: '50px', color: '#888' }}>No peer feedback data</div>
+                )}
+              </div>
+            </Col>
+            
+            {/* Work Product Grade Pie Chart */}
+            <Col xs={24} md={12} lg={6}>
+              <div style={{ ...chartContainer, height: '200px', borderRadius: '8px' }}>
+                {workProductGradeDistData && workProductGradeDistData.labels && workProductGradeDistData.labels.length > 0 ? (
+                  <Pie 
+                    options={pieChartOptions('Work Product Grades')} 
+                    data={processGradeDistributionForPieChart(
+                      // Pass the original API data, not the processed bar chart data
+                      workProductGradeDistData._apiData || []
+                    )}
+                    key={`wp-pie-${trendDateRange[0].format('YYYYMMDD')}-${trendDateRange[1].format('YYYYMMDD')}`}
+                  />
+                ) : (
+                  <div style={{ textAlign: 'center', paddingTop: '70px', color: '#888' }}>No Work Product grade data</div>
+                )}
+              </div>
+            </Col>
+            {/* Comprehension Grade Pie Chart */}
+            <Col xs={24} md={12} lg={6}>
+              <div style={{ ...chartContainer, height: '200px', borderRadius: '8px' }}>
+                {comprehensionGradeDistData && comprehensionGradeDistData.labels && comprehensionGradeDistData.labels.length > 0 ? (
+                  <Pie 
+                    options={pieChartOptions('Comprehension Grades')} 
+                    data={processGradeDistributionForPieChart(
+                      // Pass the original API data, not the processed bar chart data
+                      comprehensionGradeDistData._apiData || []
+                    )}
+                    key={`comp-pie-${trendDateRange[0].format('YYYYMMDD')}-${trendDateRange[1].format('YYYYMMDD')}`}
+                  />
+                ) : (
+                  <div style={{ textAlign: 'center', paddingTop: '70px', color: '#888' }}>No Comprehension grade data</div>
                 )}
               </div>
             </Col>
@@ -784,45 +895,8 @@ const PilotOverview = () => {
         )}
       </Card>
 
-      {/* Grade Distribution Section (Two Charts) */}
-      <Card style={{ marginBottom: '24px' }}>
-         <Title level={4} style={{ margin: 0, marginBottom: '16px' }}>Overall Grade Distributions</Title>
-         {gradeDistLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
-         {gradeDistError && <Alert message="Error loading grade distributions" description={gradeDistError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
-         {!gradeDistLoading && !gradeDistError && (
-           <Row gutter={[16, 16]}>
-              {/* Work Product Grade Chart */}
-              <Col xs={24} md={12}>
-                <div style={{ ...chartContainer, height: '300px', overflowY: 'auto' }}> {/* Show 5 bars at a time */}
-                  {workProductGradeDistData && workProductGradeDistData.labels.length > 0 ? (
-                      <Bar 
-                        options={gradeDistributionBarOptions('Work Product Grades')} 
-                        data={workProductGradeDistData} 
-                      />
-                  ) : (
-                      <div style={{ textAlign: 'center', paddingTop: '50px', color: '#888' }}>No Work Product grade data</div>
-                  )}
-                 </div>
-              </Col>
-              {/* Comprehension Grade Chart */}
-              <Col xs={24} md={12}>
-                 <div style={{ ...chartContainer, height: '300px', overflowY: 'auto' }}> {/* Show 5 bars at a time */}
-                   {comprehensionGradeDistData && comprehensionGradeDistData.labels.length > 0 ? (
-                      <Bar 
-                        options={gradeDistributionBarOptions('Comprehension Grades')} 
-                        data={comprehensionGradeDistData} 
-                      />
-                   ) : (
-                      <div style={{ textAlign: 'center', paddingTop: '50px', color: '#888' }}>No Comprehension grade data</div>
-                   )}
-                  </div>
-              </Col>
-            </Row>
-         )}
-      </Card>
-
       {/* NEW Peer Feedback Table Section */}
-      <Card style={{ marginBottom: '24px' }} title="Peer Feedback Details">
+      <Card style={{ marginBottom: '24px', borderRadius: '8px' }} title={<Title level={4} style={{ margin: 0 }}>Peer Feedback Details</Title>}>
          {peerFeedbackLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
          {peerFeedbackError && <Alert message="Error loading peer feedback" description={peerFeedbackError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
          {!peerFeedbackLoading && !peerFeedbackError && (
@@ -832,12 +906,13 @@ const PilotOverview = () => {
               rowKey={(record, index) => record.feedback_id ?? `pf-${index}`}
               pagination={{ pageSize: 10, position: ['bottomCenter'] }}
               scroll={{ y: 400 }}
+              style={{ borderRadius: '8px' }}
             />
          )}
       </Card>
 
       {/* NEW Task Analysis Table Section */}
-       <Card style={{ marginBottom: '24px' }} title="Task Analysis">
+       <Card style={{ marginBottom: '24px', borderRadius: '8px' }} title={<Title level={4} style={{ margin: 0 }}>Task Analysis</Title>}>
          {taskAnalysisLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
          {taskAnalysisError && <Alert message="Error loading task analysis" description={taskAnalysisError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
          {!taskAnalysisLoading && !taskAnalysisError && (
@@ -847,6 +922,7 @@ const PilotOverview = () => {
               rowKey={(record, index) => record.auto_id ?? `ta-${index}`}
               pagination={{ pageSize: 10, position: ['bottomCenter'] }}
               scroll={{ x: 'max-content', y: 400 }}
+              style={{ borderRadius: '8px' }}
             />
          )}
       </Card>
@@ -856,7 +932,7 @@ const PilotOverview = () => {
         title={`Peer Feedback Details - ${selectedFeedbackCategory} on ${selectedFeedbackDate}`}
         open={feedbackModalVisible}
         onCancel={() => setFeedbackModalVisible(false)}
-        footer={null} // No OK/Cancel buttons
+        footer={null} 
         width={800}
       >
         {feedbackDetailsLoading ? (
@@ -884,43 +960,6 @@ const PilotOverview = () => {
           />
         ) : (
           <Text>No specific feedback found for this category on this day.</Text>
-        )}
-      </Modal>
-
-      {/* Daily Sentiment Details Modal */}
-      <Modal
-        title={`Daily Sentiment Details - ${selectedDailySentCategory} on ${selectedDailySentDate}`}
-        open={dailySentModalVisible}
-        onCancel={() => setDailySentModalVisible(false)}
-        footer={null}
-        width={800}
-      >
-        {dailySentDetailsLoading ? (
-          <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>
-        ) : dailySentDetailsError ? (
-          <Alert message="Error Loading Details" description={dailySentDetailsError} type="error" showIcon />
-        ) : dailySentDetails.length > 0 ? (
-          <List
-            itemLayout="vertical"
-            dataSource={dailySentDetails}
-            renderItem={item => (
-              <List.Item
-                key={item.user_id + item.date?.value}
-              >
-                <List.Item.Meta
-                  title={<Text strong>{item.user_name || `User ID: ${item.user_id}`}</Text>}
-                  description={item.sentiment_reason || 'No reason provided.'}
-                />
-                <Space size="large">
-                   <Text>Score: {item.sentiment_score?.toFixed(2) ?? 'N/A'}</Text>
-                   <Text>Messages: {item.message_count ?? 'N/A'}</Text>
-                   <Text>Category: <Tag>{item.sentiment_category || 'N/A'}</Tag></Text>
-                </Space>
-              </List.Item>
-            )}
-          />
-        ) : (
-          <Text>No specific sentiment details found for this category on this day.</Text>
         )}
       </Modal>
     </div>
