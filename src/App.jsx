@@ -72,7 +72,7 @@ const Navigation = () => {
           marginRight: '24px', 
           fontSize: '20px', 
           fontWeight: 'bold',
-          color: '#4b42d9',
+          color: '#ffffff',
           whiteSpace: 'nowrap'
         }}>
           AI Pilot Admin
