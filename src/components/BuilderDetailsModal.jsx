@@ -91,7 +91,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         if (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received') {
            return <Tag color="red">Tech issue</Tag>;
         }
-        return <Text style={{ whiteSpace: 'pre-wrap' }}>{feedback || '-'}</Text>;
+        return <Text style={{ whiteSpace: 'pre-wrap', color: '#ffffff' }}>{feedback || '-'}</Text>;
       }
     },
     {
@@ -187,7 +187,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
          if (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received') {
            return <Tag color="red">Tech issue</Tag>;
         }
-        return <Text style={{ whiteSpace: 'pre-wrap' }}>{feedback || '-'}</Text>;
+        return <Text style={{ whiteSpace: 'pre-wrap', color: '#ffffff' }}>{feedback || '-'}</Text>;
       }
     },
     {
@@ -218,11 +218,12 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         return record.from_user_id ? (
           <Link
             to={`/builders/${record.from_user_id}`}
+            style={{ color: '#4b42d9' }}
           >
             {text || 'Unknown'}
           </Link>
         ) : (
-          text || 'Unknown'
+          <Text style={{ color: '#ffffff' }}>{text || 'Unknown'}</Text>
         );
       }
     },
@@ -232,7 +233,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       key: 'feedback',
       width: '30%',
       render: (text) => (
-        <Text style={{ whiteSpace: 'pre-wrap' }}>
+        <Text style={{ whiteSpace: 'pre-wrap', color: '#ffffff' }}>
           {text || '-'}
         </Text>
       ),
@@ -243,7 +244,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       key: 'summary',
       width: '30%',
       render: (text) => (
-        <Text style={{ whiteSpace: 'pre-wrap' }}>
+        <Text style={{ whiteSpace: 'pre-wrap', color: '#ffffff' }}>
           {text || '-'}
         </Text>
       ),
@@ -323,14 +324,14 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       {loadingDetails ? (
         <div style={{ textAlign: 'center', padding: '50px' }}>
           <Spin size="large" />
-          <p>Loading details...</p>
+          <p style={{ color: '#ffffff' }}>Loading details...</p>
         </div>
       ) : (
         <Space direction="vertical" style={{ width: '100%' }}>
           <Card>
-            <Title level={4}>Summary</Title>
+            <Title level={4} style={{ color: '#ffffff' }}>Summary</Title>
             <Space direction="vertical">
-              <Text>
+              <Text style={{ color: '#ffffff' }}>
                 Total Items: {detailsData?.length || 0}
               </Text>
             </Space>

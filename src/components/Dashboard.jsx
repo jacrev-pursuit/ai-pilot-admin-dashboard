@@ -513,15 +513,7 @@ const PilotOverview = () => {
       title: {
         display: true,
         text: title,
-        color: chartColors.text,
-        font: {
-          size: 14,
-          weight: 'bold'
-        },
-        padding: {
-          top: 5,
-          bottom: 5
-        }
+        color: chartColors.text
       },
       tooltip: {
         callbacks: {
@@ -862,7 +854,7 @@ const PilotOverview = () => {
               <div style={{ ...chartContainer, height: '200px', borderRadius: '8px' }}>
                 {workProductGradeDistData && workProductGradeDistData.labels && workProductGradeDistData.labels.length > 0 ? (
                   <Pie 
-                    options={pieChartOptions('Work Product Grades')} 
+                    options={pieChartOptions('Work Product Grade Distribution')} 
                     data={processGradeDistributionForPieChart(
                       // Pass the original API data, not the processed bar chart data
                       workProductGradeDistData._apiData || []
@@ -879,7 +871,7 @@ const PilotOverview = () => {
               <div style={{ ...chartContainer, height: '200px', borderRadius: '8px' }}>
                 {comprehensionGradeDistData && comprehensionGradeDistData.labels && comprehensionGradeDistData.labels.length > 0 ? (
                   <Pie 
-                    options={pieChartOptions('Comprehension Grades')} 
+                    options={pieChartOptions('Comprehension Grade Distribution')} 
                     data={processGradeDistributionForPieChart(
                       // Pass the original API data, not the processed bar chart data
                       comprehensionGradeDistData._apiData || []
@@ -929,7 +921,7 @@ const PilotOverview = () => {
 
       {/* Feedback Details Modal */}
       <Modal
-        title={`Peer Feedback Details - ${selectedFeedbackCategory} on ${selectedFeedbackDate}`}
+        title={<span style={{ color: "#ffffff" }}>{`Peer Feedback Details - ${selectedFeedbackCategory} on ${selectedFeedbackDate}`}</span>}
         open={feedbackModalVisible}
         onCancel={() => setFeedbackModalVisible(false)}
         footer={null} 
@@ -948,18 +940,18 @@ const PilotOverview = () => {
                 <List.Item.Meta
                   title={
                     <Space size="middle">
-                       <Text>From: <Text strong>{item.reviewer_name || 'Anonymous'}</Text></Text>
-                       <Text>To: <Text strong>{item.recipient_name || 'Unknown'}</Text></Text>
+                       <Text style={{ color: "#ffffff" }}>From: <Text strong style={{ color: "#ffffff" }}>{item.reviewer_name || 'Anonymous'}</Text></Text>
+                       <Text style={{ color: "#ffffff" }}>To: <Text strong style={{ color: "#ffffff" }}>{item.recipient_name || 'Unknown'}</Text></Text>
                     </Space>
                   }
-                  description={item.feedback_text}
+                  description={<div style={{ color: "#ffffff", whiteSpace: "pre-wrap" }}>{item.feedback_text}</div>}
                 />
-                <Text type="secondary">{dayjs(item.created_at?.value || item.created_at).format('MMMM D')}</Text>
+                <Text style={{ color: "#bfc9d1" }}>{dayjs(item.created_at?.value || item.created_at).format('MMMM D')}</Text>
               </List.Item>
             )}
           />
         ) : (
-          <Text>No specific feedback found for this category on this day.</Text>
+          <Text style={{ color: "#ffffff" }}>No specific feedback found for this category on this day.</Text>
         )}
       </Modal>
     </div>
