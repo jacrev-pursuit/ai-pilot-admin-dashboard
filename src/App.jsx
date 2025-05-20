@@ -51,33 +51,39 @@ const Navigation = () => {
 
   return (
     <Header style={{ 
-      background: '#fff', 
-      padding: '0 24px', 
-      display: 'flex', 
+      display: 'flex',
       alignItems: 'center',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 1000
+      padding: '0 24px'
     }}>
-      <div style={{ 
-        marginRight: '48px', 
-        fontSize: '20px', 
-        fontWeight: 'bold',
-        color: '#4f46e5'
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        width: '100%',
+        maxWidth: '1200px',
+        margin: '0 auto',
+        overflow: 'hidden',
+        paddingLeft: '12px'
       }}>
-        AI Pilot Admin
+        <div style={{ 
+          marginRight: '24px', 
+          fontSize: '20px', 
+          fontWeight: 'bold',
+          color: '#4b42d9',
+          whiteSpace: 'nowrap'
+        }}>
+          AI Pilot Admin
+        </div>
+        <Menu
+          mode="horizontal"
+          selectedKeys={[location.pathname]}
+          style={{ 
+            flex: 1,
+            border: 'none'
+          }}
+          theme="dark"
+          items={menuItems}
+        />
       </div>
-      <Menu
-        mode="horizontal"
-        selectedKeys={[location.pathname]}
-        style={{ 
-          flex: 1,
-          border: 'none',
-          background: 'transparent'
-        }}
-        items={menuItems}
-      />
     </Header>
   );
 };
@@ -87,7 +93,16 @@ function App() {
     <Router>
       <Layout style={{ minHeight: '100vh' }}>
         <Navigation />
-          <Content style={{ margin: '24px 16px', padding: 24, minHeight: 280 }}>
+        <div style={{ 
+          maxWidth: '1200px', 
+          width: '100%', 
+          margin: '0 auto',
+          padding: '0 16px'
+        }}>
+          <Content style={{ 
+            padding: '24px 0', 
+            minHeight: 280
+          }}>
             <Routes>
               <Route path="/" element={<PilotOverview />} />
               <Route path="/builders" element={<BuilderView />} />
@@ -102,6 +117,7 @@ function App() {
               <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
             </Routes>
           </Content>
+        </div>
       </Layout>
     </Router>
   );

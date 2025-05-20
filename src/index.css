@@ -37,6 +37,7 @@ html, body {
 
 .ant-layout {
   min-height: 100vh;
+  padding-left: 0;
   background: var(--color-bg-main) !important;
 }
 
@@ -46,21 +47,36 @@ html, body {
   color: var(--color-text-main) !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
   border-bottom: 1px solid var(--color-border-light);
-  padding: 0 24px !important;
+  padding: 0 !important;
   height: 64px !important;
   line-height: 64px !important;
-  position: fixed !important;
-  top: 0;
-  left: 0;
-  right: 0;
   z-index: 1000;
-  width: 100vw !important;
+  width: 100% !important;
+}
+
+/* Menu specific styles */
+.ant-menu.ant-menu-dark, .ant-menu-dark .ant-menu-sub, .ant-menu.ant-menu-dark .ant-menu-sub {
+  background: var(--color-bg-header) !important;
+}
+
+.ant-menu-dark.ant-menu-horizontal > .ant-menu-item, 
+.ant-menu-dark.ant-menu-horizontal > .ant-menu-submenu {
+  padding: 0 20px;
+  color: var(--color-text-main);
+}
+
+.ant-menu-dark.ant-menu-horizontal > .ant-menu-item:hover {
+  background-color: var(--color-bg-hover) !important;
+}
+
+.ant-menu-dark.ant-menu-horizontal > .ant-menu-item-selected {
+  background-color: var(--color-primary) !important;
+  color: white !important;
 }
 
 /* Content styles */
 .ant-layout-content {
   background: var(--color-bg-main) !important;
-  margin-top: 64px !important;
   padding: 24px 0 24px 0 !important;
   min-height: calc(100vh - 64px) !important;
   width: 100% !important;
@@ -142,7 +158,7 @@ html, body {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .ant-layout-content {
-    padding: 8px 0 !important;
+    padding: 16px 16px !important;
   }
   
   .builder-view-container,
@@ -150,8 +166,36 @@ html, body {
   .dashboard-container {
     padding: 0 !important;
   }
+  
   .ant-card {
     padding: 0 !important;
+    margin-bottom: 16px !important;
+  }
+  
+  /* Improve header responsiveness */
+  .ant-layout-header {
+    padding: 0 16px !important;
+  }
+  
+  .ant-menu {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Even smaller screens */
+@media (max-width: 576px) {
+  .ant-layout-content {
+    padding: 12px 12px !important;
+  }
+  
+  .ant-card-body {
+    padding: 12px !important;
+  }
+  
+  /* Stack menu items if needed */
+  .ant-menu-item {
+    padding: 0 12px !important;
   }
 }
 
@@ -198,11 +242,6 @@ html, body {
   border-right: 1px solid var(--color-border-light);
 }
 
-/* Add padding to the main layout to offset the fixed sider */
-.ant-layout {
-  padding-left: 200px; /* Match the Sider width (default is 200px) */
-}
-
 /* Ensure the Sider itself doesn't get the padding */
 .ant-layout-sider ~ .ant-layout {
   padding-left: 0; /* Reset padding for the layout *containing* the sider */
@@ -210,8 +249,8 @@ html, body {
 
 /* Ensure the layout containing the Content gets the padding */
 .ant-layout-has-sider {
-  /* This might be needed depending on exact structure, but the general .ant-layout rule might suffice */
-  /* padding-left: 200px !important; */
+  /* Remove any sidebar-related padding */
+  padding-left: 0 !important;
 }
 
 /* Adjust content margin/padding if necessary */
