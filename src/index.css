@@ -10,8 +10,8 @@
   --color-bg-hover: #232b3b;
   --color-border: #232b3b;
   --color-border-light: #2d3748;
-  --color-primary: #1976d2;
-  --color-primary-hover: #1565c0;
+  --color-primary: #4b42d9;
+  --color-primary-hover: #3a33b0;
   --color-text-main: #ffffff;
   --color-text-secondary: #bfc9d1;
   --color-text-muted: #7b8a99;
@@ -221,9 +221,10 @@ html, body {
  /* color: #495057; */
 }
 
-.ant-menu-item-selected {
-  /* background-color: #e8e6fc !important; /* Lighter accent background */ 
-   /* color: #4f46e5 !important; */
+.ant-menu-item-selected, .ant-menu-item-active {
+  color: #ffffff !important;
+  background: rgba(75, 66, 217, 0.18) !important;
+  border-bottom: 2px solid #4b42d9 !important;
 }
 
 /* --- Customizations --- */
@@ -261,14 +262,14 @@ html, body {
 
 /* Buttons */
 .ant-btn-primary, .ant-btn-link, .ant-btn {
-  background: var(--color-btn-bg) !important;
+  background: var(--color-primary) !important;
   color: var(--color-btn-text) !important;
   border: none !important;
   border-radius: 6px !important;
   font-weight: 500;
 }
 .ant-btn-primary:hover, .ant-btn-link:hover, .ant-btn:hover {
-  background: var(--color-btn-bg-hover) !important;
+  background: var(--color-primary-hover) !important;
   color: var(--color-btn-text) !important;
 }
 
@@ -289,13 +290,13 @@ html, body {
   border-bottom: none !important;
 }
 .ant-menu-item-selected, .ant-menu-item-active {
-  color: var(--color-primary) !important;
-  background: rgba(25, 118, 210, 0.12) !important;
-  border-bottom: 2px solid var(--color-primary) !important;
+  color: #ffffff !important;
+  background: rgba(75, 66, 217, 0.18) !important;
+  border-bottom: 2px solid #4b42d9 !important;
 }
 .ant-menu-item:hover {
-  color: var(--color-primary) !important;
-  background: rgba(25, 118, 210, 0.08) !important;
+  color: #ffffff !important;
+  background: rgba(75, 66, 217, 0.10) !important;
 }
 
 /* Typography */
@@ -344,13 +345,13 @@ h1, h2, h3, h4, h5, h6, .ant-typography {
   color: #fff !important;
 }
 .ant-menu-item-selected, .ant-menu-item-active {
-  color: #1976d2 !important;
-  background: rgba(25, 118, 210, 0.18) !important;
-  border-bottom: 2px solid #1976d2 !important;
+  color: #ffffff !important;
+  background: rgba(75, 66, 217, 0.18) !important;
+  border-bottom: 2px solid #4b42d9 !important;
 }
 .ant-menu-item:hover {
-  color: #1976d2 !important;
-  background: rgba(25, 118, 210, 0.10) !important;
+  color: #ffffff !important;
+  background: rgba(75, 66, 217, 0.10) !important;
 }
 
 /* Grade tag color coding for saturated backgrounds and black text */
