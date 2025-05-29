@@ -153,12 +153,12 @@ const AllTaskAnalysisView = () => {
 
         // Render criteria and areas tags
         const criteriaTags = (Array.isArray(criteria) && criteria.length > 0)
-          ? criteria.map(c => <Tag key={`crit-${record.analysis_id}-${c}`} color="green">{c}</Tag>)
+          ? criteria.map(c => <Tag key={`crit-${record.analysis_id}-${c}`} className="criteria-met-tag">{c}</Tag>)
           : null;
         const areaTags = (Array.isArray(areas) && areas.length > 0)
           ? areas.map(a => {
               const label = a === "technical issue with analysis - please try again" ? "Tech Issue" : a;
-              return <Tag key={`area-${record.analysis_id}-${a}`} color="red">{label}</Tag>;
+              return <Tag key={`area-${record.analysis_id}-${a}`} className="areas-for-improvement-tag">{label}</Tag>;
             })
           : null;
 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Card, Typography, DatePicker, Table, Tabs, Spin, message, Button, Select, Space, Row, Col, Tag, Modal, Descriptions, Alert } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, LinkOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { fetchBuilderData, fetchBuilderDetails } from '../services/builderService';
+import { fetchBuilderData, fetchBuilderDetails, fetchVideoAnalyses } from '../services/builderService';
 import { Line, getElementAtEvent } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -22,6 +22,7 @@ import { Bar } from 'react-chartjs-2';
 // Import the correct grading utils
 import { getLetterGrade, getGradeColor, getGradeTagClass } from '../utils/gradingUtils';
 import { parseAnalysis } from '../utils/parsingUtils'; // Import the utility function
+
 
 // Add/Update CSS for highlighting - More specific selector
 const styleSheet = document.styleSheets[0];
@@ -775,13 +776,16 @@ const BuilderDetailsPage = () => {
   const [comprehensionData, setComprehensionData] = useState([]);
   const [peerFeedbackData, setPeerFeedbackData] = useState([]);
   const [promptsData, setPromptsData] = useState([]);
-  const [sentimentData, setSentimentData] = useState([]);
+  const [videoAnalysesData, setVideoAnalysesData] = useState([]);
+  // const [sentimentData, setSentimentData] = useState([]);
 
   // Need state for the modals
   const [isWorkProductModalVisible, setWorkProductModalVisible] = useState(false);
   const [selectedWorkProduct, setSelectedWorkProduct] = useState(null);
   const [isComprehensionModalVisible, setComprehensionModalVisible] = useState(false); // State for Comprehension modal
   const [selectedComprehension, setSelectedComprehension] = useState(null); // State for selected Comprehension item
+  // const [selectedVideoAnalysis, setSelectedVideoAnalysis] = useState(null);
+  // const [videoAnalysisModalVisible, setVideoAnalysisModalVisible] = useState(false);
 
   const [highlightedRowKey, setHighlightedRowKey] = useState(null);
   const [highlightedRowType, setHighlightedRowType] = useState(null);
@@ -789,20 +793,20 @@ const BuilderDetailsPage = () => {
   const [hoveredChartType, setHoveredChartType] = useState(null);
 
   // Chart Refs
-  const sentimentChartRef = useRef(null);
+  // const sentimentChartRef = useRef(null);
   const peerFeedbackChartRef = useRef(null);
   const workProductChartRef = useRef(null);
   const comprehensionChartRef = useRef(null); // Add ref for Comprehension chart
   // ADD Table Refs
-  const sentimentTableRef = useRef(null);
+  // const sentimentTableRef = useRef(null);
   const peerFeedbackTableRef = useRef(null);
   const workProductTableRef = useRef(null);
   const comprehensionTableRef = useRef(null); // Add ref for Comprehension table
 
   // Updated useMemo calls to pass dataType
-  const sentimentChartData = useMemo(() => processScoreBasedLineChartData(
-    sentimentData, 'date', 'sentiment_score', 'date', 'Sentiment Score', dateRange[0], dateRange[1], 'sentiment'
-  ), [sentimentData, dateRange]);
+  // const sentimentChartData = useMemo(() => processScoreBasedLineChartData(
+  //   sentimentData, 'date', 'sentiment_score', 'date', 'Sentiment Score', dateRange[0], dateRange[1], 'sentiment'
+  // ), [sentimentData, dateRange]);
 
   const peerFeedbackChartData = useMemo(() => processScoreBasedLineChartData(
     peerFeedbackData, 'timestamp', 'sentiment_score', 'feedback_id', 'Peer Feedback Score', dateRange[0], dateRange[1], 'peerFeedback'
@@ -833,7 +837,8 @@ const BuilderDetailsPage = () => {
       case 'comprehension': dataExists = comprehensionData.length > 0; break;
       case 'peer_feedback': dataExists = peerFeedbackData.length > 0; break;
       case 'prompts': dataExists = promptsData.length > 0; break;
-      case 'sentiment': dataExists = sentimentData.length > 0; break;
+      case 'video_analyses': dataExists = videoAnalysesData.length > 0; break;
+      // case 'sentiment': dataExists = sentimentData.length > 0; break;
       default: return; // Unknown type
     }
 
@@ -855,7 +860,8 @@ const BuilderDetailsPage = () => {
         case 'comprehension': setComprehensionData(data); break;
         case 'peer_feedback': setPeerFeedbackData(data); break;
         case 'prompts': setPromptsData(data); break; // Assuming you add a prompts tab/table
-        case 'sentiment': setSentimentData(data); break;
+        case 'video_analyses': setVideoAnalysesData(data); break;
+        // case 'sentiment': setSentimentData(data); break;
         default: break;
       }
     } catch (error) {
@@ -908,15 +914,86 @@ const BuilderDetailsPage = () => {
       setComprehensionData([]);
       setPeerFeedbackData([]);
       setPromptsData([]);
-      setSentimentData([]);
+      setVideoAnalysesData([]); // Clear video analyses data
+      // setSentimentData([]);
       
       const startDate = dateRange[0].format('YYYY-MM-DD');
       const endDate = dateRange[1].format('YYYY-MM-DD');
 
       try {
-        // Fetch all data types sequentially
+        // Fetch video analyses first
+        const videoData = await fetchVideoAnalyses(startDate, endDate, selectedBuilderId).catch(e => {
+          console.error('Video analyses fetch error:', e);
+          return [];
+        });
+        
+        // Process video data to match the format of workProduct data
+        const processedVideoData = videoData.map(video => {
+          // Calculate average score
+          const scores = [
+            video.technical_score || 0,
+            video.business_score || 0,
+            video.professional_skills_score || 0
+          ];
+          const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+          
+          // Get overall explanations from each rationale
+          let technicalExplanation = '';
+          let businessExplanation = '';
+          let professionalExplanation = '';
+          
+          try {
+            if (video.technical_score_rationale) {
+              const technicalJson = JSON.parse(video.technical_score_rationale);
+              technicalExplanation = technicalJson.overall_explanation || '';
+            }
+          } catch (e) {
+            console.error('Error parsing technical rationale:', e);
+          }
+          
+          try {
+            if (video.business_score_rationale) {
+              const businessJson = JSON.parse(video.business_score_rationale);
+              businessExplanation = businessJson.overall_explanation || '';
+            }
+          } catch (e) {
+            console.error('Error parsing business rationale:', e);
+          }
+          
+          try {
+            if (video.professional_skills_score_rationale) {
+              const professionalJson = JSON.parse(video.professional_skills_score_rationale);
+              professionalExplanation = professionalJson.overall_explanation || '';
+            }
+          } catch (e) {
+            console.error('Error parsing professional rationale:', e);
+          }
+          
+          // Create an analysis object that matches the format expected by the work product table
+          const analysisObj = {
+            completion_score: (avgScore / 5) * 100, // Convert score out of 5 to percentage
+            feedback: `Technical: ${technicalExplanation}\n\nBusiness: ${businessExplanation}\n\nProfessional: ${professionalExplanation}`,
+            criteria_met: [],
+            areas_for_improvement: []
+          };
+          
+          return {
+            task_id: `video-${video.video_id}`, // Create a unique ID with prefix
+            task_title: video.task_title || 'Video Demo Analysis', // Use the joined task_title or fallback to default
+            date: video.submission_date || new Date().toISOString(), // Use the joined submission_date or fallback
+            analysis: JSON.stringify(analysisObj),
+            user_id: video.user_id,
+            isVideoAnalysis: true, // Flag to distinguish videos from regular work products
+            videoData: video // Store the original video data
+          };
+        });
+        
+        setVideoAnalysesData(processedVideoData);
+        
+        // Fetch all other data types sequentially
         const wpData = await fetchBuilderDetails(selectedBuilderId, 'workProduct', startDate, endDate).catch(e => { console.error('WP fetch error:', e); return []; });
-        setWorkProductData(wpData);
+        // Combine work product data with processed video data
+        setWorkProductData([...wpData, ...processedVideoData]);
 
         const compData = await fetchBuilderDetails(selectedBuilderId, 'comprehension', startDate, endDate).catch(e => { console.error('Comp fetch error:', e); return []; });
         setComprehensionData(compData);
@@ -926,9 +1003,6 @@ const BuilderDetailsPage = () => {
 
         const pData = await fetchBuilderDetails(selectedBuilderId, 'prompts', startDate, endDate).catch(e => { console.error('Prompts fetch error:', e); return []; });
         setPromptsData(pData);
-
-        const sentData = await fetchBuilderDetails(selectedBuilderId, 'sentiment', startDate, endDate).catch(e => { console.error('Sent fetch error:', e); return []; });
-        setSentimentData(sentData);
 
       } catch (error) {
         message.error(`Failed to load some builder details`);
@@ -1005,10 +1079,10 @@ const BuilderDetailsPage = () => {
   useEffect(() => {
     const handleClickOutside = (event) => { 
       // Check if the click is outside ALL chart refs and ALL table refs
-      const isOutsideCharts = ![sentimentChartRef, peerFeedbackChartRef, workProductChartRef, comprehensionChartRef].some(
+      const isOutsideCharts = ![peerFeedbackChartRef, workProductChartRef, comprehensionChartRef].some(
         ref => ref.current && ref.current.contains(event.target)
       );
-      const isOutsideTables = ![sentimentTableRef, peerFeedbackTableRef, workProductTableRef, comprehensionTableRef].some(
+      const isOutsideTables = ![peerFeedbackTableRef, workProductTableRef, comprehensionTableRef].some(
         ref => ref.current && ref.current.contains(event.target)
       );
 
@@ -1025,7 +1099,7 @@ const BuilderDetailsPage = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
     // Add new refs to dependency array
-  }, [highlightedRowKey, highlightedRowType, sentimentChartRef, peerFeedbackChartRef, workProductChartRef, comprehensionChartRef, sentimentTableRef, peerFeedbackTableRef, workProductTableRef, comprehensionTableRef]);
+  }, [highlightedRowKey, highlightedRowType, peerFeedbackChartRef, workProductChartRef, comprehensionChartRef, peerFeedbackTableRef, workProductTableRef, comprehensionTableRef]);
 
   // Define columns for each table
   const workProductColumns = [
@@ -1193,51 +1267,73 @@ const BuilderDetailsPage = () => {
     },
   ].map(col => ({ ...col, className: 'peer-feedback-col' }));
   
-  const sentimentColumns = [
-      { 
-        title: 'Date', 
-        dataIndex: 'date', 
-        key: 'date', 
-        render: (d) => d ? dayjs(d?.value || d).format('MMMM D') : 'N/A', 
-        width: '15%', // Adjusted width
-        sorter: (a, b) => dayjs(a.date?.value || a.date).unix() - dayjs(b.date?.value || b.date).unix(),
-        sortDirections: ['descend', 'ascend']
-      },
-      {
-        title: 'Category', // Shortened title
-        dataIndex: 'sentiment_score', // Still sorting/coloring by score
-        key: 'sentiment_score', 
-        width: '15%', // Adjusted width
-        sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
-        sortDirections: ['descend', 'ascend'],
-        render: (score, record) => {
-          const label = record.sentiment_category || mapScoreToLabel(score); // Use category from record, fallback to score mapping
-          const sentimentClassMap = {
-            'Very Positive': 'sentiment-tag-very-positive',
-            'Positive': 'sentiment-tag-positive',
-            'Neutral': 'sentiment-tag-neutral',
-            'Negative': 'sentiment-tag-negative',
-            'Very Negative': 'sentiment-tag-very-negative'
-          };
-          const sentimentClass = sentimentClassMap[label] || 'sentiment-tag-neutral';
-          return (
-            <Tag className={sentimentClass}>
-              {label}
-            </Tag>
-          );
-        }
-      },
-      { 
-        title: 'Sentiment Reason (Outlier Sentence)', 
-        dataIndex: 'sentiment_reason', // Use the new field from backend
-        key: 'sentiment_reason', 
-        width: '70%', // Adjusted width
-        render: (text) => text || '-' // Display text or dash if null
-      },
-  ].map(col => ({ ...col, className: 'sentiment-col' }));
+  // Define promptColumns for the prompts table
+  const promptColumns = [
+    { 
+      title: 'Date', 
+      dataIndex: 'date', 
+      key: 'date', 
+      render: (d) => d ? dayjs(d?.value || d).format('MMMM D') : 'N/A', 
+      width: '30%',
+      sorter: (a, b) => dayjs(a.date?.value || a.date).unix() - dayjs(b.date?.value || b.date).unix(),
+      sortDirections: ['descend', 'ascend']
+    },
+    { 
+      title: 'Prompts Sent', 
+      dataIndex: 'count', 
+      key: 'count', 
+      width: '70%',
+      sorter: (a, b) => (a.count || 0) - (b.count || 0),
+      sortDirections: ['descend', 'ascend']
+    }
+  ].map(col => ({ ...col, className: 'prompt-col' }));
+  
+  // const sentimentColumns = [
+  //     { 
+  //       title: 'Date', 
+  //       dataIndex: 'date', 
+  //       key: 'date', 
+  //       render: (d) => d ? dayjs(d?.value || d).format('MMMM D') : 'N/A', 
+  //       width: '15%', // Adjusted width
+  //       sorter: (a, b) => dayjs(a.date?.value || a.date).unix() - dayjs(b.date?.value || b.date).unix(),
+  //       sortDirections: ['descend', 'ascend']
+  //     },
+  //     {
+  //       title: 'Category', // Shortened title
+  //       dataIndex: 'sentiment_score', // Still sorting/coloring by score
+  //       key: 'sentiment_score', 
+  //       width: '15%', // Adjusted width
+  //       sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
+  //       sortDirections: ['descend', 'ascend'],
+  //       render: (score, record) => {
+  //         const label = record.sentiment_category || mapScoreToLabel(score); // Use category from record, fallback to score mapping
+  //         const sentimentClassMap = {
+  //           'Very Positive': 'sentiment-tag-very-positive',
+  //           'Positive': 'sentiment-tag-positive',
+  //           'Neutral': 'sentiment-tag-neutral',
+  //           'Negative': 'sentiment-tag-negative',
+  //           'Very Negative': 'sentiment-tag-very-negative'
+  //         };
+  //         const sentimentClass = sentimentClassMap[label] || 'sentiment-tag-neutral';
+  //         return (
+  //           <Tag className={sentimentClass}>
+  //             {label}
+  //           </Tag>
+  //         );
+  //       }
+  //     },
+  //     { 
+  //       title: 'Sentiment Reason (Outlier Sentence)', 
+  //       dataIndex: 'sentiment_reason', // Use the new field from backend
+  //       key: 'sentiment_reason', 
+  //       width: '70%', // Adjusted width
+  //       render: (text) => text || '-' // Display text or dash if null
+  //     },
+  // ].map(col => ({ ...col, className: 'sentiment-col' }));
 
   // Function to show modal
   const showWorkProductDetails = (record) => {
+    // All entries (including video analyses) are now shown in the work product modal
     setSelectedWorkProduct(record);
     setWorkProductModalVisible(true);
   };
@@ -1292,110 +1388,165 @@ const BuilderDetailsPage = () => {
     return <Text style={{ whiteSpace: 'pre-wrap', fontSize: '12px' }}><pre>{content}</pre></Text>;
   };
 
-  return (
-    <div style={{ padding: '20px' }}>
-      <Button 
-        icon={<ArrowLeftOutlined />} 
-        onClick={() => navigate('/builders')} 
-        style={{ marginBottom: '20px' }}
-      >
-        Back to Builders List
-      </Button>
+  // Helper function to parse video analysis rationale
+  const parseRationale = (jsonString) => {
+    if (!jsonString) return { formattedText: 'No rationale available' };
+    
+    try {
+      const parsedJson = JSON.parse(jsonString);
       
-      <Title level={2}>Builder Details</Title>
-
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          <Card>
-              <Space wrap>
-                  <Select
-                    showSearch
-                    style={{ width: 300 }}
-                    placeholder="Select a Builder"
-                    optionFilterProp="children"
-                    onChange={handleBuilderChange}
-                    value={selectedBuilderId}
-                    filterOption={(input, option) =>
-                      (option?.children ?? '').toLowerCase().includes(input.toLowerCase()) // Safe access
-                    }
-                    allowClear
-                  >
-                    {allBuilders.map(builder => (
-                      <Option key={builder.user_id} value={builder.user_id.toString()}>
-                        {builder.name}
-                      </Option>
-                    ))}
-                  </Select>
-                  <RangePicker 
-                      value={dateRange} 
-                      onChange={handleDateRangeChange} 
-                      allowClear={false} // Usually you want a date range
-                  />
-              </Space>
-               {selectedBuilderName && (
-                  <Title level={3} style={{ marginTop: '16px' }}>{selectedBuilderName}</Title>
-              )}
-          </Card>
+      // Create a neatly formatted component for displaying the rationale
+      const formattedContent = (
+        <div>
+          {parsedJson.overall_explanation && (
+            <div style={{ marginBottom: '15px' }}>
+              <Text style={{ display: 'block', color: "var(--color-text-main)", whiteSpace: 'pre-wrap' }}>
+                {parsedJson.overall_explanation}
+              </Text>
+            </div>
+          )}
           
-          {!selectedBuilderId ? (
-              <Text>Please select a builder to view details.</Text>
-          ) : (
-            <Spin spinning={loading}>
-             {/* Remove the single Chart Section Card */}
-             {/* <Card title="Metrics Over Time" style={{ marginBottom: '20px' }}> ... </Card> */}
-             
-              {/* Details Section - Restructured into Chart/Table Pairs */}
-              <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                {/* Row 1: Sentiment */}
-                <Row gutter={[16, 16]}>
-                  <Col span={24}> 
-                    <Card title="Sentiment Trend & Details" bordered={true}>
-                <Row gutter={[16, 16]}> 
-                  <Col xs={24} md={8}> {/* Chart: 1/3 width */}
-                          <SentimentChart 
-                            ref={sentimentChartRef}
-                            data={sentimentData} 
-                            onPointClick={handlePointClick} 
-                            highlightedRowKey={highlightedRowKey} 
-                            highlightedRowType={highlightedRowType}
-                            onPointHover={handlePointHover}
-                            hoveredPointIndex={hoveredPointIndex}
-                            hoveredChartType={hoveredChartType}
-                            dateRange={dateRange}
-                          /> 
-                  </Col>
-                  <Col xs={24} md={16}> {/* Table: 2/3 width */}
-                          <div ref={sentimentTableRef} style={{ height: '290px', overflow: 'hidden' }}>
-                            <Table 
-                              dataSource={
-                                // Apply filter when highlighted
-                                highlightedRowType === 'sentiment' && highlightedRowKey
-                                  ? sentimentData.filter(record => (record.date?.value || record.date.toString()) === (highlightedRowKey?.value || highlightedRowKey?.toString()))
-                                  : sentimentData
-                              }
-                              columns={sentimentColumns} 
-                              rowKey={(record) => record.date?.value || record.date.toString()} // Extract primitive key
-                              size="small" 
-                              scroll={{ y: 240 }} 
-                              rowClassName={(record) => {
-                                // Ensure consistent key comparison (primitive vs primitive)
-                                const recordKey = record.date?.value || record.date.toString();
-                                const highlightKey = highlightedRowKey?.value || highlightedRowKey?.toString(); 
-                                const shouldHighlight = highlightedRowType === 'sentiment' && recordKey === highlightKey;
-                                return shouldHighlight ? 'highlighted-row' : '';
-                              }}
-                            />
-                          </div>
-                  </Col>
-                      </Row>
-                    </Card>
-                  </Col>
-                </Row>
+          {parsedJson.overall_supporting_evidence && (
+            <div style={{ marginBottom: '15px' }}>
 
+              <Text style={{ display: 'block', color: "var(--color-text-main)", whiteSpace: 'pre-wrap' }}>
+                {parsedJson.overall_supporting_evidence}
+              </Text>
+            </div>
+          )}
+          
+          {parsedJson.sub_criteria && Object.keys(parsedJson.sub_criteria).length > 0 && (
+            <div style={{ marginTop: '15px' }}>
+              <Text strong style={{ display: 'block', marginBottom: '10px', color: "var(--color-text-main)" }}>
+                Criteria Details:
+              </Text>
+              {Object.entries(parsedJson.sub_criteria).map(([criteriaName, criteriaData], index) => (
+                <div key={`criteria-${index}`} style={{ marginBottom: '15px', marginLeft: '10px', borderLeft: '2px solid var(--color-border-light)', paddingLeft: '10px' }}>
+                  <Text strong style={{ display: 'block', marginBottom: '5px', color: "var(--color-text-main)" }}>
+                    {criteriaName}:
+                  </Text>
+                  {criteriaData.score !== undefined && (
+                    <div style={{ marginBottom: '5px' }}>
+                      <Text style={{ color: "var(--color-text-main)" }}>
+                        Score: {criteriaData.score}/5
+                      </Text>
+                    </div>
+                  )}
+                  {criteriaData.explanation && (
+                    <div style={{ marginBottom: '5px' }}>
+                      <Text style={{ display: 'block', color: "var(--color-text-main)", whiteSpace: 'pre-wrap' }}>
+                        {criteriaData.explanation}
+                      </Text>
+                    </div>
+                  )}
+                  {criteriaData.supporting_evidence && (
+                    <div style={{ marginTop: '5px' }}>
+                      <Text style={{ color: "var(--color-text-secondary)", fontSize: '12px', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
+                        {criteriaData.supporting_evidence}
+                      </Text>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* If there are strengths/weaknesses, display them */}
+          {(parsedJson.strengths || parsedJson.weaknesses) && (
+            <div style={{ marginTop: '15px' }}>
+              {parsedJson.strengths && parsedJson.strengths.length > 0 && (
+                <div style={{ marginBottom: '10px' }}>
+                  <Text strong style={{ color: "var(--color-text-main)", display: 'block', marginBottom: '5px' }}>Strengths:</Text>
+                  <ul style={{ marginTop: '5px', paddingLeft: '20px', color: "var(--color-text-main)" }}>
+                    {parsedJson.strengths.map((item, i) => (
+                      <li key={`strength-${i}`} style={{ color: "var(--color-text-main)" }}>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {parsedJson.weaknesses && parsedJson.weaknesses.length > 0 && (
+                <div>
+                  <Text strong style={{ color: "var(--color-text-main)", display: 'block', marginBottom: '5px' }}>Weaknesses:</Text>
+                  <ul style={{ marginTop: '5px', paddingLeft: '20px', color: "var(--color-text-main)" }}>
+                    {parsedJson.weaknesses.map((item, i) => (
+                      <li key={`weakness-${i}`} style={{ color: "var(--color-text-main)" }}>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+      
+      return { formattedContent, rawJson: parsedJson };
+    } catch (error) {
+      console.error("Failed to parse rationale JSON:", error);
+      
+      // Try to display as plain text if it's not valid JSON
+      return { formattedText: jsonString };
+    }
+  };
+
+  // Render tabs
+  return (
+    <div className="builder-details-page">
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Card className="builder-select-card" style={{ borderRadius: '8px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div>
+              <Title level={2} style={{ margin: 0 }}>Builder Details</Title>
+              <Text type="secondary">View performance metrics for a specific builder</Text>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
+              <Select
+                value={selectedBuilderId}
+                onChange={handleBuilderChange}
+                placeholder="Select Builder"
+                loading={loading}
+                style={{ width: 250, marginRight: '0' }}
+                filterOption={(input, option) => option.children.toLowerCase().includes(input.toLowerCase())}
+                showSearch
+              >
+                {allBuilders && allBuilders.map(builder => (
+                  <Select.Option key={builder.user_id} value={builder.user_id.toString()}>
+                    {builder.name}
+                  </Select.Option>
+                ))}
+              </Select>
+              <RangePicker 
+                value={dateRange} 
+                onChange={handleDateRangeChange} 
+                style={{ width: 280 }}
+              />
+            </div>
+          </div>
+        </Card>
+
+        {!selectedBuilderId && (
+          <Alert
+            message="Please select a builder"
+            description="Choose a builder from the dropdown above to view their details."
+            type="info"
+            showIcon
+            style={{ marginBottom: '20px' }}
+          />
+        )}
+
+        {selectedBuilderId && (
+          <div>
+            <Spin spinning={loading}>
+              <Space direction="vertical" size="large" style={{ width: '100%' }}>
                 {/* Row 2: Peer Feedback */}
-                <Row gutter={[16, 16]}>
+                <Row gutter={[24, 24]}>
                    <Col span={24}> 
-                     <Card title="Peer Feedback Trend & Details" bordered={true}>
-                      <Row gutter={[16, 16]}> 
+                     <Card title="Peer Feedback Trend & Details" bordered={true} style={{ borderRadius: '8px' }}>
+                      <Row gutter={[24, 24]}> 
                   <Col xs={24} md={8}> {/* Chart: 1/3 width */}
                           <PeerFeedbackChart 
                             ref={peerFeedbackChartRef}
@@ -1410,10 +1561,9 @@ const BuilderDetailsPage = () => {
                           /> 
                   </Col>
                   <Col xs={24} md={16}> {/* Table: 2/3 width */}
-                          <div ref={peerFeedbackTableRef} style={{ height: '290px', overflow: 'hidden' }}>
+                          <div ref={peerFeedbackTableRef} style={{ height: '290px', overflow: 'hidden', borderRadius: '8px' }}>
                             <Table
-                              dataSource={
-                                // Apply filter when highlighted
+                              dataSource={                                
                                 highlightedRowType === 'peerFeedback' && highlightedRowKey
                                   ? peerFeedbackData.filter(record => record.feedback_id === highlightedRowKey)
                                   : peerFeedbackData
@@ -1421,15 +1571,12 @@ const BuilderDetailsPage = () => {
                               columns={peerFeedbackColumns}
                               rowKey="feedback_id"
                               size="small"
-                              scroll={{ y: 240 }}
+                              scroll={{ y: 240 }} 
                               rowClassName={(record) => {
                                 const shouldHighlight = highlightedRowType === 'peerFeedback' && record.feedback_id === highlightedRowKey;
-                                // Optional Log:
-                                // if (highlightedRowKey && highlightedRowType === 'peerFeedback') {
-                                //   console.log(`Checking Peer Feedback Row: Record Key=${record.feedback_id}, Highlight Key=${highlightedRowKey}, Match=${shouldHighlight}`);
-                                // }
                                 return shouldHighlight ? 'highlighted-row' : '';
                               }}
+                              style={{ borderRadius: '8px' }}
                             />
                           </div>
                   </Col>
@@ -1439,10 +1586,10 @@ const BuilderDetailsPage = () => {
                 </Row>
 
                 {/* Row 3: Work Product */}
-                 <Row gutter={[16, 16]}>
+                 <Row gutter={[24, 24]}>
                    <Col span={24}> 
-                     <Card title="Work Product Trend & Details" bordered={true}>
-                      <Row gutter={[16, 16]}> 
+                     <Card title="Work Product Trend & Details" bordered={true} style={{ borderRadius: '8px' }}>
+                      <Row gutter={[24, 24]}> 
                         <Col xs={24} md={8}> {/* Chart: 1/3 width */}
                           <WorkProductChart 
                             ref={workProductChartRef}
@@ -1457,16 +1604,15 @@ const BuilderDetailsPage = () => {
                           /> 
                         </Col>
                         <Col xs={24} md={16}> {/* Table: 2/3 width */}
-                           <div ref={workProductTableRef} style={{ height: '290px', overflow: 'hidden' }}>
+                           <div ref={workProductTableRef} style={{ height: '290px', overflow: 'hidden', borderRadius: '8px' }}>
                              <Table 
-                                dataSource={
-                                  // Apply filter when highlighted
+                                dataSource={                                  
                                   highlightedRowType === 'workProduct' && highlightedRowKey
                                     ? workProductData.filter(record => record.task_id?.toString() === highlightedRowKey?.toString())
                                     : workProductData
                                 } 
                                 columns={workProductColumns} 
-                                rowKey={(record) => record.task_id?.toString()} // Ensure primitive key
+                                rowKey={(record) => record.task_id?.toString()} 
                                 size="small" 
                                 scroll={{ y: 240 }} 
                                 rowClassName={(record) => {
@@ -1475,6 +1621,7 @@ const BuilderDetailsPage = () => {
                                   const shouldHighlight = highlightedRowType === 'workProduct' && recordKey === highlightKey;
                                   return shouldHighlight ? 'highlighted-row' : '';
                                 }}
+                                style={{ borderRadius: '8px' }}
                              />
                            </div>
                         </Col>
@@ -1484,10 +1631,10 @@ const BuilderDetailsPage = () => {
                 </Row>
                 
                 {/* Row 4: Comprehension - NEW SECTION */}
-                 <Row gutter={[16, 16]}>
+                 <Row gutter={[24, 24]}>
                    <Col span={24}> 
-                     <Card title="Comprehension Trend & Details" bordered={true}>
-                      <Row gutter={[16, 16]}> 
+                     <Card title="Comprehension Trend & Details" bordered={true} style={{ borderRadius: '8px' }}>
+                      <Row gutter={[24, 24]}> 
                         <Col xs={24} md={8}> {/* Chart: 1/3 width */}
                           <ComprehensionChart 
                             ref={comprehensionChartRef} // Assign ref
@@ -1502,7 +1649,7 @@ const BuilderDetailsPage = () => {
                           /> 
                         </Col>
                         <Col xs={24} md={16}> {/* Table: 2/3 width */}
-                           <div ref={comprehensionTableRef} style={{ height: '290px', overflow: 'hidden' }}> // Assign ref
+                           <div ref={comprehensionTableRef} style={{ height: '290px', overflow: 'hidden', borderRadius: '8px' }}> 
                              <Table 
                                 dataSource={ 
                                   highlightedRowType === 'comprehension' && highlightedRowKey
@@ -1519,6 +1666,7 @@ const BuilderDetailsPage = () => {
                                   const shouldHighlight = highlightedRowType === 'comprehension' && recordKey === highlightKey;
                                   return shouldHighlight ? 'highlighted-row' : '';
                                 }}
+                                style={{ borderRadius: '8px' }}
                              />
                            </div>
                         </Col>
@@ -1528,10 +1676,10 @@ const BuilderDetailsPage = () => {
                 </Row>
                 
                 {/* Row 5: Prompts */}
-                <Row gutter={[16, 16]}>
+                <Row gutter={[24, 24]}>
                   <Col span={24}> 
-                    <Card title="Prompts Sent Over Time (Daily)" bordered={true}>
-                      <Row gutter={[16, 16]}> 
+                    <Card title="Prompts Sent Over Time (Daily)" bordered={true} style={{ borderRadius: '8px' }}>
+                      <Row gutter={[24, 24]}> 
                          <Col xs={24} md={8}> {/* Chart: 1/3 width */}
                            <PromptsChart 
                              data={promptsData}
@@ -1539,23 +1687,30 @@ const BuilderDetailsPage = () => {
                            /> 
                          </Col>
                          <Col xs={24} md={16}> {/* Table: 2/3 width (placeholder) */}
-                           {/* Maybe add prompt details table here later? */}
-                           <div style={{ height: '290px', display: 'flex', alignItems:'center', justifyContent:'center' }}>
-                             <Text type="secondary">(Prompt details table placeholder)</Text>
+                           <div style={{ height: '290px', overflow: 'hidden', borderRadius: '8px' }}>
+                              <Table
+                                dataSource={promptsData}
+                                columns={promptColumns}
+                                rowKey={(record) => `prompt-${record.date}-${record.count}`}
+                                size="small"
+                                scroll={{ y: 240 }}
+                                style={{ borderRadius: '8px' }}
+                              />
                            </div>
                          </Col>
                        </Row>
                      </Card>
-                   </Col>
-                 </Row>
+                  </Col>
+                </Row>
               </Space>
             </Spin>
-          )}
+          </div>
+        )}
       </Space>
 
       {/* Work Product Details Modal */}
       <Modal
-        title={`Work Product Details - ${selectedWorkProduct?.task_title || 'Task'}`}
+        title={<Typography.Text style={{ color: 'var(--color-text-main)' }}>{`Work Product Details - ${selectedWorkProduct?.task_title || 'Task'}`}</Typography.Text>}
         open={isWorkProductModalVisible}
         onCancel={hideWorkProductDetails}
         footer={[
@@ -1589,7 +1744,7 @@ const BuilderDetailsPage = () => {
                  {selectedWorkProduct.analyzed_content && (
                     <div style={{ marginTop: '16px' }}>
                         <Text strong style={{ display: 'block' }}>Analyzed Content:</Text>
-                        <div style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px', maxHeight: '300px', overflowY: 'auto' }}>
+                        <div style={{ background: 'var(--color-bg-hover)', color: 'var(--color-text-main)', padding: '8px', borderRadius: '4px', marginTop: '4px', maxHeight: '300px', overflowY: 'auto' }}>
                            {renderAnalyzedContent(selectedWorkProduct.analyzed_content)}
                         </div>
                     </div>
@@ -1599,7 +1754,7 @@ const BuilderDetailsPage = () => {
                  {analysis?.submission_summary && (
                    <div style={{ marginTop: '16px' }}>
                      <Text strong style={{ display: 'block' }}>Submission Summary:</Text>
-                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg-hover)', color: 'var(--color-text-main)', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
                        {analysis.submission_summary}
                      </Paragraph>
                    </div>
@@ -1609,7 +1764,7 @@ const BuilderDetailsPage = () => {
                  {analysis?.feedback && (
                    <div style={{ marginTop: '16px' }}>
                      <Text strong style={{ display: 'block' }}>Feedback:</Text>
-                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                     <Paragraph style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg-hover)', color: 'var(--color-text-main)', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
                        {analysis.feedback}
                      </Paragraph>
                    </div>
@@ -1620,7 +1775,7 @@ const BuilderDetailsPage = () => {
                    <div style={{ marginTop: '16px' }}>
                      <Text strong style={{ display: 'block' }}>Criteria Met:</Text>
                      <Space wrap size={[4, 8]} style={{ marginTop: '4px' }}>
-                       {analysis.criteria_met.map((item, index) => <Tag color="green" key={`wp-crit-${index}`}>{item}</Tag>)}
+                       {analysis.criteria_met.map((item, index) => <Tag className="criteria-met-tag" key={`wp-crit-${index}`}>{item}</Tag>)}
                      </Space>
                    </div>
                  )}
@@ -1630,7 +1785,7 @@ const BuilderDetailsPage = () => {
                    <div style={{ marginTop: '16px' }}>
                      <Text strong style={{ display: 'block' }}>Areas for Improvement:</Text>
                      <Space wrap size={[4, 8]} style={{ marginTop: '4px' }}>
-                       {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`wp-area-${index}`}>{item}</Tag>)}
+                       {analysis.areas_for_improvement.map((item, index) => <Tag className="areas-for-improvement-tag" key={`wp-area-${index}`}>{item}</Tag>)}
                      </Space>
                    </div>
                  )}
@@ -1640,7 +1795,7 @@ const BuilderDetailsPage = () => {
                     <div style={{ marginTop: '16px' }}>
                       <Title level={5} style={{ marginBottom: '8px' }}>Specific Findings:</Title>
                       {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
-                        <div key={`wp-find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
+                        <div key={`wp-find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid var(--color-border-light)' }}>
                           <Text strong>{category}:</Text>
                           {findings?.strengths && findings.strengths.length > 0 && (
                             <div style={{ marginTop: '4px' }}>
@@ -1670,7 +1825,7 @@ const BuilderDetailsPage = () => {
 
       {/* Comprehension Details Modal */}
       <Modal
-        title={`Comprehension Details - ${selectedComprehension?.task_title || 'Task'}`}
+        title={<Typography.Text style={{ color: 'var(--color-text-main)' }}>{`Comprehension Details - ${selectedComprehension?.task_title || 'Task'}`}</Typography.Text>}
         open={isComprehensionModalVisible}
         onCancel={hideComprehensionDetails}
         footer={[
@@ -1704,7 +1859,7 @@ const BuilderDetailsPage = () => {
                  {selectedComprehension.analyzed_content && (
                     <div style={{ marginTop: '16px' }}>
                         <Text strong style={{ display: 'block' }}>Analyzed Content:</Text>
-                        <div style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px', maxHeight: '300px', overflowY: 'auto' }}>
+                        <div style={{ background: 'var(--color-bg-hover)', color: 'var(--color-text-main)', padding: '8px', borderRadius: '4px', marginTop: '4px', maxHeight: '300px', overflowY: 'auto' }}>
                            {renderAnalyzedContent(selectedComprehension.analyzed_content)}
                         </div>
                     </div>
@@ -1714,7 +1869,7 @@ const BuilderDetailsPage = () => {
                 {analysis?.submission_summary && (
                   <div style={{ marginTop: '16px' }}>
                     <Text strong style={{ display: 'block' }}>Submission Summary:</Text>
-                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg-hover)', color: 'var(--color-text-main)', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
                       {analysis.submission_summary}
                     </Paragraph>
                   </div>
@@ -1724,7 +1879,7 @@ const BuilderDetailsPage = () => {
                 {analysis?.feedback && (
                   <div style={{ marginTop: '16px' }}>
                     <Text strong style={{ display: 'block' }}>Feedback:</Text>
-                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                    <Paragraph style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg-hover)', color: 'var(--color-text-main)', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
                       {analysis.feedback}
                     </Paragraph>
                   </div>
@@ -1735,7 +1890,7 @@ const BuilderDetailsPage = () => {
                   <div style={{ marginTop: '16px' }}>
                     <Text strong style={{ display: 'block' }}>Criteria Met:</Text>
                     <Space wrap size={[4, 8]} style={{ marginTop: '4px' }}>
-                      {analysis.criteria_met.map((item, index) => <Tag color="green" key={`comp-crit-${index}`}>{item}</Tag>)}
+                      {analysis.criteria_met.map((item, index) => <Tag className="criteria-met-tag" key={`comp-crit-${index}`}>{item}</Tag>)}
                     </Space>
                   </div>
                 )}
@@ -1745,7 +1900,7 @@ const BuilderDetailsPage = () => {
                   <div style={{ marginTop: '16px' }}>
                     <Text strong style={{ display: 'block' }}>Areas for Improvement:</Text>
                     <Space wrap size={[4, 8]} style={{ marginTop: '4px' }}>
-                      {analysis.areas_for_improvement.map((item, index) => <Tag color="orange" key={`comp-area-${index}`}>{item}</Tag>)}
+                      {analysis.areas_for_improvement.map((item, index) => <Tag className="areas-for-improvement-tag" key={`comp-area-${index}`}>{item}</Tag>)}
                     </Space>
                   </div>
                 )}
@@ -1755,7 +1910,7 @@ const BuilderDetailsPage = () => {
                    <div style={{ marginTop: '16px' }}>
                      <Title level={5} style={{ marginBottom: '8px' }}>Specific Findings:</Title>
                      {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
-                       <div key={`comp-find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid #eee' }}>
+                       <div key={`comp-find-cat-${catIndex}`} style={{ marginBottom: '12px', paddingLeft: '10px', borderLeft: '2px solid var(--color-border-light)' }}>
                          <Text strong>{category}:</Text>
                          {findings?.strengths && findings.strengths.length > 0 && (
                            <div style={{ marginTop: '4px' }}>

@@ -27,7 +27,8 @@ import {
   fetchAllPeerFeedback, 
   fetchAllTaskAnalysis,
   fetchTaskSummary,
-  fetchTaskGradeDistribution
+  fetchTaskGradeDistribution,
+  fetchVideoAnalyses
 } from '../services/builderService';
 import { parseAnalysis } from '../utils/parsingUtils'; // Import the utility function
 
@@ -324,14 +325,81 @@ const PilotOverview = () => {
         setPeerFeedbackLoading(false);
       }
 
-      // Fetch All Task Analysis
+      // Fetch All Task Analysis and Video Analyses
       setTaskAnalysisLoading(true);
       setTaskAnalysisError(null);
       try {
+        // Fetch task analysis data
         const analysisData = await fetchAllTaskAnalysis(startDate, endDate);
-        setAllTaskAnalysisData(analysisData);
+        
+        // Fetch video analyses
+        const videoData = await fetchVideoAnalyses(startDate, endDate);
+        
+        // Process video data to match the format of task analysis data
+        const processedVideoData = videoData.map(video => {
+          // Calculate average score (out of 100)
+          const scores = [
+            video.technical_score || 0,
+            video.business_score || 0,
+            video.professional_skills_score || 0
+          ];
+          const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+          
+          // Get overall explanations from each rationale
+          let technicalExplanation = '';
+          let businessExplanation = '';
+          let professionalExplanation = '';
+          
+          try {
+            if (video.technical_score_rationale) {
+              const technicalJson = JSON.parse(video.technical_score_rationale);
+              technicalExplanation = technicalJson.overall_explanation || '';
+            }
+          } catch (e) {
+            console.error('Error parsing technical rationale:', e);
+          }
+          
+          try {
+            if (video.business_score_rationale) {
+              const businessJson = JSON.parse(video.business_score_rationale);
+              businessExplanation = businessJson.overall_explanation || '';
+            }
+          } catch (e) {
+            console.error('Error parsing business rationale:', e);
+          }
+          
+          try {
+            if (video.professional_skills_score_rationale) {
+              const professionalJson = JSON.parse(video.professional_skills_score_rationale);
+              professionalExplanation = professionalJson.overall_explanation || '';
+            }
+          } catch (e) {
+            console.error('Error parsing professional rationale:', e);
+          }
+          
+          // Create an analysis object to match the task analysis format
+          const analysisObj = {
+            completion_score: (avgScore / 5) * 100, // Convert score out of 5 to percentage
+            feedback: `Technical: ${technicalExplanation}\n\nBusiness: ${businessExplanation}\n\nProfessional: ${professionalExplanation}`,
+          };
+          
+          return {
+            auto_id: `video-${video.video_id}`, // Create a unique ID with prefix
+            task_title: 'Video Demo Analysis',
+            learning_type: 'Work product',
+            user_name: video.user_name || 'Unknown',
+            user_id: video.user_id,
+            date: video.submission_date || new Date().toISOString(),
+            analysis: JSON.stringify(analysisObj),
+            isVideoAnalysis: true, // Flag to identify as video analysis
+            videoData: video // Store original video data
+          };
+        });
+        
+        // Combine task analysis data with processed video data
+        setAllTaskAnalysisData([...analysisData, ...processedVideoData]);
       } catch (err) {
-        console.error("Failed to fetch all task analysis:", err);
+        console.error("Failed to fetch all task analysis or video analysis:", err);
         setTaskAnalysisError(err.message);
       } finally {
         setTaskAnalysisLoading(false);
@@ -726,14 +794,6 @@ const PilotOverview = () => {
   ];
 
   const overviewTaskAnalysisColumns = [
-    { 
-      title: 'Date', 
-      dataIndex: 'date', 
-      key: 'date', 
-      render: (d) => d ? dayjs(d?.value || d).format('MMM D, YYYY') : 'N/A',
-      sorter: (a, b) => dayjs(a.date?.value || a.date).unix() - dayjs(b.date?.value || b.date).unix(),
-      sortDirections: ['descend', 'ascend']
-    },
     {
       title: 'Builder',
       dataIndex: 'user_name',
@@ -743,9 +803,9 @@ const PilotOverview = () => {
           <Link to={`/builders/${record.user_id}`}>{text || 'Unknown'}</Link>
         ) : ( text || 'Unknown' )
       ),
-       sorter: (a, b) => (a.user_name || '').localeCompare(b.user_name || ''),
-       filters: builderFilters,
-       onFilter: (value, record) => (record.user_name || '').indexOf(value) === 0,
+      sorter: (a, b) => (a.user_name || '').localeCompare(b.user_name || ''),
+      filters: builderFilters,
+      onFilter: (value, record) => (record.user_name || '').indexOf(value) === 0,
     },
     { 
       title: 'Task Title', 
@@ -762,9 +822,31 @@ const PilotOverview = () => {
       onFilter: (value, record) => record.learning_type === value,
     },
     { 
+      title: 'Date', 
+      dataIndex: 'date', 
+      key: 'date', 
+      render: (d) => d ? dayjs(d?.value || d).format('MMM D, YYYY') : 'N/A',
+      sorter: (a, b) => dayjs(a.date?.value || a.date).unix() - dayjs(b.date?.value || b.date).unix(),
+      sortDirections: ['descend', 'ascend']
+    },
+    { 
       title: 'Grade', 
       key: 'grade', 
       render: (_, record) => { 
+        // For video analysis entries
+        if (record.isVideoAnalysis && record.videoData) {
+          const video = record.videoData;
+          const scores = [
+            video.technical_score || 0,
+            video.business_score || 0,
+            video.professional_skills_score || 0
+          ];
+          const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+          const grade = getLetterGrade((avgScore / 5) * 100);
+          return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>;
+        }
+        
+        // For regular task analysis entries
         const analysis = parseAnalysis(record.analysis);
         if (!analysis) return '-'; 
         const score = analysis.completion_score;
@@ -773,24 +855,51 @@ const PilotOverview = () => {
       },
       filters: gradeFilters,
       onFilter: (value, record) => {
+        if (record.isVideoAnalysis && record.videoData) {
+          const video = record.videoData;
+          const scores = [
+            video.technical_score || 0,
+            video.business_score || 0,
+            video.professional_skills_score || 0
+          ];
+          const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+          return getLetterGrade((avgScore / 5) * 100) === value;
+        }
+        
         const analysis = parseAnalysis(record.analysis);
         if (!analysis) return false;
         const score = analysis.completion_score;
         return getLetterGrade(score) === value;
       },
     },
-     {
+    {
       title: 'Actions',
       key: 'actions',
-      render: (_, record) => (
-        <Button 
-          size="small" 
-          onClick={() => navigate(`/submission/${record.auto_id}`)} 
-          disabled={!record.auto_id}
-        >
-          View Details
-        </Button>
-      ),
+      render: (_, record) => {
+        // For video analysis entries, navigate to builder details page
+        if (record.isVideoAnalysis) {
+          return (
+            <Button 
+              size="small" 
+              onClick={() => navigate(`/builders/${record.user_id}`)}
+              disabled={!record.user_id}
+            >
+              View Builder
+            </Button>
+          );
+        }
+        
+        // For regular task analysis entries
+        return (
+          <Button 
+            size="small" 
+            onClick={() => navigate(`/submission/${record.auto_id}`)} 
+            disabled={!record.auto_id}
+          >
+            View Details
+          </Button>
+        );
+      },
     },
   ];
 
@@ -921,7 +1030,7 @@ const PilotOverview = () => {
 
       {/* Feedback Details Modal */}
       <Modal
-        title={<span style={{ color: "#ffffff" }}>{`Peer Feedback Details - ${selectedFeedbackCategory} on ${selectedFeedbackDate}`}</span>}
+        title={<span style={{ color: "var(--color-text-main)" }}>{`Peer Feedback Details - ${selectedFeedbackCategory} on ${selectedFeedbackDate}`}</span>}
         open={feedbackModalVisible}
         onCancel={() => setFeedbackModalVisible(false)}
         footer={null} 
@@ -940,18 +1049,18 @@ const PilotOverview = () => {
                 <List.Item.Meta
                   title={
                     <Space size="middle">
-                       <Text style={{ color: "#ffffff" }}>From: <Text strong style={{ color: "#ffffff" }}>{item.reviewer_name || 'Anonymous'}</Text></Text>
-                       <Text style={{ color: "#ffffff" }}>To: <Text strong style={{ color: "#ffffff" }}>{item.recipient_name || 'Unknown'}</Text></Text>
+                       <Text style={{ color: "var(--color-text-main)" }}>From: <Text strong style={{ color: "var(--color-text-main)" }}>{item.reviewer_name || 'Anonymous'}</Text></Text>
+                       <Text style={{ color: "var(--color-text-main)" }}>To: <Text strong style={{ color: "var(--color-text-main)" }}>{item.recipient_name || 'Unknown'}</Text></Text>
                     </Space>
                   }
-                  description={<div style={{ color: "#ffffff", whiteSpace: "pre-wrap" }}>{item.feedback_text}</div>}
+                  description={<div style={{ color: "var(--color-text-main)", whiteSpace: "pre-wrap" }}>{item.feedback_text}</div>}
                 />
-                <Text style={{ color: "#bfc9d1" }}>{dayjs(item.created_at?.value || item.created_at).format('MMMM D')}</Text>
+                <Text style={{ color: "var(--color-text-secondary)" }}>{dayjs(item.created_at?.value || item.created_at).format('MMMM D')}</Text>
               </List.Item>
             )}
           />
         ) : (
-          <Text style={{ color: "#ffffff" }}>No specific feedback found for this category on this day.</Text>
+          <Text style={{ color: "var(--color-text-main)" }}>No specific feedback found for this category on this day.</Text>
         )}
       </Modal>
     </div>

@@ -367,6 +367,10 @@ h1, h2, h3, h4, h5, h6, .ant-typography {
 .sentiment-tag-negative { background: #b45f06 !important; color: #ffffff !important; font-weight: bold !important; }
 .sentiment-tag-very-negative { background: #990000 !important; color: #ffffff !important; font-weight: bold !important; }
 
+/* Criteria and improvement tag color coding */
+.criteria-met-tag { background: #38761d !important; color: #ffffff !important; font-weight: bold !important; border: none !important; }
+.areas-for-improvement-tag { background: #990000 !important; color: #ffffff !important; font-weight: bold !important; border: none !important; }
+
 /* Chart dark background utility */
 .chart-dark-bg {
   background: #181f2a !important;

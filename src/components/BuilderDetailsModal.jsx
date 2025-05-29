@@ -58,12 +58,12 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
             return '-';
         }
         const criteriaTags = (Array.isArray(criteria) && criteria.length > 0)
-          ? criteria.map(c => <Tag key={`crit-${c}`} color="green">{c}</Tag>)
+          ? criteria.map(c => <Tag key={`crit-${c}`} className="criteria-met-tag">{c}</Tag>)
           : null;
         const areaTags = (Array.isArray(areas) && areas.length > 0)
           ? areas.map(a => {
               const label = a === "technical issue with analysis - please try again" ? "tech issue" : a;
-              return <Tag key={`area-${a}`} color="red">{label}</Tag>;
+              return <Tag key={`area-${a}`} className="areas-for-improvement-tag">{label}</Tag>;
             })
           : null;
         if (!criteriaTags && !areaTags) return '-';
@@ -91,7 +91,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         if (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received') {
            return <Tag color="red">Tech issue</Tag>;
         }
-        return <Text style={{ whiteSpace: 'pre-wrap', color: '#ffffff' }}>{feedback || '-'}</Text>;
+        return <Text style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-main)' }}>{feedback || '-'}</Text>;
       }
     },
     {
@@ -157,10 +157,10 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
             return '-';
         }
         const criteriaTags = (Array.isArray(criteria) && criteria.length > 0)
-          ? criteria.map(c => <Tag key={`crit-${c}`} color="green">{c}</Tag>)
+          ? criteria.map(c => <Tag key={`crit-${c}`} className="criteria-met-tag">{c}</Tag>)
           : null;
         const areaTags = (Array.isArray(areas) && areas.length > 0)
-          ? areas.map(a => <Tag key={`area-${a}`} color="red">{a}</Tag>)
+          ? areas.map(a => <Tag key={`area-${a}`} className="areas-for-improvement-tag">{a}</Tag>)
           : null;
         if (!criteriaTags && !areaTags) return '-';
         return (
@@ -187,7 +187,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
          if (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received') {
            return <Tag color="red">Tech issue</Tag>;
         }
-        return <Text style={{ whiteSpace: 'pre-wrap', color: '#ffffff' }}>{feedback || '-'}</Text>;
+        return <Text style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-main)' }}>{feedback || '-'}</Text>;
       }
     },
     {
@@ -218,12 +218,12 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         return record.from_user_id ? (
           <Link
             to={`/builders/${record.from_user_id}`}
-            style={{ color: '#4b42d9' }}
+            style={{ color: 'var(--color-primary)' }}
           >
             {text || 'Unknown'}
           </Link>
         ) : (
-          <Text style={{ color: '#ffffff' }}>{text || 'Unknown'}</Text>
+          <Text style={{ color: 'var(--color-text-main)' }}>{text || 'Unknown'}</Text>
         );
       }
     },
@@ -233,7 +233,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       key: 'feedback',
       width: '30%',
       render: (text) => (
-        <Text style={{ whiteSpace: 'pre-wrap', color: '#ffffff' }}>
+        <Text style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-main)' }}>
           {text || '-'}
         </Text>
       ),
@@ -244,7 +244,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       key: 'summary',
       width: '30%',
       render: (text) => (
-        <Text style={{ whiteSpace: 'pre-wrap', color: '#ffffff' }}>
+        <Text style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-main)' }}>
           {text || '-'}
         </Text>
       ),
@@ -315,7 +315,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
 
   return (
     <Modal
-      title={<Typography.Text style={{ color: 'white' }}>{`${type === 'workProduct' ? 'Work Product' : type === 'comprehension' ? 'Comprehension' : 'Peer Feedback'} Details for ${selectedBuilder?.name || 'Builder'}`}</Typography.Text>}
+      title={<Typography.Text style={{ color: 'var(--color-text-main)' }}>{`${type === 'workProduct' ? 'Work Product' : type === 'comprehension' ? 'Comprehension' : 'Peer Feedback'} Details for ${selectedBuilder?.name || 'Builder'}`}</Typography.Text>}
       open={visible}
       onCancel={onClose}
       width={1200}
@@ -324,14 +324,14 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       {loadingDetails ? (
         <div style={{ textAlign: 'center', padding: '50px' }}>
           <Spin size="large" />
-          <p style={{ color: '#ffffff' }}>Loading details...</p>
+          <p style={{ color: 'var(--color-text-main)' }}>Loading details...</p>
         </div>
       ) : (
         <Space direction="vertical" style={{ width: '100%' }}>
           <Card>
-            <Title level={4} style={{ color: '#ffffff' }}>Summary</Title>
+            <Title level={4} style={{ color: 'var(--color-text-main)' }}>Summary</Title>
             <Space direction="vertical">
-              <Text style={{ color: '#ffffff' }}>
+              <Text style={{ color: 'var(--color-text-main)' }}>
                 Total Items: {detailsData?.length || 0}
               </Text>
             </Space>

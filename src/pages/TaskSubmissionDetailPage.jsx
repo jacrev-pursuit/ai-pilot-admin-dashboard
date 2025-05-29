@@ -94,7 +94,12 @@ const TaskSubmissionDetailPage = () => {
   const submissionDateFormatted = submission?.date ? dayjs(submission.date?.value || submission.date).format('MMMM D, YYYY') : null;
 
   return (
-    <div style={{ padding: '24px', background: 'var(--color-bg-main)', minHeight: 'calc(100vh - 64px)', color: 'var(--color-text-main)' }}>
+    <div style={{ 
+      padding: '0', 
+      background: 'var(--color-bg-main)', 
+      minHeight: 'calc(100vh - 64px)', 
+      color: 'var(--color-text-main)'
+    }}>
       <Button 
         icon={<ArrowLeftOutlined />} 
         onClick={() => navigate(-1)} // Go back to previous page
@@ -108,7 +113,7 @@ const TaskSubmissionDetailPage = () => {
       
       {submission && !loading && !error && (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          <Card bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)'}}>
+          <Card bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
             <div style={{ marginBottom: '8px' }}>
               <Title level={3} style={{ marginBottom: '4px', color: 'var(--color-text-main)' }}>
                 {submission.task_title || 'Task Details'}
@@ -130,7 +135,7 @@ const TaskSubmissionDetailPage = () => {
           {!analysisError && (
             <>
               {submission.analyzed_content && (
-                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Analyzed Content</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)'}}>
+                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Analyzed Content</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
                   <div style={{ background: 'var(--color-bg-main)', padding: '12px', borderRadius: '4px', maxHeight: '300px', overflowY: 'auto' }}>
                     {renderAnalyzedContent(submission.analyzed_content)}
                   </div>
@@ -138,7 +143,7 @@ const TaskSubmissionDetailPage = () => {
               )}
 
               {analysis?.submission_summary && (
-                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Submission Summary</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)'}}>
+                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Submission Summary</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
                   <Paragraph style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg-main)', padding: '12px', borderRadius: '4px', color: 'var(--color-text-secondary)' }}>
                     {analysis.submission_summary}
                   </Paragraph>
@@ -146,19 +151,19 @@ const TaskSubmissionDetailPage = () => {
               )}
 
               {analysis?.feedback && (
-                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Feedback</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)'}}>
+                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Feedback</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
                   <Paragraph style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg-main)', padding: '12px', borderRadius: '4px', color: 'var(--color-text-secondary)' }}>
                     {analysis.feedback}
                   </Paragraph>
                 </Card>
               )}
 
-              <Row gutter={[16, 16]}>
+              <Row gutter={[24, 24]}>
                 {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
                   <Col xs={24} md={12}>
-                    <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Criteria Met</Title>} bordered={false} style={{ height: '100%', background: 'var(--color-bg-card)', color: 'var(--color-text-main)' }}>
+                    <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Criteria Met</Title>} bordered={false} style={{ height: '100%', background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
                       <Space wrap size={[8, 8]}>
-                        {analysis.criteria_met.map((item, index) => <Tag style={{ background: '#38761d', color: '#ffffff', fontWeight: 'bold', border: 'none' }} key={`crit-${index}`}>{item}</Tag>)}
+                        {analysis.criteria_met.map((item, index) => <Tag className="criteria-met-tag" key={`crit-${index}`}>{item}</Tag>)}
                       </Space>
                     </Card>
                   </Col>
@@ -166,9 +171,9 @@ const TaskSubmissionDetailPage = () => {
 
                 {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
                   <Col xs={24} md={12}>
-                    <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Areas for Improvement</Title>} bordered={false} style={{ height: '100%', background: 'var(--color-bg-card)', color: 'var(--color-text-main)' }}>
+                    <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Areas for Improvement</Title>} bordered={false} style={{ height: '100%', background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
                       <Space wrap size={[8, 8]}>
-                        {analysis.areas_for_improvement.map((item, index) => <Tag style={{ background: '#990000', color: '#ffffff', fontWeight: 'bold', border: 'none' }} key={`area-${index}`}>{item}</Tag>)}
+                        {analysis.areas_for_improvement.map((item, index) => <Tag className="areas-for-improvement-tag" key={`area-${index}`}>{item}</Tag>)}
                       </Space>
                     </Card>
                   </Col>
@@ -176,8 +181,8 @@ const TaskSubmissionDetailPage = () => {
               </Row>
 
               {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
-                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Specific Findings</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)'}}>
-                  <Row gutter={[16, 16]}>
+                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Specific Findings</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+                  <Row gutter={[24, 24]}>
                     {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
                       <Col xs={24} md={12} key={`find-cat-col-${catIndex}`}>
                         <div key={`find-cat-${catIndex}`} style={{ marginBottom: '20px', paddingLeft: '0', borderLeft: 'none', height: '100%' }}>

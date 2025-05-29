@@ -1,19 +1,16 @@
 export const chartColors = {
-  primary: '#4b42d9',
-  primaryLight: 'rgba(75, 66, 217, 0.2)',
-  secondary: '#dc3545',
-  secondaryLight: 'rgba(220, 53, 69, 0.2)',
-  tertiary: '#ffc107',
-  tertiaryLight: 'rgba(255, 193, 7, 0.2)',
-  text: '#ffffff',
-  grid: '#232b3b',
   background: '#181f2a',
+  primary: '#4b42d9',
+  secondary: '#bf9002',
+  tertiary: '#66BB6A',
+  text: '#ffffff',
+  grid: '#282f3b',
   tooltipText: '#fff',
   // Sentiment band colors (use light transparency, aligned with tags)
-  veryPositiveBg: 'rgba(30, 77, 40, 0.2)',
-  positiveBg: 'rgba(56, 118, 29, 0.2)',
-  neutralBg: 'rgba(128, 128, 128, 0.2)',
-  negativeBg: 'rgba(180, 95, 6, 0.2)',
+  veryPositiveBg: 'rgba(56, 118, 29, 0.2)',
+  positiveBg: 'rgba(56, 118, 29, 0.1)',
+  neutralBg: 'rgba(128, 128, 128, 0.1)',
+  negativeBg: 'rgba(180, 95, 6, 0.1)',
   veryNegativeBg: 'rgba(153, 0, 0, 0.2)'
 };
 
@@ -22,39 +19,47 @@ export const baseChartOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      position: 'right',
+      position: 'top',
+      align: 'end',
       labels: {
-        color: chartColors.text,
-        font: {
-          size: 12
-        }
+        boxWidth: 12,
+        padding: 15,
+        color: chartColors.text
       }
     },
     tooltip: {
-      backgroundColor: chartColors.background,
-      titleColor: chartColors.tooltipText,
-      bodyColor: chartColors.tooltipText,
-      borderColor: chartColors.grid,
+      backgroundColor: 'rgba(30, 35, 43, 0.9)',
+      titleColor: chartColors.text,
+      bodyColor: chartColors.text,
+      borderColor: 'rgba(255, 255, 255, 0.1)',
       borderWidth: 1,
-      padding: 10,
+      padding: 12,
+      cornerRadius: 4,
       displayColors: true,
     }
   },
   scales: {
-    y: {
-      grid: {
-        color: chartColors.grid
-      },
-      ticks: {
-        color: chartColors.text
-      }
-    },
     x: {
       grid: {
-        color: chartColors.grid
+        color: chartColors.grid,
+        borderColor: chartColors.grid,
+        tickColor: chartColors.grid
       },
       ticks: {
-        color: chartColors.text
+        color: chartColors.text,
+        padding: 8
+      }
+    },
+    y: {
+      beginAtZero: true,
+      grid: {
+        color: chartColors.grid,
+        borderColor: chartColors.grid,
+        tickColor: chartColors.grid
+      },
+      ticks: {
+        color: chartColors.text,
+        padding: 8
       }
     }
   }
@@ -62,8 +67,9 @@ export const baseChartOptions = {
 
 export const chartContainer = {
   background: chartColors.background,
-  padding: '20px',
   borderRadius: '8px',
-  marginBottom: '20px',
+  padding: '16px',
+  position: 'relative',
+  width: '100%',
   height: '300px'
 }; 

@@ -212,12 +212,12 @@ const CohortTaskDetailsPage = () => {
                 return '-';
             }
             const criteriaTags = (Array.isArray(criteria) && criteria.length > 0)
-              ? criteria.map(c => <Tag key={`crit-${c}`} color="green">{c}</Tag>)
+              ? criteria.map(c => <Tag key={`crit-${c}`} className="criteria-met-tag">{c}</Tag>)
               : null;
             const areaTags = (Array.isArray(areas) && areas.length > 0)
               ? areas.map(a => {
                   const label = a === "technical issue with analysis - please try again" ? "Tech Issue" : a;
-                  return <Tag key={`area-${a}`} color="red">{label}</Tag>;
+                  return <Tag key={`area-${a}`} className="areas-for-improvement-tag">{label}</Tag>;
                 })
               : null;
              if (!criteriaTags && !areaTags) return '-';

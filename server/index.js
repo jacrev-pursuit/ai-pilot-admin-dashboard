@@ -21,21 +21,42 @@ const DATASET = process.env.BIGQUERY_DATASET || 'pilot_agent_public';
 const BIGQUERY_LOCATION = process.env.BIGQUERY_LOCATION || 'us-central1';
 // Note: GOOGLE_APPLICATION_CREDENTIALS env var should be set in Cloud Run
 
-console.log('Credentials Configuration Check (ADC):');
-console.log(`  PROJECT_ID: ${PROJECT_ID ? 'Present' : 'MISSING'}`);
-console.log(`  GOOGLE_APPLICATION_CREDENTIALS (Path): ${process.env.GOOGLE_APPLICATION_CREDENTIALS ? process.env.GOOGLE_APPLICATION_CREDENTIALS : 'MISSING/Not Set'}`);
+console.log('BigQuery Configuration:');
+console.log(`  PROJECT_ID: ${PROJECT_ID || 'MISSING'}`);
+console.log(`  DATASET: ${DATASET || 'MISSING'}`);
+console.log(`  BIGQUERY_LOCATION: ${BIGQUERY_LOCATION}`);
+console.log(`  GOOGLE_APPLICATION_CREDENTIALS: ${process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'Set' : 'Not Set'}`);
 
 let bigquery;
 try {
-  console.log('Initializing BigQuery client using ADC...');
+  console.log('Initializing BigQuery client...');
   bigquery = new BigQuery({
     projectId: PROJECT_ID,
     location: BIGQUERY_LOCATION,
   });
-  console.log('BigQuery client initialized successfully (ADC).');
+  
+  // Validate that all required configuration is present
+  if (!PROJECT_ID) {
+    console.warn('WARNING: PROJECT_ID is not set, BigQuery queries may fail');
+    logger.warn('PROJECT_ID environment variable is not set', { bigquery_config: { project: PROJECT_ID, dataset: DATASET, location: BIGQUERY_LOCATION }});
+  }
+  
+  if (!DATASET) {
+    console.warn('WARNING: BIGQUERY_DATASET is not set, using default:', DATASET);
+    logger.warn('BIGQUERY_DATASET environment variable is not set, using default', { dataset: DATASET });
+  }
+  
+  console.log('BigQuery client initialized successfully with:');
+  console.log(`  Project: ${PROJECT_ID}`);
+  console.log(`  Dataset: ${DATASET}`);
+  console.log(`  Location: ${BIGQUERY_LOCATION}`);
 } catch (error) {
-  console.error('FATAL ERROR during BigQuery client initialization (ADC):\n', error);
-  logger.error('FATAL ERROR during BigQuery client initialization (ADC):', { error: error.message, stack: error.stack });
+  console.error('FATAL ERROR during BigQuery client initialization:\n', error);
+  logger.error('FATAL ERROR during BigQuery client initialization:', { 
+    error: error.message, 
+    stack: error.stack,
+    config: { project: PROJECT_ID, dataset: DATASET, location: BIGQUERY_LOCATION }
+  });
   // Consider exiting if BQ is critical
   // process.exit(1);
 }
@@ -1013,6 +1034,171 @@ app.get('/api/tasks/:taskId/grade-distribution', async (req, res) => {
   } catch (error) {
     console.error(`BigQuery Error fetching grade distribution for task ${taskId}:`, error);
     res.status(500).json({ error: 'Failed to fetch grade distribution data', details: error.message });
+  }
+});
+
+// --- NEW Endpoint: Fetch Video Analyses ---
+app.get('/api/video-analyses', async (req, res) => {
+  console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
+  const { startDate, endDate, userId } = req.query;
+  // Use the explicit dataset name 'pilot_agent_public' instead of relying on DATASET variable
+  const datasetName = 'pilot_agent_public'; // Explicitly set to known working value
+  const videoAnalysesTable = `${PROJECT_ID}.${datasetName}.video_analyses`;
+  const tasksTable = `${PROJECT_ID}.${datasetName}.tasks`;
+  const taskSubmissionsTable = `${PROJECT_ID}.${datasetName}.task_submissions`;
+  
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  console.log(`Using table reference: ${videoAnalysesTable}`);
+
+  let query = `
+    SELECT 
+      va.video_id, 
+      va.user_id, 
+      va.submission_id,
+      va.loom_url,
+      va.technical_score,
+      va.business_score,
+      va.professional_skills_score,
+      va.technical_score_rationale,
+      va.business_score_rationale,
+      va.professional_skills_score_rationale,
+      t.task_title,
+      ts.created_at as submission_date
+    FROM \`${videoAnalysesTable}\` va
+    LEFT JOIN \`${tasksTable}\` t ON va.video_id = CAST(t.id AS STRING)
+    LEFT JOIN \`${taskSubmissionsTable}\` ts ON va.submission_id = CAST(ts.id AS STRING)
+    WHERE 1=1
+  `;
+  
+  const params = {};
+  
+  if (userId) {
+    query += ` AND va.user_id = @userId`;
+    params.userId = userId;
+  }
+  
+  // Add date filtering on submission_date if available
+  if (startDate && endDate) {
+    query += ` AND (ts.created_at IS NULL OR (ts.created_at >= TIMESTAMP(@startDate) AND ts.created_at <= TIMESTAMP(@endDate)))`;
+    params.startDate = startDate;
+    params.endDate = endDate;
+  }
+  
+  query += ` ORDER BY ts.created_at DESC NULLS LAST, va.video_id DESC`; // Order by date (if available) then video_id
+  
+  const options = { 
+    query,
+    params
+  };
+
+  try {
+    console.log(`Executing BigQuery query for ${req.path}...`, options);
+    const [rows] = await bigquery.query(options);
+    console.log(`Query for ${req.path} finished. Row count: ${rows.length}`);
+    
+    // Calculate average score for each video analysis
+    const formattedData = rows.map(row => ({
+      ...row,
+      average_score: Math.round((row.technical_score + row.business_score + row.professional_skills_score) / 3)
+    }));
+    
+    res.json(formattedData);
+  } catch (error) {
+    console.error(`Error in ${req.path}:`, error);
+    logger.error('Error executing BigQuery video analyses query', { 
+      error: error.message, 
+      stack: error.stack, 
+      query: options.query,
+      params: options.params,
+      table: videoAnalysesTable
+    });
+    // Include more detailed error information in the response
+    res.status(500).json({ 
+      error: 'Failed to fetch video analyses', 
+      details: error.message,
+      dataset: datasetName,
+      table: videoAnalysesTable
+    });
+  }
+});
+
+// --- NEW Endpoint: Fetch Video Analysis by ID ---
+app.get('/api/video-analyses/:videoId', async (req, res) => {
+  console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
+  const { videoId } = req.params;
+  // Use the explicit dataset name 'pilot_agent_public' instead of relying on DATASET variable
+  const datasetName = 'pilot_agent_public'; // Explicitly set to known working value
+  const videoAnalysesTable = `${PROJECT_ID}.${datasetName}.video_analyses`;
+  const tasksTable = `${PROJECT_ID}.${datasetName}.tasks`;
+  const taskSubmissionsTable = `${PROJECT_ID}.${datasetName}.task_submissions`;
+  
+  if (!videoId) {
+    return res.status(400).json({ error: 'Missing required parameter: videoId' });
+  }
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  console.log(`Using table reference: ${videoAnalysesTable}`);
+
+  const query = `
+    SELECT 
+      va.video_id, 
+      va.user_id, 
+      va.submission_id,
+      va.loom_url,
+      va.technical_score,
+      va.business_score,
+      va.professional_skills_score,
+      va.technical_score_rationale,
+      va.business_score_rationale,
+      va.professional_skills_score_rationale,
+      t.task_title,
+      ts.created_at as submission_date
+    FROM \`${videoAnalysesTable}\` va
+    LEFT JOIN \`${tasksTable}\` t ON va.video_id = CAST(t.id AS STRING)
+    LEFT JOIN \`${taskSubmissionsTable}\` ts ON va.submission_id = CAST(ts.id AS STRING)
+    WHERE va.video_id = @videoId
+    LIMIT 1
+  `;
+  
+  const params = { videoId };
+  
+  const options = { 
+    query, 
+    params
+  };
+
+  try {
+    console.log(`Executing BigQuery query for ${req.path} (Video ID: ${videoId})...`);
+    const [rows] = await bigquery.query(options);
+    console.log(`Query for ${req.path} finished. Row count: ${rows.length}`);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Video analysis not found' });
+    }
+    
+    // Calculate average score
+    const videoAnalysis = rows[0];
+    videoAnalysis.average_score = Math.round(
+      (videoAnalysis.technical_score + videoAnalysis.business_score + videoAnalysis.professional_skills_score) / 3
+    );
+    
+    res.json(videoAnalysis);
+  } catch (error) {
+    console.error(`Error in ${req.path} (Video ID: ${videoId}):`, error);
+    logger.error(`Error executing BigQuery video analysis query (Video ID: ${videoId})`, { 
+      error: error.message, 
+      stack: error.stack, 
+      query: options.query,
+      params: options.params,
+      table: videoAnalysesTable
+    });
+    res.status(500).json({ 
+      error: 'Failed to fetch video analysis', 
+      details: error.message,
+      dataset: datasetName,
+      table: videoAnalysesTable
+    });
   }
 });
 

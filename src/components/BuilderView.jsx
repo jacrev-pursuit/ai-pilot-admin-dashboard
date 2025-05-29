@@ -101,17 +101,6 @@ const BuilderView = () => {
     },
     {
       title: (
-        <div onClick={() => handleSort('daily_sentiment')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'daily_sentiment' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
-          Daily Sentiment {getSortIcon('daily_sentiment')}
-        </div>
-      ),
-      dataIndex: 'daily_sentiment',
-      key: 'daily_sentiment',
-      width: '10%',
-      render: (text, record) => renderDailySentiment(text, record),
-    },
-    {
-      title: (
         <div onClick={() => handleSort('peer_feedback_sentiment')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'peer_feedback_sentiment' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
           Peer Feedback Sentiment {getSortIcon('peer_feedback_sentiment')}
         </div>
@@ -242,21 +231,6 @@ const BuilderView = () => {
     fetchData(null, null);
   }, []);
 
-  const renderDailySentiment = (sentiment, record) => {
-    if (!record.prompts_sent || record.prompts_sent === 0) return <span>No data</span>;
-    if (!sentiment || sentiment === 'null' || sentiment === 'undefined' || sentiment === '') return <span>No data</span>;
-    
-    const sentimentClassMap = {
-      'Very Positive': 'sentiment-tag-very-positive',
-      'Positive': 'sentiment-tag-positive',
-      'Neutral': 'sentiment-tag-neutral',
-      'Negative': 'sentiment-tag-negative',
-      'Very Negative': 'sentiment-tag-very-negative'
-    };
-    const sentimentClass = sentimentClassMap[sentiment] || 'sentiment-tag-neutral';
-    return <Tag className={sentimentClass}>{sentiment}</Tag>;
-  };
-
   const renderPeerFeedbackSentiment = (sentiment, record) => {
     if (sentiment === null || sentiment === undefined || sentiment === '') return <span>-</span>;
     
@@ -290,7 +264,7 @@ const BuilderView = () => {
       </div>
       
       <div className="builder-view-content">
-        <Card className="filter-card">
+        <Card className="filter-card" style={{ borderRadius: '8px', marginBottom: '20px' }}>
           <Space className="filter-space">
             <RangePicker
               value={dateRange}
@@ -323,7 +297,7 @@ const BuilderView = () => {
         </Card>
 
         {error && (
-          <Card className="error-card">
+          <Card className="error-card" style={{ borderRadius: '8px', marginBottom: '20px' }}>
             <Typography.Text type="danger">{error}</Typography.Text>
           </Card>
         )}
@@ -341,6 +315,7 @@ const BuilderView = () => {
             style: { color: 'white' }
           }}
           rowClassName={() => 'table-row'}
+          style={{ borderRadius: '8px' }}
         />
       </div>
 

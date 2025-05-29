@@ -128,4 +128,51 @@ export const fetchTaskGradeDistribution = async (taskId, startDate, endDate) => 
     console.error(`API request failed for task ${taskId} grade distribution:`, error);
     throw error;
   }
+};
+
+// Fetch video analyses
+export const fetchVideoAnalyses = async (startDate, endDate, userId = null) => {
+  const effectiveStartDate = startDate || '2000-01-01';
+  const effectiveEndDate = endDate || '2100-12-31';
+  
+  let url = `/api/video-analyses?startDate=${effectiveStartDate}&endDate=${effectiveEndDate}`;
+  
+  if (userId) {
+    url += `&userId=${userId}`;
+  }
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch video analyses');
+    }
+    const data = await response.json();
+    console.log('Video analyses fetched successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('API request failed for video analyses:', error);
+    throw error;
+  }
+};
+
+// Fetch a single video analysis by ID
+export const fetchVideoAnalysis = async (videoId) => {
+  if (!videoId) {
+    throw new Error('Video ID is required');
+  }
+  
+  try {
+    const response = await fetch(`/api/video-analyses/${videoId}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch video analysis');
+    }
+    const data = await response.json();
+    console.log(`Video analysis for ${videoId} fetched successfully:`, data);
+    return data;
+  } catch (error) {
+    console.error(`API request failed for video analysis ${videoId}:`, error);
+    throw error;
+  }
 }; 
