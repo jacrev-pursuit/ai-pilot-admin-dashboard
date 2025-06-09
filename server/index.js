@@ -149,32 +149,47 @@ app.get('/api/builders', async (req, res) => {
     if (match) {
       cohortFilter = match[1]; // "March 2025"
       levelOnlyFilter = match[2]; // "L1"
-      levelFilterCondition = 'AND e.cohort = @cohort AND e.level = @levelOnly';
+      levelFilterCondition = 'AND se.cohort = @cohort AND se.level = @levelOnly';
     } else {
       // Fallback: treat as level-only filter
       levelOnlyFilter = level;
-      levelFilterCondition = 'AND e.level = @levelOnly';
+      levelFilterCondition = 'AND se.level = @levelOnly';
     }
   }
 
-  // Query using native enrollments table
+  // Query using native enrollments table with proper deduplication to ensure one row per user
   const query = `
-    WITH BaseMetrics AS (
-        -- Filter to only include users with role = "builder" and optionally by cohort-level
+    WITH UniqueEnrollments AS (
+        -- Get the most recent enrollment record per user to ensure one row per user
+        SELECT 
+            builder_email, 
+            cohort, 
+            level,
+            ROW_NUMBER() OVER (PARTITION BY builder_email ORDER BY cohort DESC, level DESC) as rn
+        FROM \`${enrollmentsTable}\`
+    ),
+    SingleEnrollmentPerUser AS (
+        -- Take only the most recent enrollment per user
+        SELECT builder_email, cohort, level
+        FROM UniqueEnrollments
+        WHERE rn = 1
+    ),
+    BaseMetrics AS (
+        -- Aggregate metrics per user with proper grouping - guaranteed one row per user
         SELECT
             bm.user_id,
             bm.name,
-            CONCAT(e.cohort, ' - ', e.level) as level,
+            CONCAT(se.cohort, ' - ', se.level) as level,
             SUM(bm.prompts_sent_today) as total_prompts_sent,
             SAFE_DIVIDE(SUM(bm.sum_daily_sentiment_score_today), SUM(bm.count_daily_sentiment_score_today)) as avg_daily_sentiment,
             SAFE_DIVIDE(SUM(bm.sum_peer_feedback_score_today), SUM(bm.count_peer_feedback_score_today)) as avg_peer_feedback_sentiment
         FROM \`${metricsTable}\` bm
         INNER JOIN \`${usersTable}\` u ON bm.user_id = u.user_id
-        INNER JOIN \`${enrollmentsTable}\` e ON u.email = e.builder_email
+        INNER JOIN SingleEnrollmentPerUser se ON u.email = se.builder_email
         WHERE bm.metric_date BETWEEN DATE(@startDate) AND DATE(@endDate)
           AND u.role = 'builder'
           ${levelFilterCondition}
-        GROUP BY bm.user_id, bm.name, e.cohort, e.level
+        GROUP BY bm.user_id, bm.name, se.cohort, se.level
     ),
     -- CTEs for WP/Comp Scores with role and cohort-level filtering
     TaskAnalysis AS (
@@ -183,7 +198,7 @@ app.get('/api/builders', async (req, res) => {
                JSON_EXTRACT_ARRAY(tar.analysis, '$.criteria_met') as criteria_met
         FROM \`${taskAnalysisTable}\` tar
         INNER JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
-        INNER JOIN \`${enrollmentsTable}\` e ON u.email = e.builder_email
+        INNER JOIN SingleEnrollmentPerUser se ON u.email = se.builder_email
         WHERE tar.curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
           AND tar.learning_type IN ('Work product', 'Key concept')
           AND u.role = 'builder'
@@ -217,20 +232,20 @@ app.get('/api/builders', async (req, res) => {
         FROM EligibleTasksInRange
     ),
     CompletedTasksByUser AS (
-        SELECT et.task_id, utp.user_id
+        SELECT DISTINCT et.task_id, utp.user_id
         FROM EligibleTasksInRange et
         JOIN \`${userTaskProgressTable}\` utp ON et.task_id = utp.task_id
         INNER JOIN \`${usersTable}\` u ON utp.user_id = u.user_id
-        INNER JOIN \`${enrollmentsTable}\` e ON u.email = e.builder_email
+        INNER JOIN SingleEnrollmentPerUser se ON u.email = se.builder_email
         WHERE et.deliverable_type = 'text' AND utp.status = 'completed'
           AND u.role = 'builder'
           ${levelFilterCondition}
         UNION ALL
-        SELECT et.task_id, ts.user_id
+        SELECT DISTINCT et.task_id, ts.user_id
         FROM EligibleTasksInRange et
         JOIN \`${taskSubmissionsTable}\` ts ON et.task_id = ts.task_id
         INNER JOIN \`${usersTable}\` u ON ts.user_id = u.user_id
-        INNER JOIN \`${enrollmentsTable}\` e ON u.email = e.builder_email
+        INNER JOIN SingleEnrollmentPerUser se ON u.email = se.builder_email
         WHERE et.deliverable_type = 'link'
           AND u.role = 'builder'
           ${levelFilterCondition}
@@ -240,7 +255,7 @@ app.get('/api/builders', async (req, res) => {
         FROM CompletedTasksByUser
         GROUP BY user_id
     )
-    -- Final SELECT joining all CTEs --
+    -- Final SELECT joining all CTEs - guaranteed one row per user
     SELECT 
       bm.user_id,
       bm.name,
