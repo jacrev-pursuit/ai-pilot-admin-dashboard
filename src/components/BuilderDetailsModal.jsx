@@ -255,15 +255,16 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       key: 'sentiment_label',
       width: '10%',
       render: (label) => {
-        const sentimentMap = {
-          'Very Positive': 'green',
-          'Positive': 'cyan',
-          'Neutral': 'default',
-          'Negative': 'orange',
-          'Very Negative': 'red'
+        const sentimentClassMap = {
+          'Very Positive': 'sentiment-tag-very-positive',
+          'Positive': 'sentiment-tag-positive',
+          'Neutral': 'sentiment-tag-neutral',
+          'Negative': 'sentiment-tag-negative',
+          'Very Negative': 'sentiment-tag-very-negative'
         };
+        const sentimentClass = sentimentClassMap[label] || 'sentiment-tag-neutral';
         return (
-          <Tag color={sentimentMap[label] || 'default'}>
+          <Tag className={sentimentClass}>
             {label || 'N/A'}
           </Tag>
         );

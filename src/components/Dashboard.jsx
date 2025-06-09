@@ -884,10 +884,15 @@ const PilotOverview = () => {
 
   // Convert numerical score to letter grade for video analysis
   const getScoreGrade = (score) => {
-    if (score === null || score === undefined) return 'N/A';
-    // Convert score out of 5 to a percentage (e.g., 3/5 = 60%)
-    const percentage = (score / 5) * 100;
-    return getLetterGrade(percentage);
+    if (score >= 4.5) return 'A+';
+    if (score >= 4.0) return 'A';
+    if (score >= 3.5) return 'A-';
+    if (score >= 3.0) return 'B+';
+    if (score >= 2.5) return 'B';
+    if (score >= 2.0) return 'B-';
+    if (score >= 1.5) return 'C+';
+    if (score >= 1.0) return 'C';
+    return 'F';
   };
 
   // --- Table Column Definitions --- 
@@ -1187,7 +1192,7 @@ const PilotOverview = () => {
             <Table
               columns={overviewTaskAnalysisColumns}
               dataSource={allTaskAnalysisData}
-              rowKey={(record, index) => record.auto_id ?? `ta-${index}`}
+              rowKey={(record) => record.auto_id ?? record.id ?? `ta-${record.user_id}-${record.date}`}
               pagination={{ pageSize: 10, position: ['bottomCenter'] }}
               scroll={{ x: 'max-content', y: 400 }}
               style={{ borderRadius: '8px' }}
@@ -1203,7 +1208,7 @@ const PilotOverview = () => {
             <Table
               columns={overviewPeerFeedbackColumns}
               dataSource={allPeerFeedbackData}
-              rowKey={(record, index) => record.feedback_id ?? `pf-${index}`}
+              rowKey={(record) => record.feedback_id ?? record.id ?? `pf-${record.user_id}-${record.date}`}
               pagination={{ pageSize: 10, position: ['bottomCenter'] }}
               scroll={{ y: 400 }}
               style={{ borderRadius: '8px' }}
@@ -1234,6 +1239,23 @@ const PilotOverview = () => {
                     <Space size="middle">
                        <Text style={{ color: "var(--color-text-main)" }}>From: <Text strong style={{ color: "var(--color-text-main)" }}>{item.reviewer_name || 'Anonymous'}</Text></Text>
                        <Text style={{ color: "var(--color-text-main)" }}>To: <Text strong style={{ color: "var(--color-text-main)" }}>{item.recipient_name || 'Unknown'}</Text></Text>
+                       {item.sentiment_category && (
+                         (() => {
+                           const sentimentClassMap = {
+                             'Very Positive': 'sentiment-tag-very-positive',
+                             'Positive': 'sentiment-tag-positive',
+                             'Neutral': 'sentiment-tag-neutral',
+                             'Negative': 'sentiment-tag-negative',
+                             'Very Negative': 'sentiment-tag-very-negative'
+                           };
+                           const sentimentClass = sentimentClassMap[item.sentiment_category] || 'sentiment-tag-neutral';
+                           return (
+                             <Tag className={sentimentClass}>
+                               {item.sentiment_category}
+                             </Tag>
+                           );
+                         })()
+                       )}
                     </Space>
                   }
                   description={<div style={{ color: "var(--color-text-main)", whiteSpace: "pre-wrap" }}>{item.feedback_text}</div>}
