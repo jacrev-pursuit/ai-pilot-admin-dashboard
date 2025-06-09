@@ -18,6 +18,7 @@
   "license": "ISC",
   "dependencies": {
     "@google-cloud/bigquery": "^7.5.0",
+    "@google-cloud/functions-framework": "^3.3.0",
     "@google-cloud/language": "^6.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",

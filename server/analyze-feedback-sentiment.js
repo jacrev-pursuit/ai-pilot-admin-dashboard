@@ -10,13 +10,10 @@ const openai = new OpenAI({
 });
 
 // Initialize BigQuery client
+// Use Application Default Credentials for Cloud Run compatibility
 const bigquery = new BigQuery({
   projectId: process.env.PROJECT_ID,
-  credentials: {
-    client_email: process.env.CLIENT_EMAIL,
-    private_key: process.env.PRIVATE_KEY.replace(/\\\\n/g, '\\n'),
-    private_key_id: process.env.PRIVATE_KEY_ID,
-  }
+  location: process.env.BIGQUERY_LOCATION || 'us-central1'
 });
 
 async function analyzeFeedbackWithGPT(text) {

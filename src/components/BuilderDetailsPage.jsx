@@ -1542,50 +1542,7 @@ const BuilderDetailsPage = () => {
           <div>
             <Spin spinning={loading}>
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                {/* Row 2: Peer Feedback */}
-                <Row gutter={[24, 24]}>
-                   <Col span={24}> 
-                     <Card title="Peer Feedback Trend & Details" bordered={true} style={{ borderRadius: '8px' }}>
-                      <Row gutter={[24, 24]}> 
-                  <Col xs={24} md={8}> {/* Chart: 1/3 width */}
-                          <PeerFeedbackChart 
-                            ref={peerFeedbackChartRef}
-                            data={peerFeedbackData} 
-                            onPointClick={handlePointClick} 
-                            highlightedRowKey={highlightedRowKey} 
-                            highlightedRowType={highlightedRowType}
-                            onPointHover={handlePointHover}
-                            hoveredPointIndex={hoveredPointIndex}
-                            hoveredChartType={hoveredChartType}
-                            dateRange={dateRange}
-                          /> 
-                  </Col>
-                  <Col xs={24} md={16}> {/* Table: 2/3 width */}
-                          <div ref={peerFeedbackTableRef} style={{ height: '290px', overflow: 'hidden', borderRadius: '8px' }}>
-                            <Table
-                              dataSource={                                
-                                highlightedRowType === 'peerFeedback' && highlightedRowKey
-                                  ? peerFeedbackData.filter(record => record.feedback_id === highlightedRowKey)
-                                  : peerFeedbackData
-                              }
-                              columns={peerFeedbackColumns}
-                              rowKey="feedback_id"
-                              size="small"
-                              scroll={{ y: 240 }} 
-                              rowClassName={(record) => {
-                                const shouldHighlight = highlightedRowType === 'peerFeedback' && record.feedback_id === highlightedRowKey;
-                                return shouldHighlight ? 'highlighted-row' : '';
-                              }}
-                              style={{ borderRadius: '8px' }}
-                            />
-                          </div>
-                  </Col>
-                </Row>
-             </Card>
-                  </Col>
-                </Row>
-
-                {/* Row 3: Work Product */}
+                {/* Row 2: Work Product - MOVED TO FIRST */}
                  <Row gutter={[24, 24]}>
                    <Col span={24}> 
                      <Card title="Work Product Trend & Details" bordered={true} style={{ borderRadius: '8px' }}>
@@ -1630,7 +1587,7 @@ const BuilderDetailsPage = () => {
                   </Col>
                 </Row>
                 
-                {/* Row 4: Comprehension - NEW SECTION */}
+                {/* Row 3: Comprehension - MOVED TO SECOND */}
                  <Row gutter={[24, 24]}>
                    <Col span={24}> 
                      <Card title="Comprehension Trend & Details" bordered={true} style={{ borderRadius: '8px' }}>
@@ -1672,6 +1629,49 @@ const BuilderDetailsPage = () => {
                         </Col>
                        </Row>
                      </Card>
+                  </Col>
+                </Row>
+
+                {/* Row 4: Peer Feedback - MOVED TO THIRD */}
+                <Row gutter={[24, 24]}>
+                   <Col span={24}> 
+                     <Card title="Peer Feedback Trend & Details" bordered={true} style={{ borderRadius: '8px' }}>
+                      <Row gutter={[24, 24]}> 
+                  <Col xs={24} md={8}> {/* Chart: 1/3 width */}
+                          <PeerFeedbackChart 
+                            ref={peerFeedbackChartRef}
+                            data={peerFeedbackData} 
+                            onPointClick={handlePointClick} 
+                            highlightedRowKey={highlightedRowKey} 
+                            highlightedRowType={highlightedRowType}
+                            onPointHover={handlePointHover}
+                            hoveredPointIndex={hoveredPointIndex}
+                            hoveredChartType={hoveredChartType}
+                            dateRange={dateRange}
+                          /> 
+                  </Col>
+                  <Col xs={24} md={16}> {/* Table: 2/3 width */}
+                          <div ref={peerFeedbackTableRef} style={{ height: '290px', overflow: 'hidden', borderRadius: '8px' }}>
+                            <Table
+                              dataSource={                                
+                                highlightedRowType === 'peerFeedback' && highlightedRowKey
+                                  ? peerFeedbackData.filter(record => record.feedback_id === highlightedRowKey)
+                                  : peerFeedbackData
+                              }
+                              columns={peerFeedbackColumns}
+                              rowKey="feedback_id"
+                              size="small"
+                              scroll={{ y: 240 }} 
+                              rowClassName={(record) => {
+                                const shouldHighlight = highlightedRowType === 'peerFeedback' && record.feedback_id === highlightedRowKey;
+                                return shouldHighlight ? 'highlighted-row' : '';
+                              }}
+                              style={{ borderRadius: '8px' }}
+                            />
+                          </div>
+                  </Col>
+                </Row>
+             </Card>
                   </Col>
                 </Row>
                 

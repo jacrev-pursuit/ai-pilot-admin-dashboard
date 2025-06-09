@@ -6,6 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const { BigQuery } = require('@google-cloud/bigquery');
 const logger = require('./logger');
+const { processFeedbackSentiment } = require('./analyze-feedback-sentiment');
 
 console.log('Required modules loaded.');
 
@@ -30,9 +31,12 @@ console.log(`  GOOGLE_APPLICATION_CREDENTIALS: ${process.env.GOOGLE_APPLICATION_
 let bigquery;
 try {
   console.log('Initializing BigQuery client...');
+  
+  // Switch back to using service account key file
   bigquery = new BigQuery({
     projectId: PROJECT_ID,
     location: BIGQUERY_LOCATION,
+    keyFilename: './server/service-account-key.json',
   });
   
   // Validate that all required configuration is present
@@ -79,6 +83,43 @@ const messagesTable = `${PROJECT_ID}.${DATASET}.conversation_messages`;
 const resultsTable = `${PROJECT_ID}.${DATASET}.sentiment_results`;
 const outliersTable = `${PROJECT_ID}.${DATASET}.sentiment_sentence_outliers`;
 const taskResponsesTable = `${PROJECT_ID}.${DATASET}.task_responses`;
+const enrollmentsTable = `${PROJECT_ID}.${DATASET}.enrollments_native`; // Changed to native table
+
+// Helper function to check if error is related to Google Drive permissions
+function isGoogleDrivePermissionError(error) {
+  return error.message && error.message.includes('Permission denied while getting Drive credentials');
+}
+
+// Helper function to execute query with fallback for enrollments table issues
+async function executeQueryWithEnrollmentsFallback(queryWithEnrollments, queryWithoutEnrollments, params, endpointName) {
+  try {
+    console.log(`Executing BigQuery query for ${endpointName} with enrollments...`);
+    const [rows] = await bigquery.query({ query: queryWithEnrollments, params });
+    console.log(`Query for ${endpointName} with enrollments finished. Row count: ${rows.length}`);
+    return rows;
+  } catch (error) {
+    if (isGoogleDrivePermissionError(error)) {
+      console.log(`Google Drive permission error for ${endpointName}, falling back to query without enrollments...`);
+      logger.warn(`Google Drive permission error for ${endpointName}, using fallback query`, { 
+        error: error.message, 
+        endpoint: endpointName 
+      });
+      
+      // Remove level from params for fallback query if it exists
+      const fallbackParams = { ...params };
+      if (fallbackParams.level) {
+        delete fallbackParams.level;
+      }
+      
+      const [fallbackRows] = await bigquery.query({ query: queryWithoutEnrollments, params: fallbackParams });
+      console.log(`Fallback query for ${endpointName} finished. Row count: ${fallbackRows.length}`);
+      return fallbackRows;
+    } else {
+      // Re-throw non-Drive permission errors
+      throw error;
+    }
+  }
+}
 
 // --- API Endpoints (Using OLD Query Logic) ---
 
@@ -93,31 +134,60 @@ app.get('/api/builders', async (req, res) => {
   console.log(`Handling request for /api/builders. BigQuery Client Ready: ${!!bigquery}`);
   const startDate = req.query.startDate || '2000-01-01';
   const endDate = req.query.endDate || '2100-12-31';
+  const level = req.query.level; // Optional cohort-level combination filter
 
   if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
 
-  // QUERY with updated Task Completion %
+  // Parse cohort-level combination filter
+  let levelFilterCondition = '';
+  let cohortFilter = null;
+  let levelOnlyFilter = null;
+  
+  if (level) {
+    // Check if it's a combined filter like "March 2025 - L1"
+    const match = level.match(/^(.+) - (.+)$/);
+    if (match) {
+      cohortFilter = match[1]; // "March 2025"
+      levelOnlyFilter = match[2]; // "L1"
+      levelFilterCondition = 'AND e.cohort = @cohort AND e.level = @levelOnly';
+    } else {
+      // Fallback: treat as level-only filter
+      levelOnlyFilter = level;
+      levelFilterCondition = 'AND e.level = @levelOnly';
+    }
+  }
+
+  // Query using native enrollments table
   const query = `
     WITH BaseMetrics AS (
-        -- Removed task completion fields, kept others
+        -- Filter to only include users with role = "builder" and optionally by cohort-level
         SELECT
-            user_id,
-            name,
-            SUM(prompts_sent_today) as total_prompts_sent,
-            SAFE_DIVIDE(SUM(sum_daily_sentiment_score_today), SUM(count_daily_sentiment_score_today)) as avg_daily_sentiment,
-            SAFE_DIVIDE(SUM(sum_peer_feedback_score_today), SUM(count_peer_feedback_score_today)) as avg_peer_feedback_sentiment
-        FROM \`${metricsTable}\`
-        WHERE metric_date BETWEEN DATE(@startDate) AND DATE(@endDate)
-        GROUP BY user_id, name
+            bm.user_id,
+            bm.name,
+            CONCAT(e.cohort, ' - ', e.level) as level,
+            SUM(bm.prompts_sent_today) as total_prompts_sent,
+            SAFE_DIVIDE(SUM(bm.sum_daily_sentiment_score_today), SUM(bm.count_daily_sentiment_score_today)) as avg_daily_sentiment,
+            SAFE_DIVIDE(SUM(bm.sum_peer_feedback_score_today), SUM(bm.count_peer_feedback_score_today)) as avg_peer_feedback_sentiment
+        FROM \`${metricsTable}\` bm
+        INNER JOIN \`${usersTable}\` u ON bm.user_id = u.user_id
+        INNER JOIN \`${enrollmentsTable}\` e ON u.email = e.builder_email
+        WHERE bm.metric_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+          AND u.role = 'builder'
+          ${levelFilterCondition}
+        GROUP BY bm.user_id, bm.name, e.cohort, e.level
     ),
-    -- CTEs for WP/Comp Scores (Keep from previous working version)
+    -- CTEs for WP/Comp Scores with role and cohort-level filtering
     TaskAnalysis AS (
-        SELECT user_id, learning_type,
-               SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score,
-               JSON_EXTRACT_ARRAY(analysis, '$.criteria_met') as criteria_met
-        FROM \`${taskAnalysisTable}\`
-        WHERE curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
-          AND learning_type IN ('Work product', 'Key concept')
+        SELECT tar.user_id, tar.learning_type,
+               SAFE_CAST(JSON_EXTRACT_SCALAR(tar.analysis, '$.completion_score') AS FLOAT64) as completion_score,
+               JSON_EXTRACT_ARRAY(tar.analysis, '$.criteria_met') as criteria_met
+        FROM \`${taskAnalysisTable}\` tar
+        INNER JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
+        INNER JOIN \`${enrollmentsTable}\` e ON u.email = e.builder_email
+        WHERE tar.curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+          AND tar.learning_type IN ('Work product', 'Key concept')
+          AND u.role = 'builder'
+          ${levelFilterCondition}
     ),
     FilteredTaskAnalysis AS ( 
         SELECT user_id, learning_type, completion_score
@@ -133,7 +203,7 @@ app.get('/api/builders', async (req, res) => {
         SELECT user_id, AVG(completion_score) as avg_comp_score 
         FROM FilteredTaskAnalysis WHERE learning_type = 'Key concept' GROUP BY user_id
     ),
-    -- NEW CTEs for Task Completion Percentage --
+    -- Task Completion Percentage CTEs --
     EligibleTasksInRange AS (
         SELECT t.id as task_id, t.deliverable_type
         FROM \`${tasksTable}\` t
@@ -150,12 +220,20 @@ app.get('/api/builders', async (req, res) => {
         SELECT et.task_id, utp.user_id
         FROM EligibleTasksInRange et
         JOIN \`${userTaskProgressTable}\` utp ON et.task_id = utp.task_id
+        INNER JOIN \`${usersTable}\` u ON utp.user_id = u.user_id
+        INNER JOIN \`${enrollmentsTable}\` e ON u.email = e.builder_email
         WHERE et.deliverable_type = 'text' AND utp.status = 'completed'
+          AND u.role = 'builder'
+          ${levelFilterCondition}
         UNION ALL
         SELECT et.task_id, ts.user_id
         FROM EligibleTasksInRange et
         JOIN \`${taskSubmissionsTable}\` ts ON et.task_id = ts.task_id
+        INNER JOIN \`${usersTable}\` u ON ts.user_id = u.user_id
+        INNER JOIN \`${enrollmentsTable}\` e ON u.email = e.builder_email
         WHERE et.deliverable_type = 'link'
+          AND u.role = 'builder'
+          ${levelFilterCondition}
     ),
     UserCompletionCounts AS (
         SELECT user_id, COUNT(DISTINCT task_id) as completed_count
@@ -166,10 +244,9 @@ app.get('/api/builders', async (req, res) => {
     SELECT 
       bm.user_id,
       bm.name,
-      -- Calculate New Task Completion Percentage (Rounded to 0) --
+      bm.level,
       ROUND((COALESCE(ucc.completed_count, 0) / NULLIF(tetc.total_tasks, 0)) * 100, 0) as tasks_completed_percentage,
       bm.total_prompts_sent as prompts_sent,
-      -- Other fields (Sentiment, WP/Comp Scores) from previous working query
       CASE 
         WHEN bm.avg_daily_sentiment IS NULL THEN NULL
         WHEN bm.avg_daily_sentiment >= 0.6 THEN 'Very Positive'
@@ -192,20 +269,70 @@ app.get('/api/builders', async (req, res) => {
     LEFT JOIN WorkProductAvg wp ON bm.user_id = wp.user_id
     LEFT JOIN ComprehensionAvg comp ON bm.user_id = comp.user_id
     LEFT JOIN UserCompletionCounts ucc ON bm.user_id = ucc.user_id
-    CROSS JOIN TotalEligibleTaskCount tetc -- Need total count for calculation
+    CROSS JOIN TotalEligibleTaskCount tetc
   `;
 
-  const options = { query, params: { startDate, endDate } };
+  // Build params object conditionally
+  const params = { startDate, endDate };
+  if (cohortFilter) {
+    params.cohort = cohortFilter;
+    params.levelOnly = levelOnlyFilter;
+  } else if (levelOnlyFilter) {
+    params.levelOnly = levelOnlyFilter;
+  }
 
   try {
-    console.log(`Executing BigQuery query for ${req.path}...`);
-    const [rows] = await bigquery.query(options);
-    console.log(`Query for ${req.path} finished. Row count: ${rows.length}`);
+    console.log(`Executing BigQuery query for /api/builders with native enrollments table...`);
+    console.log(`Filter applied: ${level || 'none'} (cohort: ${cohortFilter}, level: ${levelOnlyFilter})`);
+    const [rows] = await bigquery.query({ query, params });
+    console.log(`Query for /api/builders finished. Row count: ${rows.length}`);
     res.json(rows);
   } catch (error) {
     console.error(`Error in ${req.path}:`, error);
-    logger.error(`Error executing BigQuery query for ${req.path}`, { error: error.message, stack: error.stack, query: options.query }); 
+    logger.error(`Error executing BigQuery query for ${req.path}`, { error: error.message, stack: error.stack }); 
     res.status(500).json({ error: 'Failed to fetch builder data' });
+  }
+});
+
+// Get available levels endpoint
+app.get('/api/levels', async (req, res) => {
+  console.log(`Handling request for /api/levels. BigQuery Client Ready: ${!!bigquery}`);
+  console.log('LEVELS ENDPOINT: Starting execution...');
+  
+  if (!bigquery) {
+    console.log('LEVELS ENDPOINT: BigQuery client not initialized');
+    return res.status(500).json({ error: 'BigQuery client not initialized' });
+  }
+
+  const query = `
+    SELECT DISTINCT e.cohort, e.level, CONCAT(e.cohort, ' - ', e.level) as combined_level
+    FROM \`${enrollmentsTable}\` e
+    INNER JOIN \`${usersTable}\` u ON e.builder_email = u.email
+    WHERE u.role = 'builder'
+      AND e.level IS NOT NULL
+      AND e.level != ''
+      AND e.cohort IS NOT NULL
+      AND e.cohort != ''
+    ORDER BY cohort ASC, level ASC
+  `;
+
+  try {
+    console.log('LEVELS ENDPOINT: Executing query on native enrollments table...');
+    const [rows] = await bigquery.query({ query });
+    
+    // Extract just the combined level values
+    const levels = rows.map(row => row.combined_level);
+    console.log('LEVELS ENDPOINT: Returning cohort-level combinations:', levels);
+    res.json(levels);
+  } catch (error) {
+    console.error(`LEVELS ENDPOINT: Error occurred:`, error);
+    logger.error('Error fetching cohort-level combinations', { error: error.message, stack: error.stack });
+    
+    // Fallback to mock levels if native table fails
+    console.log('LEVELS ENDPOINT: Using fallback to mock cohort-level combinations...');
+    const mockLevels = ['March 2025 - L1', 'March 2025 - L2'];
+    console.log('LEVELS ENDPOINT: Sending mock levels:', mockLevels);
+    res.json(mockLevels);
   }
 });
 
@@ -224,7 +351,7 @@ app.get('/api/builders/:userId/details', async (req, res) => {
   // OLD baseQuery logic - kept for reference in if/else, but defined within
 
   if (type === 'workProduct') {
-    // OLD logic for workProduct - No validity filtering
+    // OLD logic for workProduct with role filtering for builders only
     query = `
       SELECT 
         tar.task_id, t.task_title, tar.analysis, tar.curriculum_date as date,
@@ -232,13 +359,15 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         tar.auto_id -- Added auto_id
       FROM \`${taskAnalysisTable}\` tar
       LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
+      INNER JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
       WHERE tar.user_id = CAST(@userId AS INT64)
         AND tar.curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
         AND tar.learning_type = 'Work product'
+        AND u.role = 'builder'
       ORDER BY tar.curriculum_date DESC
     `;
   } else if (type === 'comprehension') {
-    // OLD logic for comprehension
+    // OLD logic for comprehension with role filtering for builders only
     query = `
       SELECT 
         tar.task_id, t.task_title, tar.analysis, tar.curriculum_date as date,
@@ -246,13 +375,15 @@ app.get('/api/builders/:userId/details', async (req, res) => {
         tar.auto_id -- Added auto_id
       FROM \`${taskAnalysisTable}\` tar
       LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
+      INNER JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
       WHERE tar.user_id = CAST(@userId AS INT64)
         AND tar.curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
         AND tar.learning_type = 'Key concept'
+        AND u.role = 'builder'
       ORDER BY tar.curriculum_date DESC
     `;
   } else if (type === 'peer_feedback') {
-    // OLD logic for peer_feedback
+    // OLD logic for peer_feedback with role filtering for builders only
     query = `
       WITH feedback_data AS (
         SELECT 
@@ -260,8 +391,12 @@ app.get('/api/builders/:userId/details', async (req, res) => {
           fsa.sentiment_score, fsa.sentiment_category, fsa.summary, fsa.created_at as analysis_date
         FROM \`${peerFeedbackTable}\` pf 
         LEFT JOIN \`${sentimentTable}\` fsa ON CAST(pf.id AS STRING) = CAST(fsa.id AS STRING)
+        INNER JOIN \`${usersTable}\` u_to ON pf.to_user_id = u_to.user_id
+        INNER JOIN \`${usersTable}\` u_from ON pf.from_user_id = u_from.user_id
         WHERE pf.to_user_id = CAST(@userId AS INT64)
-          AND DATE(fsa.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate) 
+          AND DATE(fsa.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+          AND u_to.role = 'builder'
+          AND u_from.role = 'builder'
       )
       SELECT 
         fd.feedback_id, fd.feedback, fd.sentiment_score, fd.sentiment_category as sentiment_label,
@@ -271,31 +406,38 @@ app.get('/api/builders/:userId/details', async (req, res) => {
       ORDER BY fd.timestamp DESC
     `;
   } else if (type === 'prompts') {
-      // OLD logic for prompts
+      // OLD logic for prompts with role filtering for builders only
       query = `
-        SELECT DATE(created_at) as date, COUNT(message_id) as prompt_count
-        FROM \`${messagesTable}\`
-        WHERE user_id = CAST(@userId AS INT64)
-          AND message_role = 'user'
-          AND created_at BETWEEN TIMESTAMP(@startDate) AND TIMESTAMP(@endDate) -- Adjusted to TIMESTAMP if created_at is TIMESTAMP
+        SELECT DATE(cm.created_at) as date, COUNT(cm.message_id) as prompt_count
+        FROM \`${messagesTable}\` cm
+        INNER JOIN \`${usersTable}\` u ON cm.user_id = u.user_id
+        WHERE cm.user_id = CAST(@userId AS INT64)
+          AND cm.message_role = 'user'
+          AND cm.created_at BETWEEN TIMESTAMP(@startDate) AND TIMESTAMP(@endDate) -- Adjusted to TIMESTAMP if created_at is TIMESTAMP
+          AND u.role = 'builder'
         GROUP BY 1 ORDER BY 1 ASC
       `;
   } else if (type === 'sentiment') {
-      // OLD logic for sentiment
+      // OLD logic for sentiment with role filtering for builders only
       query = `
         WITH DailyOutliers AS (
-          SELECT user_id, date, STRING_AGG(sentence_text, '; ') AS daily_sentiment_reasons
-          FROM \`${outliersTable}\`
-          WHERE user_id = CAST(@userId AS INT64) AND date BETWEEN DATE(@startDate) AND DATE(@endDate)
-          GROUP BY user_id, date
+          SELECT so.user_id, so.date, STRING_AGG(so.sentence_text, '; ') AS daily_sentiment_reasons
+          FROM \`${outliersTable}\` so
+          INNER JOIN \`${usersTable}\` u ON so.user_id = u.user_id
+          WHERE so.user_id = CAST(@userId AS INT64) 
+            AND so.date BETWEEN DATE(@startDate) AND DATE(@endDate)
+            AND u.role = 'builder'
+          GROUP BY so.user_id, so.date
         )
         SELECT 
           sr.date, sr.sentiment_score, sr.sentiment_category, sr.message_count, 
           do.daily_sentiment_reasons AS sentiment_reason
         FROM \`${resultsTable}\` sr
+        INNER JOIN \`${usersTable}\` u ON sr.user_id = u.user_id
         LEFT JOIN DailyOutliers do ON sr.user_id = do.user_id AND sr.date = do.date
         WHERE sr.user_id = CAST(@userId AS INT64)
           AND sr.date BETWEEN DATE(@startDate) AND DATE(@endDate)
+          AND u.role = 'builder'
         ORDER BY sr.date ASC
       `;
   } else {
@@ -319,19 +461,26 @@ app.get('/api/builders/:userId/details', async (req, res) => {
 // Trends endpoints (Old Query Logic)
 app.get('/api/trends/prompts', async (req, res) => {
   console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
-  const { startDate, endDate } = req.query;
+  const { startDate, endDate, level } = req.query;
   if (!startDate || !endDate || !bigquery) return res.status(400).json({ error: 'Missing parameters or BQ client issue' });
 
-  // OLD QUERY logic
+  // TEMPORARY: Disable level filtering until enrollments table access is fixed
+  // const levelFilterCondition = level ? 'AND e.level = @level' : '';
+
+  // QUERY logic with role filtering for builders only (enrollments join removed)
   const query = `
     SELECT DATE(cm.created_at) as date, COUNT(cm.message_id) as prompt_count
     FROM \`${messagesTable}\` cm
     INNER JOIN \`${curriculumDaysTable}\` cd ON DATE(cm.created_at) = cd.day_date
+    INNER JOIN \`${usersTable}\` u ON cm.user_id = u.user_id
     WHERE cm.message_role = 'user'
       AND DATE(cm.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+      AND u.role = 'builder'
     GROUP BY 1 ORDER BY 1 ASC
   `;
-  const options = { query, params: { startDate, endDate } };
+
+  const params = { startDate, endDate };
+  const options = { query, params };
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
     const [rows] = await bigquery.query(options);
@@ -346,18 +495,25 @@ app.get('/api/trends/prompts', async (req, res) => {
 
 app.get('/api/trends/sentiment', async (req, res) => {
   console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
-  const { startDate, endDate } = req.query;
+  const { startDate, endDate, level } = req.query;
   if (!startDate || !endDate || !bigquery) return res.status(400).json({ error: 'Missing parameters or BQ client issue' });
 
-  // OLD QUERY logic
+  // TEMPORARY: Disable level filtering until enrollments table access is fixed
+  // const levelFilterCondition = level ? 'AND e.level = @level' : '';
+
+  // QUERY logic with role filtering for builders only (enrollments join removed)
   const query = `
-    SELECT DATE(date) as date, sentiment_category, COUNT(*) as count
-    FROM \`${resultsTable}\`
-    WHERE DATE(date) BETWEEN DATE(@startDate) AND DATE(@endDate)
-      AND sentiment_category IS NOT NULL
+    SELECT DATE(sr.date) as date, sr.sentiment_category, COUNT(*) as count
+    FROM \`${resultsTable}\` sr
+    INNER JOIN \`${usersTable}\` u ON sr.user_id = u.user_id
+    WHERE DATE(sr.date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+      AND sr.sentiment_category IS NOT NULL
+      AND u.role = 'builder'
     GROUP BY date, sentiment_category ORDER BY date ASC, sentiment_category ASC
   `;
-  const options = { query, params: { startDate, endDate } };
+
+  const params = { startDate, endDate };
+  const options = { query, params };
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
     const [rows] = await bigquery.query(options);
@@ -372,18 +528,28 @@ app.get('/api/trends/sentiment', async (req, res) => {
 
 app.get('/api/trends/peer-feedback', async (req, res) => {
   console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
-  const { startDate, endDate } = req.query;
+  const { startDate, endDate, level } = req.query;
   if (!startDate || !endDate || !bigquery) return res.status(400).json({ error: 'Missing parameters or BQ client issue' });
 
-  // OLD QUERY logic
+  // TEMPORARY: Disable level filtering until enrollments table access is fixed
+  // const levelFilterCondition = level ? 'AND e_from.level = @level AND e_to.level = @level' : '';
+
+  // QUERY logic with role filtering for builders only (enrollments join removed)
   const query = `
-    SELECT DATE(created_at) as date, sentiment_category, COUNT(*) as count
-    FROM \`${sentimentTable}\`
-    WHERE DATE(created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
-      AND sentiment_category IS NOT NULL
+    SELECT DATE(fsa.created_at) as date, fsa.sentiment_category, COUNT(*) as count
+    FROM \`${sentimentTable}\` fsa
+    INNER JOIN \`${peerFeedbackTable}\` pf ON CAST(fsa.id AS STRING) = CAST(pf.id AS STRING)
+    INNER JOIN \`${usersTable}\` u_from ON pf.from_user_id = u_from.user_id
+    INNER JOIN \`${usersTable}\` u_to ON pf.to_user_id = u_to.user_id
+    WHERE DATE(fsa.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+      AND fsa.sentiment_category IS NOT NULL
+      AND u_from.role = 'builder'
+      AND u_to.role = 'builder'
     GROUP BY date, sentiment_category ORDER BY date ASC, sentiment_category ASC
   `;
-  const options = { query, params: { startDate, endDate } };
+
+  const params = { startDate, endDate };
+  const options = { query, params };
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
     const [rows] = await bigquery.query(options);
@@ -391,21 +557,24 @@ app.get('/api/trends/peer-feedback', async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error(`Error in ${req.path}:`, error);
-    logger.error(`Error fetching peer feedback sentiment trends`, { error: error.message, stack: error.stack });
-    res.status(500).json({ error: 'Failed to fetch peer feedback sentiment trends' });
+    logger.error(`Error executing BigQuery peer feedback trends query`, { error: error.message, stack: error.stack, query: options.query });
+    res.status(500).json({ error: 'Failed to fetch peer feedback trends' });
   }
 });
 
 // Restore old Grades/Feedback/Sentiment Details endpoints
 app.get('/api/feedback/details', async (req, res) => {
   console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
-  const { date, category } = req.query;
+  const { date, category, level } = req.query;
   if (!date || !category || !bigquery) return res.status(400).json({ error: 'Missing parameters or BQ client issue' });
 
   const validCategories = ['Very Positive', 'Positive', 'Neutral', 'Negative', 'Very Negative'];
   if (!validCategories.includes(category)) return res.status(400).json({ error: 'Invalid category parameter' });
 
-  // OLD QUERY logic
+  // TEMPORARY: Disable level filtering until enrollments table access is fixed
+  // const levelFilterCondition = level ? 'AND e_from.level = @level AND e_to.level = @level' : '';
+
+  // QUERY logic with role filtering for builders only (enrollments join removed)
   const query = `
     SELECT pf.id as feedback_id, pf.feedback_text, pf.created_at, fsa.sentiment_category,
       CONCAT(u_from.first_name, ' ', u_from.last_name) as reviewer_name,
@@ -416,9 +585,13 @@ app.get('/api/feedback/details', async (req, res) => {
     LEFT JOIN \`${usersTable}\` u_to ON pf.to_user_id = u_to.user_id
     WHERE DATE(pf.created_at) = DATE(@date)
       AND fsa.sentiment_category = @category
+      AND u_from.role = 'builder'
+      AND u_to.role = 'builder'
     ORDER BY pf.created_at DESC
   `;
-  const options = { query, params: { date, category } };
+
+  const params = { date, category };
+  const options = { query, params };
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
     const [rows] = await bigquery.query(options);
@@ -439,7 +612,7 @@ app.get('/api/sentiment/details', async (req, res) => {
   const validCategories = ['Positive', 'Neutral', 'Negative']; 
   if (!validCategories.includes(category)) return res.status(400).json({ error: 'Invalid category parameter' });
 
-  // OLD QUERY logic
+  // OLD QUERY logic with role filtering for builders only
   const query = `
     SELECT sr.user_id, sr.sentiment_score, sr.sentiment_category, sr.message_count, sr.date,
       CONCAT(u.first_name, ' ', u.last_name) as user_name
@@ -447,6 +620,7 @@ app.get('/api/sentiment/details', async (req, res) => {
     LEFT JOIN \`${usersTable}\` u ON sr.user_id = u.user_id
     WHERE DATE(sr.date) = DATE(@date)
       AND sr.sentiment_category = @category
+      AND u.role = 'builder'
     ORDER BY sr.user_id
   `;
   const options = { query, params: { date, category } };
@@ -465,7 +639,7 @@ app.get('/api/sentiment/details', async (req, res) => {
 // Restore /api/overview/grade-distribution endpoint (filters by type, groups by grade)
 app.get('/api/overview/grade-distribution', async (req, res) => {
   console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
-  const { startDate, endDate, learningType } = req.query; // Add learningType back
+  const { startDate, endDate, learningType, level } = req.query; // Add level parameter
 
   // Add back validation for all params
   if (!startDate || !endDate || !learningType || !bigquery) {
@@ -475,21 +649,26 @@ app.get('/api/overview/grade-distribution', async (req, res) => {
       return res.status(400).json({ error: 'Invalid learningType' });
   }
 
+  // TEMPORARY: Disable level filtering until enrollments table access is fixed
+  // const levelFilterCondition = level ? 'AND e.level = @level' : '';
+
   const query = `
     WITH ValidTasks AS (
         SELECT
             tar.task_id,
-            SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score
+            SAFE_CAST(JSON_EXTRACT_SCALAR(tar.analysis, '$.completion_score') AS FLOAT64) as completion_score
         FROM \`${taskAnalysisTable}\` tar
+        INNER JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
         WHERE tar.curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
           AND tar.learning_type = @learningType -- Filter by learning type
+          AND u.role = 'builder'
           -- Filter out invalid tasks --
-          AND SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) IS NOT NULL
-          AND SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) != 0
+          AND SAFE_CAST(JSON_EXTRACT_SCALAR(tar.analysis, '$.completion_score') AS FLOAT64) IS NOT NULL
+          AND SAFE_CAST(JSON_EXTRACT_SCALAR(tar.analysis, '$.completion_score') AS FLOAT64) != 0
           AND NOT (
-              JSON_EXTRACT_ARRAY(analysis, '$.criteria_met') IS NOT NULL AND 
-              ARRAY_LENGTH(JSON_EXTRACT_ARRAY(analysis, '$.criteria_met')) = 1 AND 
-              JSON_VALUE(JSON_EXTRACT_ARRAY(analysis, '$.criteria_met')[OFFSET(0)]) = 'Submission received'
+              JSON_EXTRACT_ARRAY(tar.analysis, '$.criteria_met') IS NOT NULL AND 
+              ARRAY_LENGTH(JSON_EXTRACT_ARRAY(tar.analysis, '$.criteria_met')) = 1 AND 
+              JSON_VALUE(JSON_EXTRACT_ARRAY(tar.analysis, '$.criteria_met')[OFFSET(0)]) = 'Submission received'
           )
     ),
     GradedTasks AS (
@@ -519,7 +698,8 @@ app.get('/api/overview/grade-distribution', async (req, res) => {
     -- ORDER BY t.task_title -- Optional ordering if needed
   `;
 
-  const options = { query, params: { startDate, endDate, learningType } }; // Pass learningType
+  const params = { startDate, endDate, learningType };
+  const options = { query, params };
 
   try {
     console.log(`Executing BigQuery query for ${req.path} (Type: ${learningType})...`);
@@ -690,11 +870,14 @@ app.get('/api/tasks/all-analysis', async (req, res) => {
     LEFT JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
     LEFT JOIN \`${tasksTable}\` t ON tar.task_id = t.id
     -- WHERE clauses for filtering can be added here based on query params
-    ORDER BY tar.grading_timestamp DESC -- Default sort: newest first
+    WHERE DATE(tar.curriculum_date) >= DATE(@startDate)
+      AND DATE(tar.curriculum_date) <= DATE(@endDate)
+      AND u.role = 'builder'
+    ORDER BY tar.curriculum_date DESC, user_name ASC
     -- LIMIT/OFFSET for pagination can be added here
   `;
 
-  const options = { query };
+  const options = { query, params: { startDate, endDate } };
 
   try {
     console.log(`Executing BigQuery query for ${req.path}...`);
@@ -759,15 +942,19 @@ app.get('/api/submission/:autoId', async (req, res) => {
 
 // Endpoint to get ALL peer feedback within a date range
 app.get('/api/feedback/all', async (req, res) => {
-  const { startDate, endDate } = req.query;
+  const { startDate, endDate, level } = req.query;
   const usersTable = '`pursuit-ops.pilot_agent_public.users`';
   const feedbackTable = '`pursuit-ops.pilot_agent_public.peer_feedback`';
   const analysisTable = '`pursuit-ops.pilot_agent_public.feedback_sentiment_analysis`';
+  // const enrollmentsTable = '`pursuit-ops.pilot_agent_public.enrollments`'; // DISABLED
 
   // Basic validation for dates
   if (!startDate || !endDate) {
     return res.status(400).json({ error: 'Both startDate and endDate are required.' });
   }
+
+  // TEMPORARY: Disable level filtering until enrollments table access is fixed
+  // const levelFilterCondition = level ? 'AND e_reviewer.level = @level AND e_recipient.level = @level' : '';
 
   // TODO: Add more robust date validation if needed
 
@@ -789,12 +976,16 @@ app.get('/api/feedback/all', async (req, res) => {
     LEFT JOIN ${usersTable} recipient ON pf.to_user_id = recipient.user_id
     WHERE DATE(pf.created_at) >= DATE(@startDate)
       AND DATE(pf.created_at) <= DATE(@endDate)
+      AND reviewer.role = 'builder'
+      AND recipient.role = 'builder'
     ORDER BY pf.created_at DESC;
   `;
 
+  const params = { startDate, endDate };
+
   const options = {
     query: query,
-    params: { startDate, endDate },
+    params: params,
   };
 
   try {
@@ -808,15 +999,19 @@ app.get('/api/feedback/all', async (req, res) => {
 
 // Endpoint to get ALL task analysis results within a date range
 app.get('/api/analysis/all', async (req, res) => {
-  const { startDate, endDate } = req.query;
+  const { startDate, endDate, level } = req.query;
   const usersTable = '`pursuit-ops.pilot_agent_public.users`';
   const tasksTable = '`pursuit-ops.pilot_agent_public.tasks`';
   const analysisTable = '`pursuit-ops.pilot_agent_public.task_analysis_results`';
+  // const enrollmentsTable = '`pursuit-ops.pilot_agent_public.enrollments`'; // DISABLED
 
   // Basic validation for dates
   if (!startDate || !endDate) {
     return res.status(400).json({ error: 'Both startDate and endDate are required.' });
   }
+
+  // TEMPORARY: Disable level filtering until enrollments table access is fixed
+  // const levelFilterCondition = level ? 'AND e.level = @level' : '';
 
   // TODO: Add more robust date validation if needed
 
@@ -836,12 +1031,15 @@ app.get('/api/analysis/all', async (req, res) => {
     LEFT JOIN ${tasksTable} t ON tar.task_id = t.id
     WHERE DATE(tar.curriculum_date) >= DATE(@startDate)
       AND DATE(tar.curriculum_date) <= DATE(@endDate)
+      AND u.role = 'builder'
     ORDER BY tar.curriculum_date DESC, user_name ASC;
   `;
 
+  const params = { startDate, endDate };
+
   const options = {
     query: query,
-    params: { startDate, endDate },
+    params: params,
   };
 
   try {
@@ -885,34 +1083,39 @@ app.get('/api/tasks/summary', async (req, res) => {
       WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate) -- Filter tasks by date range here
     ),
     LinkSubmissions AS (
-      -- Count distinct users for link tasks
+      -- Count distinct users for link tasks with role filtering
       SELECT 
-        task_id,
-        COUNT(DISTINCT user_id) as link_submission_count
-      FROM ${submissionsTable}
-      WHERE task_id IN (SELECT task_id FROM TaskBase WHERE deliverable_type = 'link')
-      GROUP BY task_id
+        ts.task_id,
+        COUNT(DISTINCT ts.user_id) as link_submission_count
+      FROM ${submissionsTable} ts
+      INNER JOIN ${usersTable} u ON ts.user_id = u.user_id
+      WHERE ts.task_id IN (SELECT task_id FROM TaskBase WHERE deliverable_type = 'link')
+        AND u.role = 'builder'
+      GROUP BY ts.task_id
     ),
     TextCompletions AS (
-      -- Count distinct users for completed text tasks
+      -- Count distinct users for completed text tasks with role filtering
       SELECT 
-        task_id,
-        COUNT(DISTINCT user_id) as text_completion_count
-      FROM ${progressTable}
-      WHERE task_id IN (SELECT task_id FROM TaskBase WHERE deliverable_type = 'text')
-        AND status = 'completed'
-      GROUP BY task_id
+        utp.task_id,
+        COUNT(DISTINCT utp.user_id) as text_completion_count
+      FROM ${progressTable} utp
+      INNER JOIN ${usersTable} u ON utp.user_id = u.user_id
+      WHERE utp.task_id IN (SELECT task_id FROM TaskBase WHERE deliverable_type = 'text')
+        AND utp.status = 'completed'
+        AND u.role = 'builder'
+      GROUP BY utp.task_id
     ),
     AnalysisCounts AS (
-      -- Count analysis records for tasks within the date range 
-      -- (Note: Analysis date might differ slightly from task curriculum date)
+      -- Count analysis records for tasks within the date range with role filtering
       SELECT
-        task_id,
-        COUNT(auto_id) as analysis_count
-      FROM ${analysisTable}
-      WHERE DATE(curriculum_date) BETWEEN DATE(@startDate) AND DATE(@endDate)
-       AND task_id IN (SELECT task_id FROM TaskBase)
-      GROUP BY task_id
+        tar.task_id,
+        COUNT(tar.auto_id) as analysis_count
+      FROM ${analysisTable} tar
+      INNER JOIN ${usersTable} u ON tar.user_id = u.user_id
+      WHERE DATE(tar.curriculum_date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+       AND tar.task_id IN (SELECT task_id FROM TaskBase)
+       AND u.role = 'builder'
+      GROUP BY tar.task_id
     )
     -- Final Select joining all CTEs
     SELECT 
@@ -972,18 +1175,20 @@ app.get('/api/tasks/:taskId/grade-distribution', async (req, res) => {
   const query = `
     WITH ValidAnalyses AS (
       SELECT
-        SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) as completion_score
-      FROM ${analysisTable}
-      WHERE task_id = CAST(@taskId AS INT64)
+        SAFE_CAST(JSON_EXTRACT_SCALAR(tar.analysis, '$.completion_score') AS FLOAT64) as completion_score
+      FROM ${analysisTable} tar
+      INNER JOIN \`pursuit-ops.pilot_agent_public.users\` u ON tar.user_id = u.user_id
+      WHERE tar.task_id = CAST(@taskId AS INT64)
         -- Optional date filtering --
-        ${startDate && endDate ? `AND DATE(curriculum_date) BETWEEN DATE(@startDate) AND DATE(@endDate)` : ''}
+        ${startDate && endDate ? `AND DATE(tar.curriculum_date) BETWEEN DATE(@startDate) AND DATE(@endDate)` : ''}
         -- Filter out invalid tasks --
-        AND SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) IS NOT NULL
-        AND SAFE_CAST(JSON_EXTRACT_SCALAR(analysis, '$.completion_score') AS FLOAT64) != 0
+        AND SAFE_CAST(JSON_EXTRACT_SCALAR(tar.analysis, '$.completion_score') AS FLOAT64) IS NOT NULL
+        AND SAFE_CAST(JSON_EXTRACT_SCALAR(tar.analysis, '$.completion_score') AS FLOAT64) != 0
+        AND u.role = 'builder'
         AND NOT (
-            JSON_EXTRACT_ARRAY(analysis, '$.criteria_met') IS NOT NULL AND 
-            ARRAY_LENGTH(JSON_EXTRACT_ARRAY(analysis, '$.criteria_met')) = 1 AND 
-            JSON_VALUE(JSON_EXTRACT_ARRAY(analysis, '$.criteria_met')[OFFSET(0)]) = 'Submission received'
+            JSON_EXTRACT_ARRAY(tar.analysis, '$.criteria_met') IS NOT NULL AND 
+            ARRAY_LENGTH(JSON_EXTRACT_ARRAY(tar.analysis, '$.criteria_met')) = 1 AND 
+            JSON_VALUE(JSON_EXTRACT_ARRAY(tar.analysis, '$.criteria_met')[OFFSET(0)]) = 'Submission received'
         )
     ),
     GradedAnalyses AS (
@@ -1040,16 +1245,20 @@ app.get('/api/tasks/:taskId/grade-distribution', async (req, res) => {
 // --- NEW Endpoint: Fetch Video Analyses ---
 app.get('/api/video-analyses', async (req, res) => {
   console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
-  const { startDate, endDate, userId } = req.query;
+  const { startDate, endDate, userId, level } = req.query;
   // Use the explicit dataset name 'pilot_agent_public' instead of relying on DATASET variable
   const datasetName = 'pilot_agent_public'; // Explicitly set to known working value
   const videoAnalysesTable = `${PROJECT_ID}.${datasetName}.video_analyses`;
   const tasksTable = `${PROJECT_ID}.${datasetName}.tasks`;
   const taskSubmissionsTable = `${PROJECT_ID}.${datasetName}.task_submissions`;
+  // const enrollmentsTable = `${PROJECT_ID}.${datasetName}.enrollments`; // DISABLED
   
   if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
 
   console.log(`Using table reference: ${videoAnalysesTable}`);
+
+  // TEMPORARY: Disable level filtering until enrollments table access is fixed
+  // const levelFilterCondition = level ? 'AND e.level = @level' : '';
 
   let query = `
     SELECT 
@@ -1064,11 +1273,13 @@ app.get('/api/video-analyses', async (req, res) => {
       va.business_score_rationale,
       va.professional_skills_score_rationale,
       t.task_title,
-      ts.created_at as submission_date
+      ts.created_at as submission_date,
+      CONCAT(u.first_name, ' ', u.last_name) as user_name
     FROM \`${videoAnalysesTable}\` va
     LEFT JOIN \`${tasksTable}\` t ON va.video_id = CAST(t.id AS STRING)
     LEFT JOIN \`${taskSubmissionsTable}\` ts ON va.submission_id = CAST(ts.id AS STRING)
-    WHERE 1=1
+    INNER JOIN \`${PROJECT_ID}.${datasetName}.users\` u ON CAST(va.user_id AS INT64) = u.user_id
+    WHERE u.role = 'builder'
   `;
   
   const params = {};
@@ -1127,11 +1338,13 @@ app.get('/api/video-analyses', async (req, res) => {
 app.get('/api/video-analyses/:videoId', async (req, res) => {
   console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
   const { videoId } = req.params;
+  const { level } = req.query;
   // Use the explicit dataset name 'pilot_agent_public' instead of relying on DATASET variable
   const datasetName = 'pilot_agent_public'; // Explicitly set to known working value
   const videoAnalysesTable = `${PROJECT_ID}.${datasetName}.video_analyses`;
   const tasksTable = `${PROJECT_ID}.${datasetName}.tasks`;
   const taskSubmissionsTable = `${PROJECT_ID}.${datasetName}.task_submissions`;
+  // const enrollmentsTable = `${PROJECT_ID}.${datasetName}.enrollments`; // DISABLED
   
   if (!videoId) {
     return res.status(400).json({ error: 'Missing required parameter: videoId' });
@@ -1139,6 +1352,9 @@ app.get('/api/video-analyses/:videoId', async (req, res) => {
   if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
 
   console.log(`Using table reference: ${videoAnalysesTable}`);
+
+  // TEMPORARY: Disable level filtering until enrollments table access is fixed
+  // const levelFilterCondition = level ? 'AND e.level = @level' : '';
 
   const query = `
     SELECT 
@@ -1153,11 +1369,14 @@ app.get('/api/video-analyses/:videoId', async (req, res) => {
       va.business_score_rationale,
       va.professional_skills_score_rationale,
       t.task_title,
-      ts.created_at as submission_date
+      ts.created_at as submission_date,
+      CONCAT(u.first_name, ' ', u.last_name) as user_name
     FROM \`${videoAnalysesTable}\` va
     LEFT JOIN \`${tasksTable}\` t ON va.video_id = CAST(t.id AS STRING)
     LEFT JOIN \`${taskSubmissionsTable}\` ts ON va.submission_id = CAST(ts.id AS STRING)
+    INNER JOIN \`${PROJECT_ID}.${datasetName}.users\` u ON CAST(va.user_id AS INT64) = u.user_id
     WHERE va.video_id = @videoId
+      AND u.role = 'builder'
     LIMIT 1
   `;
   
@@ -1202,28 +1421,133 @@ app.get('/api/video-analyses/:videoId', async (req, res) => {
   }
 });
 
-// Restore static serving and fallback
-const frontendDistPath = path.resolve(__dirname, '../dist');
-app.use(express.static(frontendDistPath));
-console.log(`Attempting to serve static files from: ${frontendDistPath}`);
-app.get('*', (req, res) => {
-  res.sendFile(path.resolve(frontendDistPath, 'index.html'), (err) => {
-    if (err) {
-      logger.error('Error sending index.html:', { error: err.message, path: req.path });
-      res.status(500).send('Internal server error loading application.');
+// Feedback sentiment analysis endpoint for Cloud Scheduler
+app.post('/api/analyze-feedback', async (req, res) => {
+  try {
+    // Verify the request is from Cloud Scheduler (optional but recommended)
+    const authHeader = req.headers.authorization;
+    if (process.env.NODE_ENV === 'production' && (!authHeader || !authHeader.startsWith('Bearer '))) {
+      logger.warn('Unauthorized feedback analysis request', { headers: req.headers });
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    logger.info('Starting scheduled feedback sentiment analysis via HTTP endpoint');
+    
+    console.log('Processing only unprocessed feedback to avoid duplicates');
+    
+    // Run the analysis for all unprocessed feedback (safer approach)
+    // This prevents duplicates and only processes new feedback
+    await processFeedbackSentiment(null, null, null, true); // true = processAllUnprocessed
+    
+    logger.info('Scheduled feedback sentiment analysis completed successfully');
+    
+    res.status(200).json({
+      success: true,
+      message: 'Feedback sentiment analysis completed successfully (unprocessed only)',
+      mode: 'unprocessed-only',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    logger.error('Error in scheduled feedback sentiment analysis:', error);
+    res.status(500).json({ 
+      error: 'Analysis failed', 
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Health check endpoint for Cloud Run
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    service: 'ai-pilot-feedback-analysis'
   });
 });
+
+// API-only mode for Cloud Run - no static file serving needed
+console.log('Running in API-only mode for Cloud Run deployment');
 
 // Only start the server if this file is run directly
 if (require.main === module) {
   app.listen(port, () => {
-    // logger.info(`Server started and running on port ${port}`, {
-    //   port,
-    //   environment: process.env.NODE_ENV || 'development'
-    // });
+    console.log(`Server started and running on port ${port}`);
+    logger.info(`Server started and running on port ${port}`, {
+      port,
+      environment: process.env.NODE_ENV || 'development'
+    });
   });
 }
 
 // Export the app for testing
 module.exports = app;
+
+// Cloud Functions entry point
+const functions = require('@google-cloud/functions-framework');
+
+// Register an HTTP function with the Functions Framework
+functions.http('analyzeFeedbackHandler', async (req, res) => {
+  try {
+    console.log('Cloud Function triggered for feedback analysis');
+    
+    // Set CORS headers
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+    
+    // Health check endpoint
+    if (req.method === 'GET' && (req.path === '/health' || req.path === '/' || req.path === '')) {
+      console.log('Health check requested');
+      res.status(200).json({
+        status: 'healthy',
+        service: 'feedback-sentiment-analysis',
+        timestamp: new Date().toISOString(),
+        type: 'cloud-function'
+      });
+      return;
+    }
+    
+    // Feedback analysis endpoint
+    if (req.method === 'POST') {
+      console.log('Feedback analysis requested via Cloud Function');
+      
+      console.log('Processing only unprocessed feedback to avoid duplicates');
+      
+      // Run the analysis for all unprocessed feedback (safer approach)
+      // This prevents duplicates and only processes new feedback
+      await processFeedbackSentiment(null, null, null, true); // true = processAllUnprocessed
+      
+      console.log('Feedback sentiment analysis completed successfully');
+      
+      res.status(200).json({
+        success: true,
+        message: 'Feedback sentiment analysis completed successfully (unprocessed only)',
+        mode: 'unprocessed-only',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    
+    // Default response for unsupported methods
+    res.status(405).json({
+      error: 'Method not allowed',
+      supportedMethods: ['GET (health check)', 'POST (analyze feedback)']
+    });
+    
+  } catch (error) {
+    console.error('Error in Cloud Function:', error);
+    res.status(500).json({
+      error: 'Analysis failed',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});

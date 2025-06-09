@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Card, Row, Col, DatePicker, Spin, Alert, Typography, Modal, List, Space, Tag, Table, Button, Select } from 'antd';
+import { Card, Row, Col, DatePicker, Spin, Alert, Typography, Modal, List, Space, Tag, Table, Button, Select, Divider } from 'antd';
 import { Line, Bar, Pie } from 'react-chartjs-2';
 import { getElementAtEvent, getDatasetAtEvent } from 'react-chartjs-2';
 import {
@@ -31,6 +31,7 @@ import {
   fetchVideoAnalyses
 } from '../services/builderService';
 import { parseAnalysis } from '../utils/parsingUtils'; // Import the utility function
+import { LinkOutlined } from '@ant-design/icons';
 
 // Register ChartJS components
 ChartJS.register(
@@ -182,9 +183,12 @@ const gradeColors = {
 const PilotOverview = () => {
   const navigate = useNavigate(); // Initialize useNavigate
   const [trendDateRange, setTrendDateRange] = useState([
-    dayjs().subtract(30, 'days'),
+    dayjs('2025-03-15'),
     dayjs(),
   ]);
+  const [selectedLevel, setSelectedLevel] = useState(null); // Level filter state
+  const [availableLevels, setAvailableLevels] = useState([]); // Available levels
+  const [levelsLoading, setLevelsLoading] = useState(false);
   const [promptTrendData, setPromptTrendData] = useState(null);
   const [sentimentTrendData, setSentimentTrendData] = useState(null);
   const [peerFeedbackTrendData, setPeerFeedbackTrendData] = useState(null);
@@ -213,6 +217,46 @@ const PilotOverview = () => {
   const [comprehensionGradeDistData, setComprehensionGradeDistData] = useState(null); 
   const [gradeDistLoading, setGradeDistLoading] = useState(false);
   const [gradeDistError, setGradeDistError] = useState(null);
+
+  // Add video analysis modal state
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [videoModalVisible, setVideoModalVisible] = useState(false);
+
+  // Fetch available levels on component mount
+  useEffect(() => {
+    const fetchLevels = async () => {
+      setLevelsLoading(true);
+      try {
+        const levels = await fetchData('levels', {});
+        setAvailableLevels(levels);
+      } catch (error) {
+        console.error("Failed to fetch available levels:", error);
+      } finally {
+        setLevelsLoading(false);
+      }
+    };
+
+    fetchLevels();
+  }, []);
+
+  // Auto-set date ranges when specific cohort-level combinations are selected
+  useEffect(() => {
+    if (selectedLevel === 'March 2025 - L1') {
+      // Set date range to 3/15 - 5/9 for L1
+      setTrendDateRange([
+        dayjs('2025-03-15'),
+        dayjs('2025-05-09')
+      ]);
+    } else if (selectedLevel === 'March 2025 - L2') {
+      // Set date range to 3/15 - current date for L2
+      setTrendDateRange([
+        dayjs('2025-03-15'),
+        dayjs()
+      ]);
+    }
+    // If selectedLevel is null or other values, don't change the date range
+    // This allows users to manually change dates without interference
+  }, [selectedLevel]);
 
   // Define specific options for the Prompt Trend Chart
   const promptTrendChartOptions = {
@@ -269,12 +313,18 @@ const PilotOverview = () => {
       const endDate = trendDateRange[1].format('YYYY-MM-DD');
 
       try {
+        // Build params with level filter if selected
+        const params = { startDate, endDate };
+        if (selectedLevel) {
+          params.level = selectedLevel;
+        }
+
         // Fetch prompts data
-        const promptsResponse = await fetchData('trends/prompts', { startDate, endDate });
+        const promptsResponse = await fetchData('trends/prompts', params);
         if (!promptsResponse) throw new Error('No data returned from prompts fetch');
 
         // Fetch peer feedback sentiment data
-        const peerFeedbackResponse = await fetchData('trends/peer-feedback', { startDate, endDate });
+        const peerFeedbackResponse = await fetchData('trends/peer-feedback', params);
         if (!peerFeedbackResponse) throw new Error('No data returned from peer feedback fetch');
 
         // Process prompts data for line chart
@@ -302,7 +352,7 @@ const PilotOverview = () => {
     };
 
     fetchTrends();
-  }, [trendDateRange]);
+  }, [trendDateRange, selectedLevel]);
 
   // Fetch data for NEW tables (separate useEffect)
   useEffect(() => {
@@ -312,11 +362,17 @@ const PilotOverview = () => {
       const startDate = trendDateRange[0].format('YYYY-MM-DD');
       const endDate = trendDateRange[1].format('YYYY-MM-DD');
 
+      // Build params with level filter if selected
+      const params = { startDate, endDate };
+      if (selectedLevel) {
+        params.level = selectedLevel;
+      }
+
       // Fetch All Peer Feedback
       setPeerFeedbackLoading(true);
       setPeerFeedbackError(null);
       try {
-        const feedbackData = await fetchAllPeerFeedback(startDate, endDate);
+        const feedbackData = await fetchData('feedback/all', params);
         setAllPeerFeedbackData(feedbackData);
       } catch (err) {
         console.error("Failed to fetch all peer feedback:", err);
@@ -330,10 +386,10 @@ const PilotOverview = () => {
       setTaskAnalysisError(null);
       try {
         // Fetch task analysis data
-        const analysisData = await fetchAllTaskAnalysis(startDate, endDate);
+        const analysisData = await fetchData('analysis/all', params);
         
         // Fetch video analyses
-        const videoData = await fetchVideoAnalyses(startDate, endDate);
+        const videoData = await fetchData('video-analyses', params);
         
         // Process video data to match the format of task analysis data
         const processedVideoData = videoData.map(video => {
@@ -407,7 +463,7 @@ const PilotOverview = () => {
     };
 
     fetchTableData();
-  }, [trendDateRange]);
+  }, [trendDateRange, selectedLevel]);
 
   // useEffect for Grade Distribution (Fetch separately)
   useEffect(() => {
@@ -422,9 +478,16 @@ const PilotOverview = () => {
       const startDate = trendDateRange[0].format('YYYY-MM-DD');
       const endDate = trendDateRange[1].format('YYYY-MM-DD');
 
+      // Build params with level filter if selected
+      const baseParams = { startDate, endDate };
+      if (selectedLevel) {
+        baseParams.level = selectedLevel;
+      }
+
       try {
         // Fetch Work Product Grades using the correct endpoint
-        const wpResponse = await fetchData('overview/grade-distribution', { startDate, endDate, learningType: 'Work product' });
+        const wpParams = { ...baseParams, learningType: 'Work product' };
+        const wpResponse = await fetchData('overview/grade-distribution', wpParams);
         if (!wpResponse) throw new Error('No data returned for Work Product grade distribution');
         const wpProcessedData = processGradeDistributionData(wpResponse);
         // Store the original API data for the pie chart
@@ -432,7 +495,8 @@ const PilotOverview = () => {
         setWorkProductGradeDistData(wpProcessedData);
 
         // Fetch Comprehension Grades using the correct endpoint
-        const compResponse = await fetchData('overview/grade-distribution', { startDate, endDate, learningType: 'Key concept' });
+        const compParams = { ...baseParams, learningType: 'Key concept' };
+        const compResponse = await fetchData('overview/grade-distribution', compParams);
         if (!compResponse) throw new Error('No data returned for Comprehension grade distribution');
         const compProcessedData = processGradeDistributionData(compResponse);
         // Store the original API data for the pie chart
@@ -448,7 +512,7 @@ const PilotOverview = () => {
     };
 
     fetchAllGradeDistributions();
-  }, [trendDateRange]);
+  }, [trendDateRange, selectedLevel]);
 
   // Helper function to process grade distribution data for STACKED bar chart
   const processGradeDistributionData = (apiData) => {
@@ -712,7 +776,13 @@ const PilotOverview = () => {
     setFeedbackDetails([]); // Clear previous details
 
     try {
-      const response = await fetchData('feedback/details', { date: dateForAPI, category: clickedCategory });
+      // Build params with level filter if selected
+      const params = { date: dateForAPI, category: clickedCategory };
+      if (selectedLevel) {
+        params.level = selectedLevel;
+      }
+      
+      const response = await fetchData('feedback/details', params);
       if (!response) throw new Error('No data returned from feedback details fetch');
       setFeedbackDetails(response);
     } catch (error) {
@@ -721,6 +791,103 @@ const PilotOverview = () => {
     } finally {
       setFeedbackDetailsLoading(false);
     }
+  };
+
+  // Add video analysis modal handler
+  const handleViewVideoDetails = (record) => {
+    setSelectedVideo(record.videoData);
+    setVideoModalVisible(true);
+  };
+
+  // Add parseRationale function for video analysis modal
+  const parseRationale = (jsonString) => {
+    if (!jsonString) return { formattedText: 'No rationale provided.' };
+    
+    try {
+      // Try to parse the JSON
+      const parsed = JSON.parse(jsonString);
+      
+      // Create a structured output
+      const sections = [];
+      
+      // Add overall explanation
+      if (parsed.overall_explanation) {
+        sections.push(
+          <div key="explanation">
+            <Text strong style={{ color: 'var(--color-text-main)' }}>Overall Assessment:</Text>
+            <Paragraph style={{ color: 'var(--color-text-main)', marginLeft: '10px' }}>{parsed.overall_explanation}</Paragraph>
+          </div>
+        );
+      }
+      
+      // Add supporting evidence without the label
+      if (parsed.overall_supporting_evidence) {
+        sections.push(
+          <div key="evidence">
+            <Paragraph style={{ color: 'var(--color-text-main)', marginLeft: '10px' }}>{parsed.overall_supporting_evidence}</Paragraph>
+          </div>
+        );
+      }
+      
+      // Add subcriteria if available
+      if (parsed.sub_criteria && typeof parsed.sub_criteria === 'object') {
+        const criteriaList = [];
+        
+        Object.entries(parsed.sub_criteria).forEach(([key, value], index) => {
+          if (value && typeof value === 'object' && value.score !== undefined) {
+            criteriaList.push(
+              <div key={`criteria-${index}`} style={{ marginBottom: '8px' }}>
+                <Text style={{ color: 'var(--color-text-main)' }}>
+                  <Text strong>{key}:</Text> {value.explanation}
+                </Text>
+                <div style={{ marginLeft: '10px' }}>
+                  <Text type="secondary" style={{ color: '#cccccc' }}>Score: {value.score}/5</Text>
+                  {value.supporting_evidence && (
+                    <div>
+                      <Text type="secondary" style={{ color: '#cccccc', fontSize: '12px' }}>{value.supporting_evidence}</Text>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+        });
+        
+        if (criteriaList.length > 0) {
+          sections.push(
+            <div key="subcriteria">
+              <Divider style={{ margin: '10px 0', borderColor: '#555555' }} />
+              <Text strong style={{ color: 'var(--color-text-main)' }}>Detailed Criteria:</Text>
+              <div style={{ marginTop: '8px', marginLeft: '10px' }}>{criteriaList}</div>
+            </div>
+          );
+        }
+      }
+      
+      // If we successfully parsed but didn't find expected fields
+      if (sections.length === 0) {
+        return { 
+          formattedText: null,
+          rawJson: parsed
+        };
+      }
+      
+      return { 
+        formattedContent: <div>{sections}</div>,
+        parsed: parsed
+      };
+    } catch (e) {
+      console.error("Failed to parse rationale JSON:", e);
+      return { formattedText: jsonString };
+    }
+  };
+
+  // Convert numerical score to letter grade for video analysis
+  const getScoreGrade = (score) => {
+    if (score === null || score === undefined) return 'N/A';
+    // Convert score out of 5 to a percentage (e.g., 3/5 = 60%)
+    const percentage = (score / 5) * 100;
+    return getLetterGrade(percentage);
   };
 
   // --- Table Column Definitions --- 
@@ -876,15 +1043,15 @@ const PilotOverview = () => {
       title: 'Actions',
       key: 'actions',
       render: (_, record) => {
-        // For video analysis entries, navigate to builder details page
+        // For video analysis entries, open video details modal
         if (record.isVideoAnalysis) {
           return (
             <Button 
               size="small" 
-              onClick={() => navigate(`/builders/${record.user_id}`)}
-              disabled={!record.user_id}
+              onClick={() => handleViewVideoDetails(record)}
+              disabled={!record.videoData}
             >
-              View Builder
+              View Details
             </Button>
           );
         }
@@ -918,11 +1085,27 @@ const PilotOverview = () => {
       <Card style={{ marginBottom: '24px', borderRadius: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <Typography.Title level={4} style={{ margin: 0 }}>Overall Trends</Typography.Title>
-          <RangePicker
-            value={trendDateRange}
-            onChange={setTrendDateRange}
-            allowClear={false}
-          />
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <Select
+              placeholder="Cohort + Level"
+              value={selectedLevel}
+              onChange={setSelectedLevel}
+              allowClear
+              style={{ minWidth: '240px' }}
+              loading={levelsLoading}
+            >
+              {availableLevels.map(level => (
+                <Select.Option key={level} value={level}>
+                  {level}
+                </Select.Option>
+              ))}
+            </Select>
+            <RangePicker
+              value={trendDateRange}
+              onChange={setTrendDateRange}
+              allowClear={false}
+            />
+          </div>
         </div>
         {trendsLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
         {trendsError && <Alert message="Error loading trends" description={trendsError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
@@ -996,23 +1179,7 @@ const PilotOverview = () => {
         )}
       </Card>
 
-      {/* NEW Peer Feedback Table Section */}
-      <Card style={{ marginBottom: '24px', borderRadius: '8px' }} title={<Title level={4} style={{ margin: 0 }}>Peer Feedback Details</Title>}>
-         {peerFeedbackLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
-         {peerFeedbackError && <Alert message="Error loading peer feedback" description={peerFeedbackError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
-         {!peerFeedbackLoading && !peerFeedbackError && (
-            <Table
-              columns={overviewPeerFeedbackColumns}
-              dataSource={allPeerFeedbackData}
-              rowKey={(record, index) => record.feedback_id ?? `pf-${index}`}
-              pagination={{ pageSize: 10, position: ['bottomCenter'] }}
-              scroll={{ y: 400 }}
-              style={{ borderRadius: '8px' }}
-            />
-         )}
-      </Card>
-
-      {/* NEW Task Analysis Table Section */}
+      {/* NEW Task Analysis Table Section - MOVED TO BEFORE FEEDBACK */}
        <Card style={{ marginBottom: '24px', borderRadius: '8px' }} title={<Title level={4} style={{ margin: 0 }}>Task Analysis</Title>}>
          {taskAnalysisLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
          {taskAnalysisError && <Alert message="Error loading task analysis" description={taskAnalysisError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
@@ -1023,6 +1190,22 @@ const PilotOverview = () => {
               rowKey={(record, index) => record.auto_id ?? `ta-${index}`}
               pagination={{ pageSize: 10, position: ['bottomCenter'] }}
               scroll={{ x: 'max-content', y: 400 }}
+              style={{ borderRadius: '8px' }}
+            />
+         )}
+      </Card>
+
+      {/* NEW Peer Feedback Table Section - MOVED TO AFTER TASKS */}
+      <Card style={{ marginBottom: '24px', borderRadius: '8px' }} title={<Title level={4} style={{ margin: 0 }}>Peer Feedback Details</Title>}>
+         {peerFeedbackLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
+         {peerFeedbackError && <Alert message="Error loading peer feedback" description={peerFeedbackError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
+         {!peerFeedbackLoading && !peerFeedbackError && (
+            <Table
+              columns={overviewPeerFeedbackColumns}
+              dataSource={allPeerFeedbackData}
+              rowKey={(record, index) => record.feedback_id ?? `pf-${index}`}
+              pagination={{ pageSize: 10, position: ['bottomCenter'] }}
+              scroll={{ y: 400 }}
               style={{ borderRadius: '8px' }}
             />
          )}
@@ -1061,6 +1244,131 @@ const PilotOverview = () => {
           />
         ) : (
           <Text style={{ color: "var(--color-text-main)" }}>No specific feedback found for this category on this day.</Text>
+        )}
+      </Modal>
+
+      {/* Video Analysis Details Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <span style={{ color: "var(--color-text-main)" }}>Video Analysis Details</span>
+            {selectedVideo && selectedVideo.loom_url && (
+              <a 
+                href={selectedVideo.loom_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ color: "#1890ff", fontSize: '14px', fontWeight: 'normal' }}
+              >
+                <LinkOutlined /> Open Video Demo
+              </a>
+            )}
+          </div>
+        }
+        open={videoModalVisible}
+        onCancel={() => setVideoModalVisible(false)}
+        footer={null}
+        width={1200}
+      >
+        {selectedVideo && (
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            <Row gutter={[16, 16]}>
+              <Col span={8}>
+                <Card title={<Text style={{ color: "var(--color-text-main)" }}>Technical</Text>}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Tag className={getGradeTagClass(getScoreGrade(selectedVideo.technical_score))} style={{ fontSize: '18px', padding: '5px 15px' }}>
+                      {getScoreGrade(selectedVideo.technical_score)}
+                    </Tag>
+                    <Text style={{ display: 'block', marginTop: '10px', color: "var(--color-text-main)" }}>
+                      Score: {selectedVideo.technical_score}/5
+                    </Text>
+                  </div>
+                  
+                  <div style={{ marginTop: '15px' }}>
+                    {(() => {
+                      const { formattedContent, formattedText, rawJson } = parseRationale(selectedVideo.technical_score_rationale);
+                      
+                      if (formattedContent) {
+                        return formattedContent;
+                      } else if (formattedText) {
+                        return <Text style={{ color: "var(--color-text-main)", whiteSpace: 'pre-wrap' }}>{formattedText}</Text>;
+                      } else if (rawJson) {
+                        return <Text style={{ color: "var(--color-text-main)", whiteSpace: 'pre-wrap', fontSize: '12px' }}><pre>{JSON.stringify(rawJson, null, 2)}</pre></Text>;
+                      } else {
+                        return <Text style={{ color: "var(--color-text-main)" }}>No rationale available</Text>;
+                      }
+                    })()}
+                  </div>
+                </Card>
+              </Col>
+              
+              <Col span={8}>
+                <Card title={<Text style={{ color: "var(--color-text-main)" }}>Business</Text>}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Tag className={getGradeTagClass(getScoreGrade(selectedVideo.business_score))} style={{ fontSize: '18px', padding: '5px 15px' }}>
+                      {getScoreGrade(selectedVideo.business_score)}
+                    </Tag>
+                    <Text style={{ display: 'block', marginTop: '10px', color: "var(--color-text-main)" }}>
+                      Score: {selectedVideo.business_score}/5
+                    </Text>
+                  </div>
+                  
+                  <div style={{ marginTop: '15px' }}>
+                    {(() => {
+                      const { formattedContent, formattedText, rawJson } = parseRationale(selectedVideo.business_score_rationale);
+                      
+                      if (formattedContent) {
+                        return formattedContent;
+                      } else if (formattedText) {
+                        return <Text style={{ color: "var(--color-text-main)", whiteSpace: 'pre-wrap' }}>{formattedText}</Text>;
+                      } else if (rawJson) {
+                        return <Text style={{ color: "var(--color-text-main)", whiteSpace: 'pre-wrap', fontSize: '12px' }}><pre>{JSON.stringify(rawJson, null, 2)}</pre></Text>;
+                      } else {
+                        return <Text style={{ color: "var(--color-text-main)" }}>No rationale available</Text>;
+                      }
+                    })()}
+                  </div>
+                </Card>
+              </Col>
+              
+              <Col span={8}>
+                <Card title={<Text style={{ color: "var(--color-text-main)" }}>Professional Skills</Text>}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Tag className={getGradeTagClass(getScoreGrade(selectedVideo.professional_skills_score))} style={{ fontSize: '18px', padding: '5px 15px' }}>
+                      {getScoreGrade(selectedVideo.professional_skills_score)}
+                    </Tag>
+                    <Text style={{ display: 'block', marginTop: '10px', color: "var(--color-text-main)" }}>
+                      Score: {selectedVideo.professional_skills_score}/5
+                    </Text>
+                  </div>
+                  
+                  <div style={{ marginTop: '15px' }}>
+                    {(() => {
+                      const { formattedContent, formattedText, rawJson } = parseRationale(selectedVideo.professional_skills_score_rationale);
+                      
+                      if (formattedContent) {
+                        return formattedContent;
+                      } else if (formattedText) {
+                        return <Text style={{ color: "var(--color-text-main)", whiteSpace: 'pre-wrap' }}>{formattedText}</Text>;
+                      } else if (rawJson) {
+                        return <Text style={{ color: "var(--color-text-main)", whiteSpace: 'pre-wrap', fontSize: '12px' }}><pre>{JSON.stringify(rawJson, null, 2)}</pre></Text>;
+                      } else {
+                        return <Text style={{ color: "var(--color-text-main)" }}>No rationale available</Text>;
+                      }
+                    })()}
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+            
+            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+              <Text style={{ color: "var(--color-text-main)", fontSize: '16px' }}>
+                Overall Average: 
+              </Text>
+              <Tag className={getGradeTagClass(getScoreGrade(selectedVideo.average_score))} style={{ fontSize: '18px', padding: '5px 15px', marginLeft: '10px' }}>
+                {getScoreGrade(selectedVideo.average_score)}
+              </Tag>
+            </div>
+          </Space>
         )}
       </Modal>
     </div>

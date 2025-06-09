@@ -1,12 +1,17 @@
 // Removed API_URL constant: const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export const fetchBuilderData = async (startDate, endDate) => {
+export const fetchBuilderData = async (startDate, endDate, level = null) => {
   const effectiveStartDate = startDate || '2000-01-01';
   const effectiveEndDate = endDate || '2100-12-31';
-  console.log('Fetching builder data with dates:', { startDate: effectiveStartDate, endDate: effectiveEndDate });
+  console.log('Fetching builder data with dates:', { startDate: effectiveStartDate, endDate: effectiveEndDate, level });
   
   try {
-    const response = await fetch(`/api/builders?startDate=${effectiveStartDate}&endDate=${effectiveEndDate}`);
+    let url = `/api/builders?startDate=${effectiveStartDate}&endDate=${effectiveEndDate}`;
+    if (level) {
+      url += `&level=${encodeURIComponent(level)}`;
+    }
+    
+    const response = await fetch(url);
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || 'Failed to fetch builder data');

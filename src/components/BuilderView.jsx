@@ -11,9 +11,25 @@ const { Title } = Typography;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
+// Utility to fetch data from API endpoints
+const fetchFromAPI = async (endpoint, params) => {
+  const queryString = new URLSearchParams(params).toString();
+  const response = await fetch(`/api/${endpoint}?${queryString}`);
+  if (!response.ok) {
+    console.error(`HTTP error! status: ${response.status}, url: ${response.url}`)
+    const errorBody = await response.text();
+    console.error('Error body:', errorBody);
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+};
+
 const BuilderView = () => {
   const [dateRange, setDateRange] = useState(null);
-  const [builders, setBuilders] = useState([]);
+  const [selectedLevel, setSelectedLevel] = useState(null); // Level filter state
+  const [availableLevels, setAvailableLevels] = useState([]); // Available levels
+  const [levelsLoading, setLevelsLoading] = useState(false);
+  const [builders, setBuilders] = useState([]); // Initialize as empty array
   const [loading, setLoading] = useState(false);
   const [selectedBuilder, setSelectedBuilder] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -23,6 +39,24 @@ const BuilderView = () => {
   const [error, setError] = useState(null);
   const [builderFilter, setBuilderFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  // Fetch available levels on component mount
+  useEffect(() => {
+    const fetchLevels = async () => {
+      setLevelsLoading(true);
+      try {
+        const levels = await fetchFromAPI('levels', {});
+        setAvailableLevels(levels || []); // Ensure it's always an array
+      } catch (error) {
+        console.error("Failed to fetch available levels:", error);
+        setAvailableLevels([]); // Set to empty array on error
+      } finally {
+        setLevelsLoading(false);
+      }
+    };
+
+    fetchLevels();
+  }, []);
 
   // Function to handle sorting
   const handleSort = (key) => {
@@ -42,7 +76,7 @@ const BuilderView = () => {
   };
 
   // Sort the data based on the current sort configuration
-  const sortedBuilders = [...builders].sort((a, b) => {
+  const sortedBuilders = Array.isArray(builders) ? [...builders].sort((a, b) => {
     if (!sortConfig.key) return 0;
     
     const aValue = a[sortConfig.key];
@@ -60,7 +94,7 @@ const BuilderView = () => {
     return sortConfig.direction === 'asc' 
       ? aValue - bValue
       : bValue - aValue;
-  });
+  }) : []; // Fallback to empty array
 
   const columns = [
     {
@@ -183,8 +217,8 @@ const BuilderView = () => {
       const details = await fetchBuilderDetails(
         record.user_id,
         type,
-        dateRange ? dateRange[0].format('YYYY-MM-DD') : '2000-01-01',
-        dateRange ? dateRange[1].format('YYYY-MM-DD') : '2100-12-31'
+        dateRange && dateRange[0] && dateRange[0].format ? dateRange[0].format('YYYY-MM-DD') : '2000-01-01',
+        dateRange && dateRange[1] && dateRange[1].format ? dateRange[1].format('YYYY-MM-DD') : '2100-12-31'
       );
       setDetailsData(details);
     } catch (error) {
@@ -199,9 +233,9 @@ const BuilderView = () => {
   const handleDateRangeChange = async (dates) => {
     setDateRange(dates);
     if (dates) {
-      await fetchData(dates[0], dates[1]);
+      await fetchBuilderData2(dates[0], dates[1]);
     } else {
-      await fetchData(null, null);
+      await fetchBuilderData2(null, null);
     }
   };
 
@@ -209,18 +243,43 @@ const BuilderView = () => {
     setBuilderFilter(value);
   };
 
-  const fetchData = async (startDate, endDate) => {
+  const handleLevelFilterChange = (value) => {
+    setSelectedLevel(value === 'all' ? null : value);
+  };
+
+  // Re-fetch data when level filter changes
+  useEffect(() => {
+    fetchBuilderData2(
+      dateRange ? dateRange[0] : null,
+      dateRange ? dateRange[1] : null
+    );
+  }, [selectedLevel]); // Will trigger when selectedLevel changes
+
+  const fetchBuilderData2 = async (startDate, endDate) => {
     setLoading(true);
     setError(null);
     try {
+      // Build params object with proper date handling
+      const params = {
+        startDate: startDate && startDate.format ? startDate.format('YYYY-MM-DD') : '2000-01-01',
+        endDate: endDate && endDate.format ? endDate.format('YYYY-MM-DD') : '2100-12-31'
+      };
+      
+      // Add level filter if selected
+      if (selectedLevel) {
+        params.level = selectedLevel;
+      }
+
       const data = await fetchBuilderData(
-        startDate ? startDate.format('YYYY-MM-DD') : '2000-01-01',
-        endDate ? endDate.format('YYYY-MM-DD') : '2100-12-31'
+        params.startDate,
+        params.endDate,
+        params.level // Pass level parameter
       );
-      setBuilders(data);
+      setBuilders(Array.isArray(data) ? data : []); // Ensure it's always an array
     } catch (error) {
       console.error('Error fetching builder data:', error);
       setError('Failed to fetch builder data. Please try again later.');
+      setBuilders([]); // Set to empty array on error
       message.error('Failed to fetch builder data');
     } finally {
       setLoading(false);
@@ -228,7 +287,7 @@ const BuilderView = () => {
   };
 
   useEffect(() => {
-    fetchData(null, null);
+    fetchBuilderData2(null, null);
   }, []);
 
   const renderPeerFeedbackSentiment = (sentiment, record) => {
@@ -285,13 +344,27 @@ const BuilderView = () => {
               }
             >
               <Option value="all">All Builders</Option>
-              {builders
-                .sort((a, b) => a.name.localeCompare(b.name))
+              {Array.isArray(builders) && builders
+                .sort((a, b) => a.name && b.name ? a.name.localeCompare(b.name) : 0)
                 .map(builder => (
                   <Option key={builder.user_id} value={builder.user_id.toString()}>
-                    {builder.name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
+                    {builder.name ? builder.name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : 'Unknown'}
                   </Option>
                 ))}
+            </Select>
+            <Select
+              value={selectedLevel || 'all'}
+              style={{ width: 240 }}
+              onChange={handleLevelFilterChange}
+              placeholder="Cohort + Level"
+              className="level-select"
+              loading={levelsLoading}
+              allowClear={false}
+            >
+              <Option value="all">All Levels</Option>
+              {Array.isArray(availableLevels) && availableLevels.map(level => (
+                <Option key={level} value={level}>{level}</Option>
+              ))}
             </Select>
           </Space>
         </Card>
