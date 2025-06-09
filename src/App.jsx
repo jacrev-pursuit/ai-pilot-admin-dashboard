@@ -7,12 +7,14 @@ import {
   BarChartOutlined,
   SettingOutlined,
   UserOutlined,
-  BookOutlined
+  BookOutlined,
+  CalendarOutlined
 } from '@ant-design/icons';
 import PilotOverview from './components/Dashboard';
 import BuilderView from './components/BuilderView';
 import BuilderDetailsPage from './components/BuilderDetailsPage';
 import AllTaskAnalysisView from './components/AllTaskAnalysisView';
+import WeeklySummary from './components/WeeklySummary';
 import TaskSubmissionDetailPage from './pages/TaskSubmissionDetailPage';
 import TaskDetailPage from './pages/TaskDetailPage';
 
@@ -31,6 +33,11 @@ const Navigation = () => {
       key: '/',
       icon: <DashboardOutlined />,
       label: <Link to="/">Pilot Overview</Link>,
+    },
+    {
+      key: '/weekly-summary',
+      icon: <CalendarOutlined />,
+      label: <Link to="/weekly-summary">Weekly Summary</Link>,
     },
     {
       key: '/builders',
@@ -110,6 +117,7 @@ function App() {
           }}>
             <Routes>
               <Route path="/" element={<PilotOverview />} />
+              <Route path="/weekly-summary" element={<WeeklySummary />} />
               <Route path="/builders" element={<BuilderView />} />
               <Route path="/builders/:builderId" element={<BuilderDetailsPage />} />
               <Route path="/builder-details" element={<BuilderDetailsPage />} />

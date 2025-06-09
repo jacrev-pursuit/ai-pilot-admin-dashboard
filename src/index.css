@@ -307,6 +307,26 @@ h1, h2, h3, h4, h5, h6, .ant-typography {
   color: var(--color-text-secondary) !important;
 }
 
+/* Statistic component text styling for dark theme */
+.ant-statistic {
+  color: var(--color-text-main) !important;
+}
+.ant-statistic-title {
+  color: var(--color-text-secondary) !important;
+  font-weight: 500 !important;
+}
+.ant-statistic-content {
+  color: var(--color-text-main) !important;
+  font-weight: bold !important;
+}
+.ant-statistic-content-value {
+  color: var(--color-text-main) !important;
+}
+.ant-statistic-content-prefix,
+.ant-statistic-content-suffix {
+  color: var(--color-text-main) !important;
+}
+
 /* Tags */
 .ant-tag {
   background: var(--color-bg-hover) !important;

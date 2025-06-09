@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { fetchBuilderData, fetchBuilderDetails } from '../services/builderService';
 import BuilderDetailsModal from './BuilderDetailsModal';
 import { getLetterGrade, getGradeColor, getGradeTagClass } from '../utils/gradingUtils';
+import PeerFeedbackChart from './PeerFeedbackChart';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -26,7 +27,7 @@ const fetchFromAPI = async (endpoint, params) => {
 
 const BuilderView = () => {
   const [dateRange, setDateRange] = useState(null);
-  const [selectedLevel, setSelectedLevel] = useState(null); // Level filter state
+  const [selectedLevel, setSelectedLevel] = useState('March 2025 - L2'); // Level filter state - default to March 2025 L2
   const [availableLevels, setAvailableLevels] = useState([]); // Available levels
   const [levelsLoading, setLevelsLoading] = useState(false);
   const [builders, setBuilders] = useState([]); // Initialize as empty array
@@ -96,6 +97,11 @@ const BuilderView = () => {
       : bValue - aValue;
   }) : []; // Fallback to empty array
 
+  // Calculate max feedback count for scaling
+  const maxFeedbackCount = builders && builders.length > 0 
+    ? Math.max(...builders.map(builder => builder.total_peer_feedback_count || 0))
+    : 100;
+
   const columns = [
     {
       title: (
@@ -135,21 +141,23 @@ const BuilderView = () => {
     },
     {
       title: (
-        <div onClick={() => handleSort('peer_feedback_sentiment')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'peer_feedback_sentiment' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
-          Peer Feedback Sentiment {getSortIcon('peer_feedback_sentiment')}
+        <div onClick={() => handleSort('total_peer_feedback_count')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'total_peer_feedback_count' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Peer Feedback {getSortIcon('total_peer_feedback_count')}
         </div>
       ),
-      dataIndex: 'peer_feedback_sentiment',
-      key: 'peer_feedback_sentiment',
+      dataIndex: 'total_peer_feedback_count',
+      key: 'total_peer_feedback_count',
       width: '20%',
       render: (text, record) => {
-        if (text === null || text === undefined) {
-          return <span>-</span>;
-        }
-        const sentimentTag = renderPeerFeedbackSentiment(text, record);
         return (
           <div onClick={() => handleExpand('peer_feedback', record)} style={{ cursor: 'pointer' }}>
-            {sentimentTag}
+            <PeerFeedbackChart 
+              total_peer_feedback_count={record.total_peer_feedback_count}
+              positive_feedback_count={record.positive_feedback_count}
+              neutral_feedback_count={record.neutral_feedback_count}
+              negative_feedback_count={record.negative_feedback_count}
+              maxFeedbackCount={maxFeedbackCount}
+            />
           </div>
         );
       },
@@ -289,20 +297,6 @@ const BuilderView = () => {
   useEffect(() => {
     fetchBuilderData2(null, null);
   }, []);
-
-  const renderPeerFeedbackSentiment = (sentiment, record) => {
-    if (sentiment === null || sentiment === undefined || sentiment === '') return <span>-</span>;
-    
-    const sentimentClassMap = {
-      'Very Positive': 'sentiment-tag-very-positive',
-      'Positive': 'sentiment-tag-positive',
-      'Neutral': 'sentiment-tag-neutral',
-      'Negative': 'sentiment-tag-negative',
-      'Very Negative': 'sentiment-tag-very-negative'
-    };
-    const sentimentClass = sentimentClassMap[sentiment] || 'sentiment-tag-neutral';
-    return <Tag className={sentimentClass}>{sentiment}</Tag>;
-  };
 
   const renderWorkProductScore = (score) => {
     if (!score) return <span>No data</span>;

@@ -5,6 +5,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
 const { BigQuery } = require('@google-cloud/bigquery');
+const dayjs = require('dayjs'); // Add dayjs import
 const logger = require('./logger');
 const { processFeedbackSentiment } = require('./analyze-feedback-sentiment');
 
@@ -36,7 +37,7 @@ try {
   bigquery = new BigQuery({
     projectId: PROJECT_ID,
     location: BIGQUERY_LOCATION,
-    keyFilename: './server/service-account-key.json',
+    keyFilename: path.join(__dirname, 'service-account-key.json'),
   });
   
   // Validate that all required configuration is present
@@ -165,7 +166,7 @@ app.get('/api/builders', async (req, res) => {
             builder_email, 
             cohort, 
             level,
-            ROW_NUMBER() OVER (PARTITION BY builder_email ORDER BY cohort DESC, level DESC) as rn
+            ROW_NUMBER() OVER (PARTITION BY LOWER(builder_email) ORDER BY cohort DESC, level DESC) as rn
         FROM \`${enrollmentsTable}\`
     ),
     SingleEnrollmentPerUser AS (
@@ -175,21 +176,50 @@ app.get('/api/builders', async (req, res) => {
         WHERE rn = 1
     ),
     BaseMetrics AS (
-        -- Aggregate metrics per user with proper grouping - guaranteed one row per user
+        -- Aggregate metrics per user with detailed peer feedback distribution
         SELECT
             bm.user_id,
             bm.name,
             CONCAT(se.cohort, ' - ', se.level) as level,
             SUM(bm.prompts_sent_today) as total_prompts_sent,
-            SAFE_DIVIDE(SUM(bm.sum_daily_sentiment_score_today), SUM(bm.count_daily_sentiment_score_today)) as avg_daily_sentiment,
-            SAFE_DIVIDE(SUM(bm.sum_peer_feedback_score_today), SUM(bm.count_peer_feedback_score_today)) as avg_peer_feedback_sentiment
+            SAFE_DIVIDE(SUM(bm.sum_daily_sentiment_score_today), SUM(bm.count_daily_sentiment_score_today)) as avg_daily_sentiment
         FROM \`${metricsTable}\` bm
         INNER JOIN \`${usersTable}\` u ON bm.user_id = u.user_id
-        INNER JOIN SingleEnrollmentPerUser se ON u.email = se.builder_email
+        INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
         WHERE bm.metric_date BETWEEN DATE(@startDate) AND DATE(@endDate)
           AND u.role = 'builder'
           ${levelFilterCondition}
         GROUP BY bm.user_id, bm.name, se.cohort, se.level
+    ),
+    -- NEW: Calculate actual individual peer feedback distribution
+    PeerFeedbackDistribution AS (
+        SELECT
+            pf.to_user_id as user_id,
+            COUNT(DISTINCT pf.id) as total_peer_feedback_count,
+            -- Count individual feedback records by sentiment score
+            SUM(CASE 
+                WHEN fsa.sentiment_score > 0.2 THEN 1 
+                ELSE 0 
+            END) as positive_feedback_count,
+            SUM(CASE 
+                WHEN fsa.sentiment_score BETWEEN -0.2 AND 0.2 THEN 1 
+                ELSE 0 
+            END) as neutral_feedback_count,
+            SUM(CASE 
+                WHEN fsa.sentiment_score < -0.2 THEN 1 
+                ELSE 0 
+            END) as negative_feedback_count
+        FROM \`${peerFeedbackTable}\` pf
+        LEFT JOIN \`${sentimentTable}\` fsa ON CAST(pf.id AS STRING) = CAST(fsa.id AS STRING)
+        INNER JOIN \`${usersTable}\` u_to ON pf.to_user_id = u_to.user_id
+        INNER JOIN \`${usersTable}\` u_from ON pf.from_user_id = u_from.user_id
+        INNER JOIN SingleEnrollmentPerUser se ON LOWER(u_to.email) = LOWER(se.builder_email)
+        WHERE DATE(pf.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+          AND u_to.role = 'builder'
+          AND u_from.role = 'builder'
+          AND fsa.sentiment_score IS NOT NULL
+          ${levelFilterCondition.replace('se.', 'se.')} -- Apply same level filter
+        GROUP BY pf.to_user_id
     ),
     -- CTEs for WP/Comp Scores with role and cohort-level filtering
     TaskAnalysis AS (
@@ -198,7 +228,7 @@ app.get('/api/builders', async (req, res) => {
                JSON_EXTRACT_ARRAY(tar.analysis, '$.criteria_met') as criteria_met
         FROM \`${taskAnalysisTable}\` tar
         INNER JOIN \`${usersTable}\` u ON tar.user_id = u.user_id
-        INNER JOIN SingleEnrollmentPerUser se ON u.email = se.builder_email
+        INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
         WHERE tar.curriculum_date BETWEEN DATE(@startDate) AND DATE(@endDate)
           AND tar.learning_type IN ('Work product', 'Key concept')
           AND u.role = 'builder'
@@ -236,7 +266,7 @@ app.get('/api/builders', async (req, res) => {
         FROM EligibleTasksInRange et
         JOIN \`${userTaskProgressTable}\` utp ON et.task_id = utp.task_id
         INNER JOIN \`${usersTable}\` u ON utp.user_id = u.user_id
-        INNER JOIN SingleEnrollmentPerUser se ON u.email = se.builder_email
+        INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
         WHERE et.deliverable_type = 'text' AND utp.status = 'completed'
           AND u.role = 'builder'
           ${levelFilterCondition}
@@ -245,7 +275,7 @@ app.get('/api/builders', async (req, res) => {
         FROM EligibleTasksInRange et
         JOIN \`${taskSubmissionsTable}\` ts ON et.task_id = ts.task_id
         INNER JOIN \`${usersTable}\` u ON ts.user_id = u.user_id
-        INNER JOIN SingleEnrollmentPerUser se ON u.email = se.builder_email
+        INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
         WHERE et.deliverable_type = 'link'
           AND u.role = 'builder'
           ${levelFilterCondition}
@@ -270,17 +300,15 @@ app.get('/api/builders', async (req, res) => {
         WHEN bm.avg_daily_sentiment >= -0.6 THEN 'Negative'
         ELSE 'Very Negative'
       END as daily_sentiment,
-      CASE 
-        WHEN bm.avg_peer_feedback_sentiment IS NULL THEN NULL
-        WHEN bm.avg_peer_feedback_sentiment >= 0.6 THEN 'Very Positive'
-        WHEN bm.avg_peer_feedback_sentiment >= 0.2 THEN 'Positive'
-        WHEN bm.avg_peer_feedback_sentiment >= -0.2 THEN 'Neutral'
-        WHEN bm.avg_peer_feedback_sentiment >= -0.6 THEN 'Negative'
-        ELSE 'Very Negative'
-      END as peer_feedback_sentiment,
+      -- Use detailed peer feedback distribution from individual records
+      COALESCE(pfd.total_peer_feedback_count, 0) as total_peer_feedback_count,
+      COALESCE(pfd.positive_feedback_count, 0) as positive_feedback_count,
+      COALESCE(pfd.neutral_feedback_count, 0) as neutral_feedback_count,
+      COALESCE(pfd.negative_feedback_count, 0) as negative_feedback_count,
       ROUND(wp.avg_wp_score, 2) as work_product_score,
       ROUND(comp.avg_comp_score, 2) as comprehension_score
     FROM BaseMetrics bm
+    LEFT JOIN PeerFeedbackDistribution pfd ON bm.user_id = pfd.user_id
     LEFT JOIN WorkProductAvg wp ON bm.user_id = wp.user_id
     LEFT JOIN ComprehensionAvg comp ON bm.user_id = comp.user_id
     LEFT JOIN UserCompletionCounts ucc ON bm.user_id = ucc.user_id
@@ -1563,6 +1591,244 @@ functions.http('analyzeFeedbackHandler', async (req, res) => {
       error: 'Analysis failed',
       message: error.message,
       timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Add this new endpoint after other API routes, around line 1400
+
+// Weekly Summary Analysis endpoint
+app.get('/api/weekly-summary', async (req, res) => {
+  console.log('Handling request for /api/weekly-summary. BigQuery Client Ready:', !!bigquery);
+  
+  try {
+    const { weekStartDate } = req.query; // Remove level parameter
+    
+    if (!weekStartDate) {
+      return res.status(400).json({ error: 'weekStartDate parameter is required (YYYY-MM-DD format)' });
+    }
+    
+    // Calculate week end date (Sunday to Saturday week)
+    const startDate = weekStartDate;
+    const endDate = dayjs(weekStartDate).add(6, 'days').format('YYYY-MM-DD');
+    
+    console.log(`Generating weekly summary for ${startDate} to ${endDate}`);
+    
+    const query = `
+      WITH WeeklyTasks AS (
+        SELECT DISTINCT
+          t.id as task_id,
+          t.task_title,
+          t.learning_type,
+          cd.day_date as assigned_date
+        FROM \`${tasksTable}\` t
+        LEFT JOIN \`${timeBlocksTable}\` tb ON t.block_id = tb.id
+        LEFT JOIN \`${curriculumDaysTable}\` cd ON tb.day_id = cd.id
+        INNER JOIN \`${taskAnalysisTable}\` ta_exists ON t.id = ta_exists.task_id
+        WHERE cd.day_date >= @startDate
+          AND cd.day_date <= @endDate
+      ),
+      TaskAnalyses AS (
+        SELECT 
+          ta.task_id,
+          ta.user_id,
+          ta.analysis,
+          ta.curriculum_date,
+          ta.auto_id
+        FROM \`${taskAnalysisTable}\` ta
+        INNER JOIN \`${usersTable}\` u ON ta.user_id = u.user_id
+        WHERE u.role = 'builder'
+      ),
+      PeerFeedbackThisWeek AS (
+        SELECT 
+          pf.feedback_text,
+          sa.sentiment_score,
+          sa.sentiment_category,
+          CONCAT(u_from.first_name, ' ', u_from.last_name) as reviewer_name,
+          CONCAT(u_to.first_name, ' ', u_to.last_name) as recipient_name,
+          pf.created_at
+        FROM \`${peerFeedbackTable}\` pf
+        LEFT JOIN \`${sentimentTable}\` sa ON CAST(pf.id AS STRING) = CAST(sa.id AS STRING)
+        LEFT JOIN \`${usersTable}\` u_from ON pf.from_user_id = u_from.user_id
+        LEFT JOIN \`${usersTable}\` u_to ON pf.to_user_id = u_to.user_id
+        WHERE DATE(pf.created_at) >= @startDate
+          AND DATE(pf.created_at) <= @endDate
+          AND u_from.role = 'builder'
+          AND u_to.role = 'builder'
+      ),
+      TaskAnalysis AS (
+        SELECT 
+          wt.task_id,
+          wt.task_title,
+          wt.learning_type,
+          wt.assigned_date,
+          
+          -- Task analysis results count (numerator) - no level filtering
+          COUNT(DISTINCT ta.user_id) as analysis_results_count,
+          
+          -- Dynamic total builders based on task date (denominator)
+          CASE 
+            WHEN wt.assigned_date < '2025-05-17' THEN (
+              SELECT COUNT(DISTINCT LOWER(builder_email))
+              FROM \`${enrollmentsTable}\`
+              WHERE level = 'L1' AND cohort = 'March 2025'
+            )
+            ELSE (
+              SELECT COUNT(DISTINCT LOWER(builder_email))
+              FROM \`${enrollmentsTable}\`
+              WHERE level = 'L2' AND cohort = 'March 2025'
+            )
+          END as total_builders,
+          
+          -- Correct submission rate calculation
+          ROUND(
+            COUNT(DISTINCT ta.user_id) * 100.0 / 
+            CASE 
+              WHEN wt.assigned_date < '2025-05-17' THEN (
+                SELECT COUNT(DISTINCT LOWER(builder_email))
+                FROM \`${enrollmentsTable}\`
+                WHERE level = 'L1' AND cohort = 'March 2025'
+              )
+              ELSE (
+                SELECT COUNT(DISTINCT LOWER(builder_email))
+                FROM \`${enrollmentsTable}\`
+                WHERE level = 'L2' AND cohort = 'March 2025'
+              )
+            END, 1
+          ) as submission_rate,
+          
+          -- Grade distribution from analyses (count distinct auto_id to avoid duplicates)
+          COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 93 THEN ta.auto_id END) as grade_aplus_count,
+          COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 85 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 93 THEN ta.auto_id END) as grade_a_count,
+          COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 80 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 85 THEN ta.auto_id END) as grade_aminus_count,
+          COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 70 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 80 THEN ta.auto_id END) as grade_bplus_count,
+          COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 60 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 70 THEN ta.auto_id END) as grade_b_count,
+          COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 50 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 60 THEN ta.auto_id END) as grade_bminus_count,
+          COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 40 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 50 THEN ta.auto_id END) as grade_cplus_count,
+          COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 40 THEN ta.auto_id END) as grade_c_count,
+          
+          -- Average score
+          ROUND(AVG(CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                         THEN CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) END), 1) as avg_score,
+          
+          -- Feedback analysis
+          STRING_AGG(JSON_EXTRACT_SCALAR(ta.analysis, '$.feedback'), ' | ') as all_feedback
+          
+        FROM WeeklyTasks wt
+        LEFT JOIN TaskAnalyses ta ON wt.task_id = ta.task_id
+        GROUP BY wt.task_id, wt.task_title, wt.learning_type, wt.assigned_date
+      )
+      
+      SELECT 
+        -- Overall summary
+        (SELECT COUNT(*) FROM WeeklyTasks) as total_tasks_assigned,
+        (SELECT COUNT(DISTINCT user_id) FROM TaskAnalyses) as active_builders,
+        (SELECT COUNT(*) FROM PeerFeedbackThisWeek WHERE sentiment_category IN ('Negative', 'Very Negative')) as negative_feedback_count,
+        (SELECT COUNT(*) FROM PeerFeedbackThisWeek) as total_feedback_count,
+        
+        -- Task details as JSON array
+        ARRAY(
+          SELECT AS STRUCT
+            task_id,
+            task_title,
+            learning_type,
+            assigned_date,
+            analysis_results_count,
+            total_builders,
+            submission_rate,
+            grade_aplus_count,
+            grade_a_count, 
+            grade_aminus_count,
+            grade_bplus_count,
+            grade_b_count,
+            grade_bminus_count,
+            grade_cplus_count,
+            grade_c_count,
+            avg_score,
+            all_feedback
+          FROM TaskAnalysis
+          ORDER BY assigned_date DESC
+        ) as task_details,
+        
+        -- Negative feedback details as JSON array
+        ARRAY(
+          SELECT AS STRUCT
+            feedback_text,
+            sentiment_category,
+            reviewer_name,
+            recipient_name,
+            created_at
+          FROM PeerFeedbackThisWeek
+          WHERE sentiment_category IN ('Negative', 'Very Negative')
+          ORDER BY created_at DESC
+        ) as negative_feedback_details
+    `;
+    
+    const options = {
+      query,
+      params: { 
+        startDate,
+        endDate
+      }
+    };
+    
+    console.log('Executing BigQuery query for weekly summary...', { 
+      startDate, 
+      endDate
+    });
+    
+    const [rows] = await bigquery.query(options);
+    console.log(`Weekly summary query finished. Row count: ${rows.length}`);
+    
+    if (rows.length === 0) {
+      return res.json({
+        weekStart: startDate,
+        weekEnd: endDate,
+        summary: {
+          totalTasksAssigned: 0,
+          activeBuilders: 0,
+          negativeFeedbackCount: 0,
+          totalFeedbackCount: 0
+        },
+        taskDetails: [],
+        negativeFeedbackDetails: []
+      });
+    }
+    
+    const result = rows[0];
+    
+    res.json({
+      weekStart: startDate,
+      weekEnd: endDate,
+      summary: {
+        totalTasksAssigned: result.total_tasks_assigned || 0,
+        activeBuilders: result.active_builders || 0,
+        negativeFeedbackCount: result.negative_feedback_count || 0,
+        totalFeedbackCount: result.total_feedback_count || 0
+      },
+      taskDetails: result.task_details || [],
+      negativeFeedbackDetails: result.negative_feedback_details || []
+    });
+    
+  } catch (error) {
+    console.error('Error in weekly summary endpoint:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch weekly summary data',
+      details: error.message 
     });
   }
 });

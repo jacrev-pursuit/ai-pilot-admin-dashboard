@@ -186,7 +186,7 @@ const PilotOverview = () => {
     dayjs('2025-03-15'),
     dayjs(),
   ]);
-  const [selectedLevel, setSelectedLevel] = useState(null); // Level filter state
+  const [selectedLevel, setSelectedLevel] = useState('March 2025 - L2'); // Level filter state - default to March 2025 L2
   const [availableLevels, setAvailableLevels] = useState([]); // Available levels
   const [levelsLoading, setLevelsLoading] = useState(false);
   const [promptTrendData, setPromptTrendData] = useState(null);

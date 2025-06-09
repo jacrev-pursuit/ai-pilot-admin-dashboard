@@ -370,7 +370,7 @@ const CohortTaskDetailsPage = () => {
             columns={submissionColumns}
             dataSource={submissionsData}
             loading={submissionsLoading}
-            rowKey={(record, index) => `${record.user_id}-${record.date?.value || record.date}-${index}`}
+            rowKey={(record) => `${record.user_id}-${record.date?.value || record.date}`}
             pagination={{
                 current: pagination.currentPage,
                 pageSize: pagination.pageSize,
