@@ -252,7 +252,14 @@ const BuilderMetricsTable = () => {
         dataSource={data}
         loading={loading}
         rowKey="user_id"
-        pagination={pagination}
+        pagination={{
+          ...pagination,
+          showSizeChanger: false,
+          showQuickJumper: false,
+          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} builders`,
+          size: 'default',
+          showLessItems: false
+        }}
         onChange={handleTableChange}
         scroll={{ x: 'max-content' }}
       />

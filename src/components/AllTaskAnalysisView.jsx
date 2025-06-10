@@ -203,7 +203,14 @@ const AllTaskAnalysisView = () => {
         dataSource={analysisData}
         loading={loading}
         rowKey="analysis_id" // Use the unique analysis ID as the key
-        pagination={pagination}
+        pagination={{
+          ...pagination,
+          showSizeChanger: false,
+          showQuickJumper: false,
+          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} analyses`,
+          size: 'default',
+          showLessItems: false
+        }}
         onChange={handleTableChange}
         scroll={{ x: 'max-content' }} // Enable horizontal scroll
         size="small"

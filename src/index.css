@@ -134,8 +134,190 @@ html, body {
 
 .ant-table-thead > tr > th {
   background: var(--color-bg-card) !important;
-  color: var(--color-text-secondary) !important;
+  color: #ffffff !important;
   border-bottom: 1px solid var(--color-border-light) !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  overflow: visible !important;
+  word-break: keep-all !important;
+  padding: 12px 16px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  position: relative !important;
+}
+
+/* Ensure header content has proper spacing for icons */
+.ant-table-thead > tr > th .ant-table-header-column {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+/* Specific styling for column headers to ensure visibility */
+.ant-table-thead > tr > th .ant-table-column-title {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+/* Table filter and sort button styling for better visibility */
+.ant-table-thead > tr > th .ant-table-filter-trigger {
+  background: rgba(75, 66, 217, 0.2) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--color-primary) !important;
+  border-radius: 6px !important;
+  padding: 4px 6px !important;
+  margin-left: 6px !important;
+  opacity: 0.8 !important;
+  transition: all 0.2s ease !important;
+  flex-shrink: 0 !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+.ant-table-thead > tr > th .ant-table-filter-trigger:hover {
+  background: var(--color-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--color-primary) !important;
+  opacity: 1 !important;
+  transform: scale(1.05) !important;
+}
+
+.ant-table-thead > tr > th .ant-table-filter-trigger-container {
+  background: transparent !important;
+  flex-shrink: 0 !important;
+}
+
+/* Custom sort arrow styling to match BuilderView */
+.ant-table-thead > tr > th .ant-table-column-sorter {
+  color: #888888 !important;
+  opacity: 0.8 !important;
+  margin-left: 4px !important;
+  transition: all 0.2s ease !important;
+  flex-shrink: 0 !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+.ant-table-thead > tr > th .ant-table-column-sorter-up,
+.ant-table-thead > tr > th .ant-table-column-sorter-down {
+  color: #888888 !important;
+  font-size: 12px !important;
+  opacity: 0.8 !important;
+  transition: all 0.2s ease !important;
+  display: block !important;
+  line-height: 1 !important;
+}
+
+.ant-table-thead > tr > th .ant-table-column-sorter-up:hover,
+.ant-table-thead > tr > th .ant-table-column-sorter-down:hover {
+  color: #4f46e5 !important;
+  opacity: 1 !important;
+  font-size: 14px !important;
+  transform: scale(1.1) !important;
+}
+
+.ant-table-thead > tr > th .ant-table-column-sorter-up.active,
+.ant-table-thead > tr > th .ant-table-column-sorter-down.active {
+  color: #4f46e5 !important;
+  opacity: 1 !important;
+  font-size: 14px !important;
+}
+
+/* Better filter icon styling */
+.ant-table-thead > tr > th .ant-table-filter-trigger .anticon {
+  font-size: 14px !important;
+  color: #ffffff !important;
+}
+
+.ant-table-thead > tr > th .ant-table-filter-trigger:hover .anticon {
+  color: #ffffff !important;
+  transform: scale(1.1) !important;
+}
+
+/* Ensure proper spacing in header for all elements */
+.ant-table-thead > tr > th .ant-table-column-sorters {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  width: 100% !important;
+  justify-content: flex-start !important;
+}
+
+.ant-table-thead > tr > th .ant-table-column-sorters-with-tooltip {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  width: 100% !important;
+}
+
+/* Prevent text wrapping and ensure clean layout */
+.ant-table-thead > tr > th span {
+  white-space: nowrap !important;
+}
+
+/* Fix for narrow columns like "Avg Score" */
+.ant-table-thead > tr > th[data-column-key="avg_score"] {
+  min-width: 120px !important;
+}
+
+.ant-table-thead > tr > th[data-column-key="assigned_date"] {
+  min-width: 100px !important;
+}
+
+/* Filter dropdown styling */
+.ant-table-filter-dropdown {
+  background: var(--color-bg-card) !important;
+  border: 1px solid var(--color-border-light) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.ant-table-filter-dropdown .ant-checkbox-wrapper {
+  color: var(--color-text-main) !important;
+  padding: 6px 12px !important;
+  margin: 0 !important;
+  border-radius: 4px !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.ant-table-filter-dropdown .ant-checkbox-wrapper:hover {
+  background: var(--color-bg-hover) !important;
+}
+
+.ant-table-filter-dropdown .ant-input {
+  background: var(--color-bg-table) !important;
+  color: var(--color-text-main) !important;
+  border: 1px solid var(--color-border-light) !important;
+  border-radius: 6px !important;
+  margin-bottom: 8px !important;
+}
+
+.ant-table-filter-dropdown .ant-btn {
+  background: var(--color-primary) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.ant-table-filter-dropdown .ant-btn:hover {
+  background: var(--color-primary-hover) !important;
+  transform: translateY(-1px) !important;
+}
+
+.ant-table-filter-dropdown .ant-btn-link {
+  color: var(--color-text-secondary) !important;
+  background: transparent !important;
+}
+
+.ant-table-filter-dropdown .ant-btn-link:hover {
+  color: var(--color-primary) !important;
+  background: transparent !important;
 }
 
 .ant-table-tbody > tr > td {
@@ -396,4 +578,123 @@ h1, h2, h3, h4, h5, h6, .ant-typography {
   background: #181f2a !important;
   border-radius: 12px;
   padding: 16px;
+}
+
+/* Pagination styling to match design */
+.ant-pagination {
+  color: var(--color-text-main) !important;
+  text-align: center !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+.ant-pagination .ant-pagination-item {
+  background: var(--color-bg-card) !important;
+  border: 1px solid var(--color-border-light) !important;
+  border-radius: 8px !important;
+  margin: 0 4px !important;
+}
+
+.ant-pagination .ant-pagination-item a {
+  color: var(--color-text-main) !important;
+  font-weight: 500 !important;
+}
+
+.ant-pagination .ant-pagination-item:hover {
+  background: var(--color-bg-hover) !important;
+  border-color: var(--color-primary) !important;
+}
+
+.ant-pagination .ant-pagination-item-active {
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+}
+
+.ant-pagination .ant-pagination-item-active a {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+/* Pagination arrows and ellipsis styling */
+.ant-pagination .ant-pagination-prev,
+.ant-pagination .ant-pagination-next {
+  background: var(--color-bg-card) !important;
+  border: 1px solid var(--color-border-light) !important;
+  border-radius: 8px !important;
+  margin: 0 4px !important;
+}
+
+.ant-pagination .ant-pagination-prev:hover,
+.ant-pagination .ant-pagination-next:hover {
+  background: var(--color-bg-hover) !important;
+  border-color: var(--color-primary) !important;
+}
+
+.ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.ant-pagination .ant-pagination-next .ant-pagination-item-link {
+  color: #ffffff !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.ant-pagination .ant-pagination-jump-prev .ant-pagination-item-link-icon,
+.ant-pagination .ant-pagination-jump-next .ant-pagination-item-link-icon {
+  color: #ffffff !important;
+}
+
+.ant-pagination .ant-pagination-jump-prev .ant-pagination-item-ellipsis,
+.ant-pagination .ant-pagination-jump-next .ant-pagination-item-ellipsis {
+  color: #ffffff !important;
+}
+
+/* Center the total count */
+.ant-pagination .ant-pagination-total-text {
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+/* Pagination options styling */
+.ant-pagination-options {
+  margin-left: 16px !important;
+}
+
+.ant-pagination-options .ant-pagination-options-size-changer {
+  background: var(--color-bg-card) !important;
+  border: 1px solid var(--color-border-light) !important;
+  border-radius: 8px !important;
+  color: var(--color-text-main) !important;
+  padding: 4px 12px !important;
+}
+
+.ant-pagination-options .ant-pagination-options-quick-jumper {
+  color: var(--color-text-main) !important;
+}
+
+.ant-pagination-options .ant-pagination-options-quick-jumper input {
+  background: var(--color-bg-card) !important;
+  border: 1px solid var(--color-border-light) !important;
+  border-radius: 6px !important;
+  color: var(--color-text-main) !important;
+  margin: 0 8px !important;
+}
+
+/* Select dropdown styling for pagination */
+.ant-select-dropdown {
+  background: var(--color-bg-card) !important;
+  border: 1px solid var(--color-border-light) !important;
+  border-radius: 8px !important;
+}
+
+.ant-select-item {
+  color: var(--color-text-main) !important;
+}
+
+.ant-select-item:hover {
+  background: var(--color-bg-hover) !important;
+}
+
+.ant-select-item-option-selected {
+  background: var(--color-primary) !important;
+  color: #ffffff !important;
 }

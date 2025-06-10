@@ -1602,17 +1602,17 @@ app.get('/api/weekly-summary', async (req, res) => {
   console.log('Handling request for /api/weekly-summary. BigQuery Client Ready:', !!bigquery);
   
   try {
-    const { weekStartDate } = req.query; // Remove level parameter
+    const { weekStartDate, weekEndDate } = req.query; // Add weekEndDate parameter
     
     if (!weekStartDate) {
       return res.status(400).json({ error: 'weekStartDate parameter is required (YYYY-MM-DD format)' });
     }
     
-    // Calculate week end date (Sunday to Saturday week)
+    // Use provided endDate or calculate week end date (Sunday to Saturday week) for backward compatibility
     const startDate = weekStartDate;
-    const endDate = dayjs(weekStartDate).add(6, 'days').format('YYYY-MM-DD');
+    const endDate = weekEndDate || dayjs(weekStartDate).add(6, 'days').format('YYYY-MM-DD');
     
-    console.log(`Generating weekly summary for ${startDate} to ${endDate}`);
+    console.log(`Generating summary for ${startDate} to ${endDate}`);
     
     const query = `
       WITH WeeklyTasks AS (
@@ -1694,35 +1694,45 @@ app.get('/api/weekly-summary', async (req, res) => {
                 FROM \`${enrollmentsTable}\`
                 WHERE level = 'L2' AND cohort = 'March 2025'
               )
-            END, 1
+            END, 0
           ) as submission_rate,
           
           -- Grade distribution from analyses (count distinct auto_id to avoid duplicates)
+          -- Exclude scores of 0 which are "Document Access Error"
           COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) > 0
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 93 THEN ta.auto_id END) as grade_aplus_count,
           COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) > 0
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 85 
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 93 THEN ta.auto_id END) as grade_a_count,
           COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) > 0
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 80 
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 85 THEN ta.auto_id END) as grade_aminus_count,
           COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) > 0
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 70 
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 80 THEN ta.auto_id END) as grade_bplus_count,
           COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) > 0
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 60 
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 70 THEN ta.auto_id END) as grade_b_count,
           COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) > 0
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 50 
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 60 THEN ta.auto_id END) as grade_bminus_count,
           COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) > 0
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) >= 40 
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 50 THEN ta.auto_id END) as grade_cplus_count,
           COUNT(DISTINCT CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                     AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) > 0
                      AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) < 40 THEN ta.auto_id END) as grade_c_count,
           
-          -- Average score
+          -- Average score (excluding scores of 0 which are "Document Access Error")
           ROUND(AVG(CASE WHEN JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') IS NOT NULL 
+                         AND CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) > 0
                          THEN CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) END), 1) as avg_score,
           
           -- Feedback analysis
@@ -1828,6 +1838,166 @@ app.get('/api/weekly-summary', async (req, res) => {
     console.error('Error in weekly summary endpoint:', error);
     res.status(500).json({ 
       error: 'Failed to fetch weekly summary data',
+      details: error.message 
+    });
+  }
+});
+
+// Task details endpoint for modal
+app.get('/api/task-details/:taskId', async (req, res) => {
+  try {
+    console.log(`Handling request for /api/task-details/${req.params.taskId}. BigQuery Client Ready: ${!!bigquery}`);
+    
+    if (!bigquery) {
+      return res.status(503).json({ error: 'BigQuery client not ready' });
+    }
+
+    const { taskId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    if (!taskId) {
+      return res.status(400).json({ error: 'Task ID is required' });
+    }
+
+    console.log(`Executing BigQuery query for task details ${taskId}...`);
+
+    const query = `
+      WITH TaskInfo AS (
+        SELECT 
+          t.id as task_id,
+          t.task_title,
+          t.task_description,
+          cd.day_date as assigned_date
+        FROM \`${tasksTable}\` t
+        LEFT JOIN \`${timeBlocksTable}\` tb ON t.block_id = tb.id
+        LEFT JOIN \`${curriculumDaysTable}\` cd ON tb.day_id = cd.id
+        WHERE t.id = @taskId
+      ),
+      BuilderResponses AS (
+        SELECT 
+          ta.task_id,
+          ta.user_id as builder_id,
+          CONCAT(u.first_name, ' ', u.last_name) as builder_name,
+          SAFE_CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) as score,
+          ta.auto_id as submission_id,
+          ta.curriculum_date as submission_date,
+          ta.analyzed_content as response
+        FROM \`${taskAnalysisTable}\` ta
+        INNER JOIN \`${usersTable}\` u ON ta.user_id = u.user_id
+        WHERE ta.task_id = @taskId
+          AND u.role = 'builder'
+          ${startDate && endDate ? 'AND ta.curriculum_date >= DATE(@startDate) AND ta.curriculum_date <= DATE(@endDate)' : ''}
+        ORDER BY ta.curriculum_date DESC
+      ),
+      TaskStats AS (
+        SELECT 
+          COUNT(*) as total_submissions,
+          AVG(CASE WHEN SAFE_CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) > 0 
+                   THEN SAFE_CAST(JSON_EXTRACT_SCALAR(ta.analysis, '$.completion_score') AS FLOAT64) END) as avg_score,
+          COUNT(DISTINCT ta.user_id) as unique_builders
+        FROM \`${taskAnalysisTable}\` ta
+        INNER JOIN \`${usersTable}\` u ON ta.user_id = u.user_id
+        WHERE ta.task_id = @taskId
+          AND u.role = 'builder'
+          ${startDate && endDate ? 'AND ta.curriculum_date >= DATE(@startDate) AND ta.curriculum_date <= DATE(@endDate)' : ''}
+      ),
+      ActiveBuildersCount AS (
+        SELECT 
+          CASE 
+            WHEN ti.assigned_date < '2025-05-17' THEN (
+              SELECT COUNT(DISTINCT LOWER(builder_email))
+              FROM \`${enrollmentsTable}\`
+              WHERE level = 'L1' AND cohort = 'March 2025'
+            )
+            ELSE (
+              SELECT COUNT(DISTINCT LOWER(builder_email))
+              FROM \`${enrollmentsTable}\`
+              WHERE level = 'L2' AND cohort = 'March 2025'
+            )
+          END as total_active_builders
+        FROM TaskInfo ti
+      )
+      SELECT 
+        ti.task_id,
+        ti.task_title,
+        ti.task_description,
+        ti.assigned_date,
+        ts.total_submissions,
+        ts.avg_score,
+        ts.unique_builders,
+        abc.total_active_builders,
+        ROUND((ts.unique_builders / abc.total_active_builders) * 100, 0) as submission_rate,
+        ARRAY_AGG(
+          STRUCT(
+            br.builder_id,
+            br.builder_name,
+            br.score,
+            br.submission_id,
+            br.submission_date,
+            br.response
+          )
+        ) as responses
+      FROM TaskInfo ti
+      CROSS JOIN TaskStats ts
+      CROSS JOIN ActiveBuildersCount abc
+      LEFT JOIN BuilderResponses br ON ti.task_id = br.task_id
+      GROUP BY ti.task_id, ti.task_title, ti.task_description, ti.assigned_date, 
+               ts.total_submissions, ts.avg_score, ts.unique_builders, abc.total_active_builders
+    `;
+
+    const options = {
+      query: query,
+      params: {
+        taskId: parseInt(taskId, 10), // Convert string to integer
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate })
+      },
+      location: BIGQUERY_LOCATION,
+    };
+
+    console.log('Task details query params:', options.params);
+
+    const [rows] = await bigquery.query(options);
+    console.log(`Task details query finished. Row count: ${rows.length}`);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const taskDetails = rows[0];
+    
+    // Clean up the responses array
+    const responses = taskDetails.responses || [];
+    const cleanedResponses = responses
+      .filter(r => r.builder_id) // Remove null entries
+      .map(r => ({
+        builder_id: r.builder_id,
+        builder_name: r.builder_name,
+        score: r.score,
+        submission_id: r.submission_id,
+        submission_date: r.submission_date,
+        response: r.response
+      }));
+
+    const result = {
+      task_id: taskDetails.task_id,
+      task_title: taskDetails.task_title,
+      task_description: taskDetails.task_description,
+      assigned_date: taskDetails.assigned_date,
+      total_submissions: taskDetails.total_submissions || 0,
+      avg_score: taskDetails.avg_score || 0,
+      unique_builders: taskDetails.unique_builders || 0,
+      total_active_builders: taskDetails.total_active_builders || 0,
+      submission_rate: taskDetails.submission_rate || 0,
+      responses: cleanedResponses
+    };
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error in /api/task-details:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch task details',
       details: error.message 
     });
   }

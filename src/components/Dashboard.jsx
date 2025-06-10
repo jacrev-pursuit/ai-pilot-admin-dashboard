@@ -895,6 +895,33 @@ const PilotOverview = () => {
     return 'F';
   };
 
+  // Helper function to calculate overall grade distribution for all tasks in date range
+  const calculateOverallGradeDistribution = (taskAnalysisData) => {
+    if (!taskAnalysisData || taskAnalysisData.length === 0) return {};
+    
+    const gradeCount = {};
+    
+    taskAnalysisData.forEach(item => {
+      try {
+        let completionScore = null;
+        
+        if (item.analysis) {
+          const analysisObj = typeof item.analysis === 'string' ? JSON.parse(item.analysis) : item.analysis;
+          completionScore = analysisObj.completion_score;
+        }
+        
+        if (completionScore !== null && completionScore !== undefined && completionScore !== 0) {
+          const grade = getLetterGrade(completionScore);
+          gradeCount[grade] = (gradeCount[grade] || 0) + 1;
+        }
+      } catch (error) {
+        console.error('Error parsing analysis for grade calculation:', error);
+      }
+    });
+    
+    return gradeCount;
+  };
+
   // --- Table Column Definitions --- 
 
   const overviewPeerFeedbackColumns = [
@@ -1185,7 +1212,35 @@ const PilotOverview = () => {
       </Card>
 
       {/* NEW Task Analysis Table Section - MOVED TO BEFORE FEEDBACK */}
-       <Card style={{ marginBottom: '24px', borderRadius: '8px' }} title={<Title level={4} style={{ margin: 0 }}>Task Analysis</Title>}>
+       <Card 
+         style={{ marginBottom: '24px', borderRadius: '8px' }} 
+         title={
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+             <Title level={4} style={{ margin: 0 }}>Task Analysis</Title>
+             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+               {(() => {
+                 const gradeDistribution = calculateOverallGradeDistribution(allTaskAnalysisData);
+                 const gradeOrder = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'F'];
+                 
+                 return gradeOrder.map(grade => {
+                   const count = gradeDistribution[grade] || 0;
+                   if (count === 0) return null;
+                   
+                   return (
+                     <Tag 
+                       key={grade} 
+                       className={getGradeTagClass(grade)}
+                       style={{ margin: 0, fontSize: '12px' }}
+                     >
+                       {grade}: {count}
+                     </Tag>
+                   );
+                 }).filter(Boolean);
+               })()}
+             </div>
+           </div>
+         }
+       >
          {taskAnalysisLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
          {taskAnalysisError && <Alert message="Error loading task analysis" description={taskAnalysisError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
          {!taskAnalysisLoading && !taskAnalysisError && (
@@ -1193,7 +1248,14 @@ const PilotOverview = () => {
               columns={overviewTaskAnalysisColumns}
               dataSource={allTaskAnalysisData}
               rowKey={(record) => record.auto_id ?? record.id ?? `ta-${record.user_id}-${record.date}`}
-              pagination={{ pageSize: 10, position: ['bottomCenter'] }}
+              pagination={{ 
+                pageSize: 10, 
+                showSizeChanger: false,
+                showQuickJumper: false,
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                size: 'default',
+                showLessItems: false
+              }}
               scroll={{ x: 'max-content', y: 400 }}
               style={{ borderRadius: '8px' }}
             />
@@ -1209,7 +1271,14 @@ const PilotOverview = () => {
               columns={overviewPeerFeedbackColumns}
               dataSource={allPeerFeedbackData}
               rowKey={(record) => record.feedback_id ?? record.id ?? `pf-${record.user_id}-${record.date}`}
-              pagination={{ pageSize: 10, position: ['bottomCenter'] }}
+              pagination={{ 
+                pageSize: 10, 
+                showSizeChanger: false,
+                showQuickJumper: false,
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                size: 'default',
+                showLessItems: false
+              }}
               scroll={{ y: 400 }}
               style={{ borderRadius: '8px' }}
             />

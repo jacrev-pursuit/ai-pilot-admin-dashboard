@@ -376,10 +376,13 @@ const BuilderView = () => {
           rowKey="user_id"
           scroll={{ x: 'max-content' }}
           className="builder-table"
-          pagination={{ 
+          pagination={{
             pageSize: 10,
-            position: ['bottomCenter'],
-            style: { color: 'white' }
+            showSizeChanger: false,
+            showQuickJumper: false,
+            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} builders`,
+            size: 'default',
+            showLessItems: false
           }}
           rowClassName={() => 'table-row'}
           style={{ borderRadius: '8px' }}

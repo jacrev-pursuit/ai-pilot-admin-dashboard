@@ -395,7 +395,14 @@ const IndividualBuilderView = () => {
                   dataSource={peerFeedback} 
                   columns={peerFeedbackColumns} 
                   rowKey="id"
-                  pagination={{ pageSize: 5 }}
+                  pagination={{ 
+                    pageSize: 5, 
+                    showSizeChanger: false,
+                    showQuickJumper: false,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                    size: 'default',
+                    showLessItems: false
+                  }}
                   locale={{ emptyText: 'No peer feedback available' }}
                 />
               </Card>
@@ -407,7 +414,14 @@ const IndividualBuilderView = () => {
                   dataSource={workProduct} 
                   columns={workProductColumns} 
                   rowKey="task_id"
-                  pagination={{ pageSize: 5 }}
+                  pagination={{ 
+                    pageSize: 5, 
+                    showSizeChanger: false,
+                    showQuickJumper: false,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                    size: 'default',
+                    showLessItems: false
+                  }}
                   locale={{ emptyText: 'No work product data available' }}
                 />
               </Card>
@@ -419,7 +433,14 @@ const IndividualBuilderView = () => {
                   dataSource={comprehension} 
                   columns={comprehensionColumns} 
                   rowKey="task_id"
-                  pagination={{ pageSize: 5 }}
+                  pagination={{ 
+                    pageSize: 5, 
+                    showSizeChanger: false,
+                    showQuickJumper: false,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                    size: 'default',
+                    showLessItems: false
+                  }}
                   locale={{ emptyText: 'No comprehension data available' }}
                 />
               </Card>

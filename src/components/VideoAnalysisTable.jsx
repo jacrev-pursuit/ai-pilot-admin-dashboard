@@ -212,7 +212,14 @@ const VideoAnalysisTable = ({ userId = null, dateRange = null }) => {
           dataSource={data} 
           columns={columns} 
           rowKey="video_id"
-          pagination={{ pageSize: 10 }}
+          pagination={{ 
+            pageSize: 10, 
+            showSizeChanger: false,
+            showQuickJumper: false,
+            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} videos`,
+            size: 'default',
+            showLessItems: false
+          }}
         />
       )}
 

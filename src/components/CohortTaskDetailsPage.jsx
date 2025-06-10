@@ -372,10 +372,14 @@ const CohortTaskDetailsPage = () => {
             loading={submissionsLoading}
             rowKey={(record) => `${record.user_id}-${record.date?.value || record.date}`}
             pagination={{
-                current: pagination.currentPage,
-                pageSize: pagination.pageSize,
-                total: pagination.totalItems,
-                showSizeChanger: true,
+              current: pagination.currentPage,
+              pageSize: pagination.pageSize,
+              total: pagination.totalItems,
+              showSizeChanger: false,
+              showQuickJumper: false,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} submissions`,
+              size: 'default',
+              showLessItems: false
             }}
             onChange={handleTableChange}
             scroll={{ x: 'max-content' }}

@@ -342,7 +342,14 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
             columns={columnsToRender}
             dataSource={detailsData}
             rowKey={type === 'peerFeedback' ? 'feedback_id' : 'task_id'}
-            pagination={{ pageSize: 5 }}
+            pagination={{ 
+              pageSize: 5, 
+              showSizeChanger: false,
+              showQuickJumper: false,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+              size: 'default',
+              showLessItems: false
+            }}
             tableLayout="fixed"
           />
         </Space>
