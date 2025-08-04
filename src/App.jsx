@@ -8,15 +8,18 @@ import {
   SettingOutlined,
   UserOutlined,
   BookOutlined,
-  CalendarOutlined
+  CalendarOutlined,
+  StarOutlined
 } from '@ant-design/icons';
 import PilotOverview from './components/Dashboard';
 import BuilderView from './components/BuilderView';
 import BuilderDetailsPage from './components/BuilderDetailsPage';
 import AllTaskAnalysisView from './components/AllTaskAnalysisView';
 import WeeklySummary from './components/WeeklySummary';
+import JuneL2SelectionsView from './components/JuneL2SelectionsView';
 import TaskSubmissionDetailPage from './pages/TaskSubmissionDetailPage';
 import TaskDetailPage from './pages/TaskDetailPage';
+import VideoAnalysisDetailPage from './pages/VideoAnalysisDetailPage';
 
 const { Header, Content } = Layout;
 
@@ -29,26 +32,34 @@ const Navigation = () => {
   const location = useLocation();
   
   const menuItems = [
-    {
-      key: '/',
-      icon: <DashboardOutlined />,
-      label: <Link to="/">Pilot Overview</Link>,
-    },
+    // ARCHIVED: Pilot Overview tab - code preserved but hidden from navigation
+    // {
+    //   key: '/',
+    //   icon: <DashboardOutlined />,
+    //   label: <Link to="/">Pilot Overview</Link>,
+    // },
     {
       key: '/weekly-summary',
       icon: <CalendarOutlined />,
-      label: <Link to="/weekly-summary">Weekly Summary</Link>,
+      label: <Link to="/weekly-summary">Summary</Link>,
     },
     {
-      key: '/builders',
-      icon: <TeamOutlined />,
-      label: <Link to="/builders">Builders</Link>,
+      key: '/june-l2-selections',
+      icon: <StarOutlined />,
+      label: <Link to="/june-l2-selections">June L2 Selections</Link>,
     },
-    {
-      key: '/builder-details',
-      icon: <UserOutlined />,
-      label: <Link to="/builder-details">Builder Details</Link>,
-    },
+    // ARCHIVED: Builders tab - code preserved but hidden from navigation
+    // {
+    //   key: '/builders',
+    //   icon: <TeamOutlined />,
+    //   label: <Link to="/builders">Builders</Link>,
+    // },
+    // ARCHIVED: Builder Details tab - code preserved but hidden from navigation
+    // {
+    //   key: '/builder-details',
+    //   icon: <UserOutlined />,
+    //   label: <Link to="/builder-details">Builder Details</Link>,
+    // },
     // { // Removed Tasks Overview link
     //   key: '/tasks',
     //   icon: <BookOutlined />,
@@ -70,7 +81,7 @@ const Navigation = () => {
         display: 'flex',
         alignItems: 'center',
         width: '100%',
-        maxWidth: '1200px',
+        maxWidth: '1440px',
         margin: '0 auto',
         overflow: 'hidden',
         paddingLeft: '12px'
@@ -105,7 +116,7 @@ function App() {
       <Layout style={{ minHeight: '100vh' }}>
         <Navigation />
         <div style={{ 
-          maxWidth: '1200px', 
+          maxWidth: '1440px', 
           width: '100%', 
           margin: '0 auto',
           padding: '0 16px',
@@ -116,8 +127,12 @@ function App() {
             minHeight: 280
           }}>
             <Routes>
-              <Route path="/" element={<PilotOverview />} />
+              {/* ARCHIVED: Pilot Overview route - redirect to Summary */}
+              <Route path="/" element={<WeeklySummary />} />
               <Route path="/weekly-summary" element={<WeeklySummary />} />
+              <Route path="/june-l2-selections" element={<JuneL2SelectionsView />} />
+              {/* ARCHIVED: Original Pilot Overview route preserved but hidden */}
+              <Route path="/pilot-overview" element={<PilotOverview />} />
               <Route path="/builders" element={<BuilderView />} />
               <Route path="/builders/:builderId" element={<BuilderDetailsPage />} />
               <Route path="/builder-details" element={<BuilderDetailsPage />} />
@@ -126,6 +141,7 @@ function App() {
               {/* <Route path="/tasks/:taskId" element={<CohortTaskDetailsPage />} /> */}
               <Route path="/all-analysis" element={<AllTaskAnalysisView />} />
               <Route path="/submission/:autoId" element={<TaskSubmissionDetailPage />} />
+              <Route path="/video-analysis/:videoId" element={<VideoAnalysisDetailPage />} />
               {/* <Route path="/tasks" element={<TaskOverviewPage />} /> */} {/* Removed Tasks Overview route */}
               <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
             </Routes>

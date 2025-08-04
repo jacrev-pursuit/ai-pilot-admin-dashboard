@@ -45,37 +45,6 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       }
     },
     {
-      title: 'Assessment', // Restore Assessment column
-      key: 'assessment',
-      width: '25%',
-      render: (_, record) => {
-        const analysis = parseAnalysis(record.analysis); // Parse analysis field
-        const score = analysis?.completion_score;
-        const grade = getLetterGrade(score);
-        const criteria = analysis?.criteria_met;
-        const areas = analysis?.areas_for_improvement;
-        if (grade === 'Document Access Error' || (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received')) {
-            return '-';
-        }
-        const criteriaTags = (Array.isArray(criteria) && criteria.length > 0)
-          ? criteria.map(c => <Tag key={`crit-${c}`} className="criteria-met-tag">{c}</Tag>)
-          : null;
-        const areaTags = (Array.isArray(areas) && areas.length > 0)
-          ? areas.map(a => {
-              const label = a === "technical issue with analysis - please try again" ? "tech issue" : a;
-              return <Tag key={`area-${a}`} className="areas-for-improvement-tag">{label}</Tag>;
-            })
-          : null;
-        if (!criteriaTags && !areaTags) return '-';
-        return (
-          <Space wrap size={[0, 8]}>
-            {criteriaTags}
-            {areaTags}
-          </Space>
-        );
-      }
-    },
-    {
       title: 'Feedback',
       key: 'feedback',
       width: '25%',
@@ -99,11 +68,29 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       key: 'actions',
       width: '12%',
       render: (_, record) => {
+        const handleViewDetails = () => {
+          if (record.isVideoAnalysis && record.videoData?.video_id) {
+            // Navigate to video analysis detail page
+            navigate(`/video-analysis/${record.videoData.video_id}`);
+          } else if (record.auto_id) {
+            // Check if this is a fake auto_id for video analysis (starts with "video-")
+            if (record.auto_id.startsWith('video-')) {
+              const videoId = record.auto_id.replace('video-', '');
+              navigate(`/video-analysis/${videoId}`);
+            } else {
+              // Navigate to regular submission detail page
+              navigate(`/submission/${record.auto_id}`);
+            }
+          }
+        };
+
+        const isDisabled = !record.auto_id && !(record.isVideoAnalysis && record.videoData?.video_id);
+
         return (
           <Button 
             size="small" 
-            onClick={() => navigate(`/submission/${record.auto_id}`)}
-            disabled={!record.auto_id}
+            onClick={handleViewDetails}
+            disabled={isDisabled}
           >
             View Details
           </Button>
@@ -143,34 +130,6 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
         return <Tag className={getGradeTagClass(grade)}>{grade}</Tag>;
       }
     },
-     {
-      title: 'Assessment', // Restore Assessment column
-      key: 'assessment',
-      width: '25%',
-      render: (_, record) => {
-        const analysis = parseAnalysis(record.analysis); // Parse analysis field
-        const score = analysis?.completion_score;
-        const grade = getLetterGrade(score);
-        const criteria = analysis?.criteria_met;
-        const areas = analysis?.areas_for_improvement;
-        if (grade === 'Document Access Error' || (Array.isArray(criteria) && criteria.length === 1 && criteria[0] === 'Submission received')) {
-            return '-';
-        }
-        const criteriaTags = (Array.isArray(criteria) && criteria.length > 0)
-          ? criteria.map(c => <Tag key={`crit-${c}`} className="criteria-met-tag">{c}</Tag>)
-          : null;
-        const areaTags = (Array.isArray(areas) && areas.length > 0)
-          ? areas.map(a => <Tag key={`area-${a}`} className="areas-for-improvement-tag">{a}</Tag>)
-          : null;
-        if (!criteriaTags && !areaTags) return '-';
-        return (
-          <Space wrap size={[0, 8]}>
-            {criteriaTags}
-            {areaTags}
-          </Space>
-        );
-      }
-    },
     {
       title: 'Feedback', // Restore Feedback column
       key: 'feedback',
@@ -195,11 +154,29 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
       key: 'actions',
       width: '12%',
       render: (_, record) => {
+        const handleViewDetails = () => {
+          if (record.isVideoAnalysis && record.videoData?.video_id) {
+            // Navigate to video analysis detail page
+            navigate(`/video-analysis/${record.videoData.video_id}`);
+          } else if (record.auto_id) {
+            // Check if this is a fake auto_id for video analysis (starts with "video-")
+            if (record.auto_id.startsWith('video-')) {
+              const videoId = record.auto_id.replace('video-', '');
+              navigate(`/video-analysis/${videoId}`);
+            } else {
+              // Navigate to regular submission detail page
+              navigate(`/submission/${record.auto_id}`);
+            }
+          }
+        };
+
+        const isDisabled = !record.auto_id && !(record.isVideoAnalysis && record.videoData?.video_id);
+
         return (
           <Button 
             size="small" 
-            onClick={() => navigate(`/submission/${record.auto_id}`)}
-            disabled={!record.auto_id}
+            onClick={handleViewDetails}
+            disabled={isDisabled}
           >
             View Details
           </Button>
@@ -310,13 +287,41 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
     columnsToRender = workProductColumns;
   } else if (type === 'comprehension') {
     columnsToRender = comprehensionColumns;
+  } else if (type === 'allTasks') {
+    columnsToRender = workProductColumns; // Use same columns as work product for all tasks
+  } else if (type === 'videoTasks') {
+    // Create special columns for video tasks that include the video link
+    const videoTaskColumns = [
+      ...workProductColumns.slice(0, 2), // Task and Date columns
+      {
+        title: 'Video Link',
+        key: 'video_link',
+        width: '15%',
+        render: (_, record) => {
+          const analysis = parseAnalysis(record.analysis);
+          const loomUrl = analysis?.loom_url;
+          if (loomUrl) {
+            return (
+              <a href={loomUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
+                <span>🎥 View Video</span>
+              </a>
+            );
+          }
+          return '-';
+        }
+      },
+      workProductColumns[2], // Score column
+      workProductColumns[3], // Feedback column
+      workProductColumns[4], // Actions column with "View Details" button
+    ];
+    columnsToRender = videoTaskColumns;
   } else {
     columnsToRender = peerFeedbackColumns;
   }
 
   return (
     <Modal
-      title={<Typography.Text style={{ color: 'var(--color-text-main)' }}>{`${type === 'workProduct' ? 'Work Product' : type === 'comprehension' ? 'Comprehension' : 'Peer Feedback'} Details for ${selectedBuilder?.name || 'Builder'}`}</Typography.Text>}
+      title={<Typography.Text style={{ color: 'var(--color-text-main)' }}>{`${type === 'workProduct' ? 'Work Product' : type === 'comprehension' ? 'Comprehension' : type === 'allTasks' ? 'All Task Assessments' : type === 'videoTasks' ? 'Video Task Assessments' : 'Peer Feedback'} Details for ${selectedBuilder?.name || 'Builder'}`}</Typography.Text>}
       open={visible}
       onCancel={onClose}
       width={1200}
@@ -341,7 +346,7 @@ const BuilderDetailsModal = ({ visible, onClose, type, data, loading, builder })
           <Table
             columns={columnsToRender}
             dataSource={detailsData}
-            rowKey={type === 'peerFeedback' ? 'feedback_id' : 'task_id'}
+            rowKey={type === 'peer_feedback' ? 'feedback_id' : 'auto_id'}
             pagination={{ 
               pageSize: 5, 
               showSizeChanger: false,

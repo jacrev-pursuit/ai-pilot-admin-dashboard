@@ -131,16 +131,6 @@ const BuilderView = () => {
     },
     {
       title: (
-        <div onClick={() => handleSort('prompts_sent')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'prompts_sent' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
-          Prompts Sent {getSortIcon('prompts_sent')}
-        </div>
-      ),
-      dataIndex: 'prompts_sent',
-      key: 'prompts_sent',
-      width: '10%',
-    },
-    {
-      title: (
         <div onClick={() => handleSort('total_peer_feedback_count')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'total_peer_feedback_count' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
           Peer Feedback {getSortIcon('total_peer_feedback_count')}
         </div>
@@ -218,6 +208,8 @@ const BuilderView = () => {
     setSelectedBuilder(record);
     setModalType(type);
     setModalVisible(true);
+    // Scroll to top when modal opens
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setDetailsLoading(true);
     setError(null);
 

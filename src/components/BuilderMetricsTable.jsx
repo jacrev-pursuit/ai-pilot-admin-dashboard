@@ -92,6 +92,8 @@ const BuilderMetricsTable = () => {
 
     setModalData({ builder: record, type: metricType, data: [], loading: true });
     setIsModalVisible(true);
+    // Scroll to top when modal opens
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     try {
       const startDate = dateRange && dateRange.length === 2 ? dateRange[0].format('YYYY-MM-DD') : dayjs().subtract(30, 'days').format('YYYY-MM-DD');

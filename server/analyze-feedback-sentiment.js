@@ -1,13 +1,23 @@
 require('dotenv').config();
 const { BigQuery } = require('@google-cloud/bigquery');
-const OpenAI = require('openai');
 const fs = require('fs').promises;
 const logger = require('./logger');
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Initialize OpenAI client lazily
+let openai;
+
+function getOpenAI() {
+  if (!openai) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY environment variable is required for sentiment analysis');
+    }
+    const OpenAI = require('openai');
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
+  }
+  return openai;
+}
 
 // Initialize BigQuery client
 // Use Application Default Credentials for Cloud Run compatibility
@@ -25,6 +35,9 @@ async function analyzeFeedbackWithGPT(text) {
   }
 
   try {
+    // Only initialize OpenAI when we actually need it
+    const openaiClient = getOpenAI();
+    
     const prompt = `Analyze the following feedback and provide:
 1. Sentiment analysis (score from -1 to 1, magnitude from 0 to 1, and category: Very Negative, Negative, Neutral, Positive, or Very Positive)
 2. A structured summary with the following sections (only include sections that have relevant content):
@@ -54,7 +67,7 @@ Respond in JSON format:
   }
 }`;
 
-    const response = await openai.chat.completions.create({
+    const response = await openaiClient.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,

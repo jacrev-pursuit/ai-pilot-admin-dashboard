@@ -922,7 +922,7 @@ const BuilderDetailsPage = () => {
 
       try {
         // Fetch video analyses first
-        const videoData = await fetchVideoAnalyses(startDate, endDate, selectedBuilderId).catch(e => {
+        const videoData = await fetchVideoAnalyses(startDate, endDate, selectedBuilderId, null).catch(e => {
           console.error('Video analyses fetch error:', e);
           return [];
         });
@@ -978,7 +978,7 @@ const BuilderDetailsPage = () => {
           };
           
           return {
-            task_id: `video-${video.video_id}`, // Create a unique ID with prefix
+            auto_id: `video-${video.video_id}`, // Create a unique ID with prefix
             task_title: video.task_title || 'Video Demo Analysis', // Use the joined task_title or fallback to default
             date: video.submission_date || new Date().toISOString(), // Use the joined submission_date or fallback
             analysis: JSON.stringify(analysisObj),

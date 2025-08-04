@@ -6,7 +6,7 @@ import { getLetterGrade, getGradeTagClass } from '../utils/gradingUtils';
 
 const { Title, Text, Paragraph } = Typography;
 
-const VideoAnalysisTable = ({ userId = null, dateRange = null }) => {
+const VideoAnalysisTable = ({ userId = null, dateRange = null, level = null }) => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [error, setError] = useState(null);
@@ -113,7 +113,7 @@ const VideoAnalysisTable = ({ userId = null, dateRange = null }) => {
         const startDate = dateRange?.[0]?.format('YYYY-MM-DD');
         const endDate = dateRange?.[1]?.format('YYYY-MM-DD');
         
-        const videoData = await fetchVideoAnalyses(startDate, endDate, userId);
+        const videoData = await fetchVideoAnalyses(startDate, endDate, userId, level);
         setData(videoData);
       } catch (err) {
         console.error('Error fetching video analyses:', err);
@@ -125,11 +125,13 @@ const VideoAnalysisTable = ({ userId = null, dateRange = null }) => {
     };
     
     fetchData();
-  }, [userId, dateRange]);
+  }, [userId, dateRange, level]);
 
   const handleViewDetails = (record) => {
     setSelectedVideo(record);
     setModalVisible(true);
+    // Scroll to top when modal opens
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const columns = [

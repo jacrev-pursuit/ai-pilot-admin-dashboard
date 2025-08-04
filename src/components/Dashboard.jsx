@@ -389,7 +389,7 @@ const PilotOverview = () => {
         const analysisData = await fetchData('analysis/all', params);
         
         // Fetch video analyses
-        const videoData = await fetchData('video-analyses', params);
+        const videoData = await fetchVideoAnalyses(startDate, endDate, null, selectedLevel);
         
         // Process video data to match the format of task analysis data
         const processedVideoData = videoData.map(video => {
@@ -773,6 +773,8 @@ const PilotOverview = () => {
     setSelectedFeedbackDate(clickedLabel); // Store display date
     setSelectedFeedbackCategory(clickedCategory);
     setFeedbackModalVisible(true);
+    // Scroll to top when modal opens
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setFeedbackDetails([]); // Clear previous details
 
     try {
@@ -797,6 +799,8 @@ const PilotOverview = () => {
   const handleViewVideoDetails = (record) => {
     setSelectedVideo(record.videoData);
     setVideoModalVisible(true);
+    // Scroll to top when modal opens
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Add parseRationale function for video analysis modal
@@ -1092,7 +1096,15 @@ const PilotOverview = () => {
         return (
           <Button 
             size="small" 
-            onClick={() => navigate(`/submission/${record.auto_id}`)} 
+            onClick={() => {
+              // Check if this is a fake auto_id for video analysis (defensive check)
+              if (record.auto_id.startsWith('video-')) {
+                const videoId = record.auto_id.replace('video-', '');
+                navigate(`/video-analysis/${videoId}`);
+              } else {
+                navigate(`/submission/${record.auto_id}`);
+              }
+            }} 
             disabled={!record.auto_id}
           >
             View Details

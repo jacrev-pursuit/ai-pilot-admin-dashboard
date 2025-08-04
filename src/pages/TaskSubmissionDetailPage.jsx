@@ -62,6 +62,7 @@ const TaskSubmissionDetailPage = () => {
         setLoading(false);
         return;
       }
+      
       setLoading(true);
       setError(null);
       try {
@@ -88,6 +89,16 @@ const TaskSubmissionDetailPage = () => {
     fetchSubmissionDetails();
   }, [autoId]); // Depend on autoId
 
+  // Scroll to top after content is loaded
+  useEffect(() => {
+    if (!loading && (submission || error)) {
+      // Use setTimeout to ensure scroll happens after DOM updates
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 0);
+    }
+  }, [loading, submission, error]);
+
   const analysis = submission ? parseAnalysis(submission.analysis) : null;
   const analysisError = !analysis || analysis.feedback === 'Error parsing analysis data.';
   const grade = analysis?.completion_score !== null && analysis?.completion_score !== undefined ? getLetterGrade(analysis.completion_score) : null;
@@ -95,75 +106,117 @@ const TaskSubmissionDetailPage = () => {
 
   return (
     <div style={{ 
-      padding: '0', 
+      padding: '16px', 
       background: 'var(--color-bg-main)', 
       minHeight: 'calc(100vh - 64px)', 
       color: 'var(--color-text-main)'
     }}>
       <Button 
         icon={<ArrowLeftOutlined />} 
-        onClick={() => navigate(-1)} // Go back to previous page
-        style={{ marginBottom: '24px' }}
+        onClick={() => navigate(-1)}
+        style={{ marginBottom: '16px' }}
+        size="small"
       >
         Back
       </Button>
 
       {loading && <div style={{ textAlign: 'center', padding: '50px 0' }}><Spin size="large" /></div>}
-      {error && !loading && <Alert message="Error" description={error} type="error" showIcon style={{ marginBottom: '24px'}} />}
+      {error && !loading && <Alert message="Error" description={error} type="error" showIcon style={{ marginBottom: '16px'}} />}
       
       {submission && !loading && !error && (
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          <Card bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
-            <div style={{ marginBottom: '8px' }}>
-              <Title level={3} style={{ marginBottom: '4px', color: 'var(--color-text-main)' }}>
-                {submission.task_title || 'Task Details'}
-                {submissionDateFormatted && ` | ${submissionDateFormatted}`}
-              </Title>
-              <Text type="secondary" style={{ fontSize: '1em', color: 'var(--color-text-secondary)' }}>
-                {submission.user_name || 'Unknown'}
-                {!analysisError && grade && (
-                  <>, <Tag className={getGradeTagClass(grade)}>{grade}</Tag></>
-                )}
-              </Text>
+        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+          {/* Compact Header */}
+          <Card bordered={false} style={{ 
+            background: 'var(--color-bg-card)', 
+            marginBottom: '16px', 
+            padding: '16px 20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <Title level={4} style={{ marginBottom: '4px', color: 'var(--color-text-main)' }}>
+                  {submission.task_title || 'Task Details'}
+                </Title>
+                <Text type="secondary" style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+                  {submission.user_name || 'Unknown'}
+                  {submissionDateFormatted && ` • ${submissionDateFormatted}`}
+                </Text>
+              </div>
+              {!analysisError && grade && (
+                <Tag className={getGradeTagClass(grade)} style={{ fontSize: '16px', padding: '4px 12px' }}>
+                  {grade}
+                </Tag>
+              )}
+              {analysis?.completion_score && (
+                <div style={{ textAlign: 'right', marginLeft: '16px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--color-text-main)' }}>
+                    {analysis.completion_score}
+                    {(analysis?.technical_score || analysis?.business_score || analysis?.professional_skills_score) && '/5'}
+                  </div>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>Overall Score</Text>
+                </div>
+              )}
             </div>
           </Card>
 
           {analysisError && (
-            <Alert message="Error parsing analysis data" description="Some or all of the automated analysis could not be displayed." type="warning" showIcon />
+            <Alert message="Error parsing analysis data" type="warning" showIcon style={{ marginBottom: '16px' }} />
           )}
 
           {!analysisError && (
-            <>
+            <Space direction="vertical" size="large" style={{ width: '100%' }}>
+              {/* Analyzed Content */}
               {submission.analyzed_content && (
-                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Analyzed Content</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
-                  <div style={{ background: 'var(--color-bg-main)', padding: '12px', borderRadius: '4px', maxHeight: '300px', overflowY: 'auto' }}>
+                <Card 
+                  title={<Title level={5} style={{ color: 'var(--color-text-main)' }}>Analyzed Content</Title>} 
+                  bordered={false} 
+                  style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}
+                >
+                  <div style={{ 
+                    background: 'var(--color-bg-main)', 
+                    padding: '12px', 
+                    borderRadius: '4px', 
+                    maxHeight: '300px', 
+                    overflowY: 'auto' 
+                  }}>
                     {renderAnalyzedContent(submission.analyzed_content)}
                   </div>
                 </Card>
               )}
 
-              {analysis?.submission_summary && (
-                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Submission Summary</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
-                  <Paragraph style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg-main)', padding: '12px', borderRadius: '4px', color: 'var(--color-text-secondary)' }}>
-                    {analysis.submission_summary}
-                  </Paragraph>
-                </Card>
-              )}
-
+              {/* Main Feedback */}
               {analysis?.feedback && (
-                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Feedback</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
-                  <Paragraph style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg-main)', padding: '12px', borderRadius: '4px', color: 'var(--color-text-secondary)' }}>
+                <Card 
+                  title={<Title level={5} style={{ color: 'var(--color-text-main)' }}>Feedback</Title>} 
+                  bordered={false} 
+                  style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}
+                >
+                  <Paragraph style={{ 
+                    whiteSpace: 'pre-wrap', 
+                    background: 'var(--color-bg-main)', 
+                    padding: '12px', 
+                    borderRadius: '4px', 
+                    color: 'var(--color-text-secondary)' 
+                  }}>
                     {analysis.feedback}
                   </Paragraph>
                 </Card>
               )}
 
+              {/* Criteria Met and Areas for Improvement Row */}
               <Row gutter={[24, 24]}>
                 {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
                   <Col xs={24} md={12}>
-                    <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Criteria Met</Title>} bordered={false} style={{ height: '100%', background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+                    <Card 
+                      title={<Title level={5} style={{ color: 'var(--color-text-main)' }}>Criteria Met</Title>} 
+                      bordered={false} 
+                      style={{ height: '100%', background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}
+                    >
                       <Space wrap size={[8, 8]}>
-                        {analysis.criteria_met.map((item, index) => <Tag className="criteria-met-tag" key={`crit-${index}`}>{item}</Tag>)}
+                        {analysis.criteria_met.map((item, index) => (
+                          <Tag key={`crit-${index}`} color="green" style={{ fontSize: '12px', padding: '4px 8px' }}>
+                            {item}
+                          </Tag>
+                        ))}
                       </Space>
                     </Card>
                   </Col>
@@ -171,40 +224,74 @@ const TaskSubmissionDetailPage = () => {
 
                 {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
                   <Col xs={24} md={12}>
-                    <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Areas for Improvement</Title>} bordered={false} style={{ height: '100%', background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+                    <Card 
+                      title={<Title level={5} style={{ color: 'var(--color-text-main)' }}>Areas for Improvement</Title>} 
+                      bordered={false} 
+                      style={{ height: '100%', background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}
+                    >
                       <Space wrap size={[8, 8]}>
-                        {analysis.areas_for_improvement.map((item, index) => <Tag className="areas-for-improvement-tag" key={`area-${index}`}>{item}</Tag>)}
+                        {analysis.areas_for_improvement.map((item, index) => (
+                          <Tag key={`area-${index}`} color="orange" style={{ fontSize: '12px', padding: '4px 8px' }}>
+                            {item}
+                          </Tag>
+                        ))}
                       </Space>
                     </Card>
                   </Col>
                 )}
               </Row>
 
+              {/* Specific Findings Section */}
               {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
-                <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Specific Findings</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+                <Card 
+                  title={<Title level={5} style={{ color: 'var(--color-text-main)' }}>Specific Findings</Title>} 
+                  bordered={false} 
+                  style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}
+                >
                   <Row gutter={[24, 24]}>
                     {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
                       <Col xs={24} md={12} key={`find-cat-col-${catIndex}`}>
-                        <div key={`find-cat-${catIndex}`} style={{ marginBottom: '20px', paddingLeft: '0', borderLeft: 'none', height: '100%' }}>
-                          <Title level={5} style={{ textTransform: 'capitalize', marginBottom: '10px', textDecoration: 'underline', color: 'var(--color-text-main)'}}>{category.replace(/_/g, ' ')}</Title>
+                        <div style={{ marginBottom: '20px', paddingLeft: '0', borderLeft: 'none', height: '100%' }}>
+                          <Title level={5} style={{ 
+                            textTransform: 'capitalize', 
+                            marginBottom: '16px', 
+                            color: 'var(--color-text-main)',
+                            borderBottom: '2px solid var(--color-text-secondary)',
+                            paddingBottom: '8px'
+                          }}>
+                            {category.replace(/_/g, ' ')}
+                          </Title>
+                          
                           {findings?.strengths && findings.strengths.length > 0 && (
-                            <div style={{ marginBottom: '10px' }}>
-                              <Text strong style={{color: 'var(--color-text-main)'}}>Strengths:</Text>
+                            <div style={{ marginBottom: '16px' }}>
+                              <Text strong style={{ color: 'var(--color-text-main)', fontSize: '14px' }}>Strengths:</Text>
                               <ul style={{ margin: '8px 0 0 20px', padding: 0, listStyleType: 'disc', color: 'var(--color-text-secondary)' }}>
-                                {findings.strengths.map((item, index) => <li key={`str-${catIndex}-${index}`} style={{ marginBottom: '4px'}}>{item}</li>)}
+                                {findings.strengths.map((item, index) => (
+                                  <li key={`str-${catIndex}-${index}`} style={{ marginBottom: '6px', lineHeight: '1.5' }}>
+                                    {item}
+                                  </li>
+                                ))}
                               </ul>
                             </div>
                           )}
+                          
                           {findings?.weaknesses && findings.weaknesses.length > 0 && (
                             <div>
-                              <Text strong style={{color: 'var(--color-text-main)'}}>Weaknesses:</Text>
+                              <Text strong style={{ color: 'var(--color-text-main)', fontSize: '14px' }}>Weaknesses:</Text>
                               <ul style={{ margin: '8px 0 0 20px', padding: 0, listStyleType: 'disc', color: 'var(--color-text-secondary)' }}>
-                                {findings.weaknesses.map((item, index) => <li key={`weak-${catIndex}-${index}`} style={{ marginBottom: '4px'}}>{item}</li>)}
+                                {findings.weaknesses.map((item, index) => (
+                                  <li key={`weak-${catIndex}-${index}`} style={{ marginBottom: '6px', lineHeight: '1.5' }}>
+                                    {item}
+                                  </li>
+                                ))}
                               </ul>
                             </div>
                           )}
+                          
                           {(!findings?.strengths || findings.strengths.length === 0) && (!findings?.weaknesses || findings.weaknesses.length === 0) && (
-                            <Text type="secondary" style={{color: 'var(--color-text-muted)'}}>No specific strengths or weaknesses noted for this category.</Text>
+                            <Text type="secondary" style={{ color: 'var(--color-text-muted)' }}>
+                              No specific strengths or weaknesses noted for this category.
+                            </Text>
                           )}
                         </div>
                       </Col>
@@ -212,11 +299,12 @@ const TaskSubmissionDetailPage = () => {
                   </Row>
                 </Card>
               )}
-            </>
+            </Space>
           )}
-        </Space>
+        </div>
       )}
-       {!submission && !loading && !error && (
+      
+      {!submission && !loading && !error && (
         <Alert message="Submission Not Found" description="The requested submission could not be found or is unavailable." type="warning" showIcon />
       )}
     </div>

@@ -136,7 +136,7 @@ export const fetchTaskGradeDistribution = async (taskId, startDate, endDate) => 
 };
 
 // Fetch video analyses
-export const fetchVideoAnalyses = async (startDate, endDate, userId = null) => {
+export const fetchVideoAnalyses = async (startDate, endDate, userId = null, level = null) => {
   const effectiveStartDate = startDate || '2000-01-01';
   const effectiveEndDate = endDate || '2100-12-31';
   
@@ -144,6 +144,10 @@ export const fetchVideoAnalyses = async (startDate, endDate, userId = null) => {
   
   if (userId) {
     url += `&userId=${userId}`;
+  }
+  
+  if (level) {
+    url += `&level=${encodeURIComponent(level)}`;
   }
   
   try {

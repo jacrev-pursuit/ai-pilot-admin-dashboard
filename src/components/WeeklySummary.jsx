@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, DatePicker, Select, Typography, Spin, Alert, Table, Tag, Progress, Divider, Space, Button, Statistic, Modal } from 'antd';
-import { CalendarOutlined, UserOutlined, FileTextOutlined, AlertOutlined, EyeOutlined } from '@ant-design/icons';
+import { Card, Row, Col, DatePicker, Select, Typography, Spin, Alert, Table, Tag, Progress, Divider, Space, Button, Statistic, Modal, Switch, Pagination, message } from 'antd';
+import { CalendarOutlined, UserOutlined, FileTextOutlined, AlertOutlined, EyeOutlined, TrophyOutlined, BookOutlined, LinkOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getLetterGrade, getGradeTagClass } from '../utils/gradingUtils';
+import { Link } from 'react-router-dom';
+import PeerFeedbackChart from './PeerFeedbackChart';
+import BuilderDetailsModal from './BuilderDetailsModal';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
 
 // Grade colors for charts - updated to match detailed grading system
 const gradeColors = {
@@ -19,14 +23,62 @@ const gradeColors = {
   'C': '#cc6900'   // Light orange
 };
 
+// Helper function to detect if content is a URL
+const isURL = (str) => {
+  if (!str || typeof str !== 'string') return false;
+  const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
+  return urlRegex.test(str);
+};
+
+// Helper function to parse and render analyzed content (from TaskSubmissionDetailPage)
+const parseAnalysisForModal = (analysisString) => {
+  if (!analysisString) return null;
+  try {
+    const cleanedString = analysisString
+      .replace(/\n/g, '\n')
+      .replace(/\t/g, '\t')
+      .replace(/\\"/g, '"');
+    return JSON.parse(cleanedString);
+  } catch (error) {
+    console.error("Failed to parse analysis JSON:", error, "String:", analysisString);
+    return {
+        completion_score: null,
+        criteria_met: [],
+        areas_for_improvement: [],
+        feedback: 'Error parsing analysis data.'
+    };
+  }
+};
+
+// Helper function to render analyzed content
+const renderAnalyzedContent = (content) => {
+  if (!content) return '-';
+  const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
+  try {
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].type === 'link' && typeof parsed[0].content === 'string') {
+      const url = parsed[0].content;
+       if (urlRegex.test(url)) { 
+         return <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>{url}</a>;
+       } else {
+         return <Text style={{ whiteSpace: 'pre-wrap', fontSize: '12px', color: 'var(--color-text-secondary)' }}><pre>{JSON.stringify(parsed, null, 2)}</pre></Text>;
+       }
+    }
+  } catch (e) {}
+  if (typeof content === 'string' && urlRegex.test(content)) {
+    return <a href={content} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>{content}</a>;
+  }
+  return <Text style={{ whiteSpace: 'pre-wrap', fontSize: '12px', color: 'var(--color-text-secondary)' }}><pre>{content}</pre></Text>;
+};
+
 const WeeklySummary = () => {
   const [startDate, setStartDate] = useState(
-    // Default to 7 days ago
-    dayjs().subtract(6, 'days').startOf('day')
+    // Default to start of March 2025 to capture cohort activity
+    dayjs('2025-03-01').startOf('day')
   );
   const [endDate, setEndDate] = useState(
-    // Default to today
-    dayjs().endOf('day')
+    // Default to end of August 2025 to capture full cohort period
+    dayjs('2025-08-31').endOf('day')
   );
   const [selectedLevel, setSelectedLevel] = useState('March 2025 - L2');
   const [availableLevels, setAvailableLevels] = useState([]);
@@ -36,6 +88,25 @@ const WeeklySummary = () => {
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedTaskDetails, setSelectedTaskDetails] = useState(null);
   const [loadingTaskDetails, setLoadingTaskDetails] = useState(false);
+  const [showNegativeFeedback, setShowNegativeFeedback] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [modalData, setModalData] = useState(null);
+  
+  // Add new state for detailed analysis modal
+  const [analysisModalVisible, setAnalysisModalVisible] = useState(false);
+  const [selectedAnalysisResponse, setSelectedAnalysisResponse] = useState(null);
+  
+  // Builders table state
+  const [builders, setBuilders] = useState([]);
+  const [buildersLoading, setBuildersLoading] = useState(false);
+  const [buildersError, setBuildersError] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState('');
+  const [detailsData, setDetailsData] = useState([]);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [selectedBuilder, setSelectedBuilder] = useState(null);
 
   // Fetch available levels
   useEffect(() => {
@@ -58,29 +129,72 @@ const WeeklySummary = () => {
     }
   }, [startDate, endDate, selectedLevel]);
 
+  // Re-fetch data when level filter changes
+  useEffect(() => {
+    if (summaryData) {
+      fetchBuildersData();
+    }
+  }, [selectedLevel]); // Will trigger when selectedLevel changes
+
   const fetchDateRangeSummary = async () => {
     setLoading(true);
-    setError(null);
-    
     try {
       const params = new URLSearchParams({
         weekStartDate: startDate.format('YYYY-MM-DD'),
-        weekEndDate: endDate.format('YYYY-MM-DD'),
-        ...(selectedLevel && { level: selectedLevel })
+        weekEndDate: endDate.format('YYYY-MM-DD')
       });
       
-      const response = await fetch(`/api/weekly-summary?${params}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Add level filter if selected
+      if (selectedLevel) {
+        params.append('level', selectedLevel);
       }
-      
+
+      const response = await fetch(`/api/weekly-summary?${params}`);
       const data = await response.json();
-      setSummaryData(data);
+      
+      if (response.ok) {
+        setSummaryData(data);
+      } else {
+        console.error('Error fetching summary:', data.error);
+      }
     } catch (error) {
-      console.error('Error fetching date range summary:', error);
-      setError(error.message);
+      console.error('Error fetching summary:', error);
     } finally {
       setLoading(false);
+    }
+    
+    // Fetch builders data for the same date range
+    await fetchBuildersData();
+  };
+
+  // Fetch builders data
+  const fetchBuildersData = async () => {
+    setBuildersLoading(true);
+    setBuildersError(null);
+    try {
+      const params = new URLSearchParams({
+        startDate: startDate.format('YYYY-MM-DD'),
+        endDate: endDate.format('YYYY-MM-DD')
+      });
+      
+      // Add level filter if selected
+      if (selectedLevel) {
+        params.append('level', selectedLevel);
+      }
+
+      const response = await fetch(`/api/builders?${params}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch builders data');
+      }
+      const data = await response.json();
+      setBuilders(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching builders data:', error);
+      setBuildersError('Failed to fetch builders data. Please try again later.');
+      setBuilders([]);
+      message.error('Failed to fetch builders data');
+    } finally {
+      setBuildersLoading(false);
     }
   };
 
@@ -264,6 +378,53 @@ const WeeklySummary = () => {
     );
   };
 
+  // Helper function to render builder grade distribution as horizontal bar
+  const renderBuilderGradeDistribution = (record) => {
+    const grades = {
+      'C': record.grade_c_count || 0,
+      'C+': record.grade_cplus_count || 0,
+      'B-': record.grade_bminus_count || 0,
+      'B': record.grade_b_count || 0,
+      'B+': record.grade_bplus_count || 0,
+      'A-': record.grade_aminus_count || 0,
+      'A': record.grade_a_count || 0,
+      'A+': record.grade_aplus_count || 0
+    };
+
+    const total = record.total_graded_tasks || 0;
+    
+    if (total === 0) {
+      return <Text type="secondary" style={{ fontSize: '12px' }}>No grades yet</Text>;
+    }
+
+    return (
+      <div style={{ width: '120px' }}>
+        <div style={{ display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#2d2d2d' }}>
+          {Object.entries(grades).map(([grade, count]) => {
+            if (count === 0) return null;
+            const percentage = (count / total) * 100;
+            return (
+              <div
+                key={grade}
+                style={{
+                  width: `${percentage}%`,
+                  backgroundColor: gradeColors[grade],
+                  height: '100%'
+                }}
+                title={`${grade}: ${count} (${percentage.toFixed(1)}%)`}
+              />
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#8c8c8c', marginTop: '2px' }}>
+          <span>C</span>
+          <span>Total: {total}</span>
+          <span>A+</span>
+        </div>
+      </div>
+    );
+  };
+
   // Helper function to render overall grade distribution as horizontal bar (like individual tasks)
   const renderOverallGradeDistribution = (taskDetails) => {
     if (!taskDetails || taskDetails.length === 0) return null;
@@ -387,9 +548,21 @@ const WeeklySummary = () => {
   const handleViewDetails = async (taskRecord) => {
     setLoadingTaskDetails(true);
     setDetailsModalVisible(true);
+    // Scroll to top when modal opens
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     
     try {
-      const response = await fetch(`/api/task-details/${taskRecord.task_id}?startDate=${startDate.format('YYYY-MM-DD')}&endDate=${endDate.format('YYYY-MM-DD')}`);
+      const params = new URLSearchParams({
+        startDate: startDate.format('YYYY-MM-DD'),
+        endDate: endDate.format('YYYY-MM-DD')
+      });
+      
+      // Add level filter if selected
+      if (selectedLevel) {
+        params.append('level', selectedLevel);
+      }
+
+      const response = await fetch(`/api/task-details/${taskRecord.task_id}?${params}`);
       if (!response.ok) {
         throw new Error('Failed to fetch task details');
       }
@@ -557,12 +730,221 @@ const WeeklySummary = () => {
     },
   ];
 
+  // Builders table sorting and utilities
+  const handleSort = (key) => {
+    let direction = 'desc';
+    if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) {
+      return '⇅';
+    }
+    return sortConfig.direction === 'asc' ? '↑' : '↓';
+  };
+
+  // Sort builders based on current sort config
+  const sortedBuilders = builders && builders.length > 0 ? [...builders].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    
+    const aValue = a[sortConfig.key];
+    const bValue = b[sortConfig.key];
+    
+    if (aValue === null || aValue === undefined) return 1;
+    if (bValue === null || bValue === undefined) return -1;
+    
+    if (typeof aValue === 'string') {
+      return sortConfig.direction === 'asc' 
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    }
+    
+    return sortConfig.direction === 'asc' 
+      ? aValue - bValue
+      : bValue - aValue;
+  }) : [];
+
+  // Calculate max feedback count for scaling
+  const maxFeedbackCount = builders && builders.length > 0 
+    ? Math.max(...builders.map(builder => builder.total_peer_feedback_count || 0))
+    : 100;
+
+  // Builders table columns
+  const buildersColumns = [
+    {
+      title: (
+        <div onClick={() => handleSort('name')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'name' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Builder Name {getSortIcon('name')}
+        </div>
+      ),
+      dataIndex: 'name',
+      key: 'name',
+      width: '10%',
+      render: (text, record) => (
+        <Link to={`/builders/${record.user_id}`}>
+          {text.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
+        </Link>
+      ),
+    },
+    {
+      title: (
+        <div onClick={() => handleSort('attendance_percentage')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'attendance_percentage' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Attendance {getSortIcon('attendance_percentage')}
+        </div>
+      ),
+      dataIndex: 'attendance_percentage',
+      key: 'attendance_percentage',
+      width: '10%',
+      render: (text, record) => {
+        const attendancePercentage = record.attendance_percentage || 0;
+        const daysAttended = record.days_attended || 0;
+        const totalDays = record.total_curriculum_days || 0;
+        
+        return (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: attendancePercentage >= 90 ? '#52c41a' : attendancePercentage >= 80 ? '#faad14' : '#ff4d4f' }}>
+              {attendancePercentage}%
+            </div>
+            <div style={{ fontSize: '11px', color: '#8c8c8c' }}>
+              {daysAttended}/{totalDays} days
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      title: (
+        <div onClick={() => handleSort('tasks_completed_percentage')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'tasks_completed_percentage' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Tasks Completed {getSortIcon('tasks_completed_percentage')}
+        </div>
+      ),
+      dataIndex: 'tasks_completed_percentage',
+      key: 'tasks_completed_percentage',
+      width: '10%',
+      render: (text) => text === null ? '-' : `${text}%`,
+    },
+    {
+      title: (
+        <div onClick={() => handleSort('total_peer_feedback_count')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'total_peer_feedback_count' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Peer Feedback {getSortIcon('total_peer_feedback_count')}
+        </div>
+      ),
+      dataIndex: 'total_peer_feedback_count',
+      key: 'total_peer_feedback_count',
+      width: '20%',
+      render: (text, record) => {
+        return (
+          <div onClick={() => handleBuilderExpand('peer_feedback', record)} style={{ cursor: 'pointer' }}>
+            <PeerFeedbackChart 
+              total_peer_feedback_count={record.total_peer_feedback_count}
+              positive_feedback_count={record.positive_feedback_count}
+              neutral_feedback_count={record.neutral_feedback_count}
+              negative_feedback_count={record.negative_feedback_count}
+              maxFeedbackCount={maxFeedbackCount}
+            />
+          </div>
+        );
+      },
+    },
+    {
+      title: (
+        <div onClick={() => handleSort('total_graded_tasks')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: sortConfig.key === 'total_graded_tasks' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Overall Task Score {getSortIcon('total_graded_tasks')}
+        </div>
+      ),
+      dataIndex: 'total_graded_tasks',
+      key: 'total_graded_tasks',
+      width: '20%',
+      render: (text, record) => {
+        return (
+          <div onClick={() => handleBuilderExpand('allTasks', record)} style={{ cursor: 'pointer' }}>
+            {renderBuilderGradeDistribution(record)}
+          </div>
+        );
+      },
+    },
+    {
+      title: (
+        <div onClick={() => handleSort('video_tasks_completed')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: sortConfig.key === 'video_tasks_completed' ? 'bold' : 'normal', height: '32px', whiteSpace: 'nowrap' }}>
+          Video Tasks {getSortIcon('video_tasks_completed')}
+        </div>
+      ),
+      dataIndex: 'video_tasks_completed',
+      key: 'video_tasks_completed',
+      width: '15%',
+      render: (text, record) => {
+        const videoCount = record.video_tasks_completed || 0;
+        const avgScore = record.avg_video_score;
+        
+        if (videoCount === 0) {
+          return <Text type="secondary" style={{ fontSize: '12px', textAlign: 'center', width: '100%', display: 'block' }}>No videos</Text>;
+        }
+        
+        const grade = avgScore ? getLetterGrade(avgScore) : null;
+        
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
+              {videoCount} video{videoCount !== 1 ? 's' : ''}
+            </div>
+            {grade && (
+              <Tag 
+                className={getGradeTagClass(grade)} 
+                style={{ fontSize: '11px', margin: 0, cursor: 'pointer' }}
+                onClick={() => handleBuilderExpand('videoTasks', record)}
+              >
+                {grade}
+              </Tag>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
+  // Handle builder modal expansion
+  const handleBuilderExpand = async (type, record) => {
+    setSelectedBuilder(record);
+    setModalType(type);
+    setModalVisible(true);
+    // Scroll to top when modal opens
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setDetailsLoading(true);
+    setBuildersError(null);
+
+    try {
+      const response = await fetch(`/api/builders/${record.user_id}/details?type=${type}&startDate=${startDate.format('YYYY-MM-DD')}&endDate=${endDate.format('YYYY-MM-DD')}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch builder details');
+      }
+      const details = await response.json();
+      setDetailsData(details);
+    } catch (error) {
+      console.error('Error fetching details:', error);
+      setBuildersError('Failed to fetch builder details. Please try again later.');
+      message.error('Failed to fetch details');
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  // Helper function to handle detailed analysis view
+  const handleViewAnalysisDetails = (response) => {
+    setSelectedAnalysisResponse(response);
+    setAnalysisModalVisible(true);
+    // Scroll to top when modal opens
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '50px' }}>
         <Spin size="large" />
         <div style={{ marginTop: '20px' }}>
-          <Text>Generating weekly summary...</Text>
+          <Text>Generating summary...</Text>
         </div>
       </div>
     );
@@ -571,7 +953,7 @@ const WeeklySummary = () => {
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Title level={2}>Date Range Analysis</Title>
+        <Title level={2}>Summary</Title>
         <Space>
           <DatePicker
             value={startDate}
@@ -701,27 +1083,129 @@ const WeeklySummary = () => {
             />
           </Card>
 
-          {/* Negative Feedback Section */}
-          {summaryData.negativeFeedbackDetails.length > 0 && (
+
+          {/* Builders Table Section */}
+          <Card 
+            title={
+              <span style={{ color: '#ffffff' }}>
+                <UserOutlined /> Builder Performance Overview
+              </span>
+            }
+            style={{ marginBottom: '24px' }}
+          >
+            {buildersLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}
+            {buildersError && <Alert message="Error loading builders data" description={buildersError} type="error" showIcon style={{ marginBottom: '16px'}}/>}
+            {!buildersLoading && !buildersError && (
+              <Table
+                columns={buildersColumns}
+                dataSource={sortedBuilders}
+                rowKey="user_id"
+                scroll={{ x: 'max-content' }}
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: false,
+                  showQuickJumper: false,
+                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} builders`,
+                  size: 'default',
+                  showLessItems: false
+                }}
+                style={{ borderRadius: '8px' }}
+              />
+            )}
+          </Card>
+
+          {/* Peer Feedback Section - Moved to bottom */}
+          {summaryData.allFeedbackDetails && summaryData.allFeedbackDetails.length > 0 && (
             <Card 
               title={
-                <span style={{ color: '#ffffff' }}>
-                  <AlertOutlined /> Negative Feedback This Week
-                </span>
-              }
-            >
-              {summaryData.negativeFeedbackDetails.map((feedback, index) => (
-                <div key={index} style={{ marginBottom: '16px', padding: '12px', border: '1px solid #808080', borderRadius: '6px' }}>
-                  <div style={{ marginBottom: '8px' }}>
-                    <Tag className="sentiment-tag-negative">{feedback.sentiment_category}</Tag>
-                    <Text strong>{feedback.reviewer_name}</Text> → <Text strong>{feedback.recipient_name}</Text>
-                    <Text type="secondary" style={{ float: 'right' }}>
-                      {dayjs(feedback.created_at?.value || feedback.created_at).format('MMM D, HH:mm')}
-                    </Text>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <span style={{ color: '#ffffff' }}>
+                    <AlertOutlined /> Peer Feedback
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Text style={{ color: '#ffffff', fontSize: '14px' }}>Show negative only</Text>
+                    <Switch 
+                      checked={showNegativeFeedback}
+                      onChange={setShowNegativeFeedback}
+                      size="small"
+                    />
                   </div>
-                  <Text>{feedback.feedback_text}</Text>
                 </div>
-              ))}
+              }
+              style={{ marginBottom: '24px' }}
+            >
+              <Table
+                columns={[
+                  { 
+                    title: 'Date', 
+                    dataIndex: 'created_at', 
+                    key: 'created_at', 
+                    width: '15%',
+                    render: (ts) => ts ? dayjs(ts?.value || ts).format('MMM D, YYYY') : 'N/A', 
+                    sorter: (a, b) => dayjs(a.created_at?.value || a.created_at).unix() - dayjs(b.created_at?.value || b.created_at).unix(), 
+                    sortDirections: ['descend', 'ascend']
+                  },
+                  { 
+                    title: 'Reviewer',
+                    dataIndex: 'reviewer_name',
+                    key: 'reviewer_name',
+                    width: '15%',
+                    render: (text) => text || 'Unknown',
+                    sorter: (a, b) => (a.reviewer_name || '').localeCompare(b.reviewer_name || ''),
+                  },
+                   { 
+                    title: 'Recipient',
+                    dataIndex: 'recipient_name',
+                    key: 'recipient_name',
+                    width: '15%',
+                    render: (text) => text || 'Unknown',
+                     sorter: (a, b) => (a.recipient_name || '').localeCompare(b.recipient_name || ''),
+                  },
+                  { 
+                    title: 'Sentiment', 
+                    dataIndex: 'sentiment_category',
+                    key: 'sentiment_category', 
+                    width: '15%',
+                    sorter: (a, b) => (a.sentiment_score ?? -Infinity) - (b.sentiment_score ?? -Infinity),
+                    sortDirections: ['descend', 'ascend'],
+                    render: (label) => { 
+                      const sentimentClassMap = {
+                        'Very Positive': 'sentiment-tag-very-positive',
+                        'Positive': 'sentiment-tag-positive',
+                        'Neutral': 'sentiment-tag-neutral',
+                        'Negative': 'sentiment-tag-negative',
+                        'Very Negative': 'sentiment-tag-very-negative'
+                      };
+                      const sentimentClass = sentimentClassMap[label] || 'sentiment-tag-neutral';
+                      return <Tag className={sentimentClass}>{label || 'N/A'}</Tag>;
+                    },
+                  },
+                  { 
+                    title: 'Feedback', 
+                    dataIndex: 'feedback_text', 
+                    key: 'feedback_text', 
+                    width: '40%',
+                    render: (text) => <div style={{ whiteSpace: 'pre-wrap' }}>{text || '-'}</div> 
+                  },
+                ]}
+                dataSource={showNegativeFeedback 
+                  ? summaryData.allFeedbackDetails.filter(feedback => 
+                      feedback.sentiment_category === 'Negative' || feedback.sentiment_category === 'Very Negative'
+                    )
+                  : summaryData.allFeedbackDetails
+                }
+                rowKey={(record) => `feedback-${String(record.created_at)}-${record.reviewer_name}-${record.recipient_name}`}
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: false,
+                  showQuickJumper: false,
+                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} feedback entries`,
+                  size: 'default',
+                  showLessItems: false
+                }}
+                scroll={{ y: 400 }}
+                size="middle"
+              />
             </Card>
           )}
         </>
@@ -729,7 +1213,7 @@ const WeeklySummary = () => {
 
       <Modal
         title={
-          <div style={{ color: '#ffffff' }}>
+          <Typography.Text style={{ color: 'var(--color-text-main)' }}>
             {selectedTaskDetails ? (
               <span>
                 {selectedTaskDetails.task_title}
@@ -738,7 +1222,7 @@ const WeeklySummary = () => {
                     marginLeft: '12px', 
                     fontSize: '14px', 
                     fontWeight: 'normal',
-                    color: '#bfc9d1' 
+                    color: 'var(--color-text-secondary)' 
                   }}>
                     ({(() => {
                       const dateValue = selectedTaskDetails.assigned_date?.value 
@@ -752,7 +1236,7 @@ const WeeklySummary = () => {
             ) : (
               'Task Details'
             )}
-          </div>
+          </Typography.Text>
         }
         open={detailsModalVisible}
         onCancel={() => {
@@ -847,14 +1331,14 @@ const WeeklySummary = () => {
                     title: 'Builder',
                     dataIndex: 'builder_name',
                     key: 'builder_name',
-                    width: '25%',
+                    width: '20%',
                     sorter: (a, b) => (a.builder_name || '').localeCompare(b.builder_name || ''),
                   },
                   {
                     title: 'Score',
                     dataIndex: 'score',
                     key: 'score',
-                    width: '15%',
+                    width: '10%',
                     sorter: (a, b) => (a.score || 0) - (b.score || 0),
                     render: (score) => {
                       const grade = getLetterGrade(score);
@@ -870,17 +1354,74 @@ const WeeklySummary = () => {
                     title: 'Response',
                     dataIndex: 'response',
                     key: 'response',
-                    width: '60%',
+                    width: '40%',
                     ellipsis: true,
-                    render: (response) => (
-                      <div style={{ 
-                        maxHeight: '100px', 
-                        overflow: 'auto',
-                        wordWrap: 'break-word',
-                        whiteSpace: 'pre-wrap'
-                      }}>
-                        {response || 'No response provided'}
-                      </div>
+                    render: (response) => {
+                      // Check if response is a URL
+                      if (isURL(response)) {
+                        return (
+                          <a 
+                            href={response} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                          >
+                            <LinkOutlined style={{ color: 'var(--color-primary)' }} />
+                            <Text style={{ color: 'var(--color-primary)' }}>Open Link</Text>
+                          </a>
+                        );
+                      }
+                      
+                      // Try to parse JSON and check for links
+                      try {
+                        const parsed = JSON.parse(response);
+                        if (Array.isArray(parsed) && parsed.length > 0 && 
+                            typeof parsed[0] === 'object' && 
+                            parsed[0].type === 'link' && 
+                            typeof parsed[0].content === 'string' &&
+                            isURL(parsed[0].content)) {
+                          return (
+                            <a 
+                              href={parsed[0].content} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                            >
+                              <LinkOutlined style={{ color: 'var(--color-primary)' }} />
+                              <Text style={{ color: 'var(--color-primary)' }}>Open Link</Text>
+                            </a>
+                          );
+                        }
+                      } catch (e) {
+                        // Not JSON, continue with regular rendering
+                      }
+
+                      // Regular text response
+                      return (
+                        <div style={{ 
+                          maxHeight: '100px', 
+                          overflow: 'auto',
+                          wordWrap: 'break-word',
+                          whiteSpace: 'pre-wrap'
+                        }}>
+                          {response || 'No response provided'}
+                        </div>
+                      );
+                    },
+                  },
+                  {
+                    title: 'Details',
+                    key: 'details',
+                    width: '15%',
+                    render: (_, record) => (
+                      <Button
+                        type="primary"
+                        icon={<InfoCircleOutlined />}
+                        size="small"
+                        onClick={() => handleViewAnalysisDetails(record)}
+                      >
+                        View Analysis
+                      </Button>
                     ),
                   },
                 ]}
@@ -901,6 +1442,177 @@ const WeeklySummary = () => {
         ) : (
           <div style={{ textAlign: 'center', padding: '40px' }}>
             <Text type="secondary">Failed to load task details</Text>
+          </div>
+        )}
+      </Modal>
+
+      {/* Builder Details Modal */}
+      <BuilderDetailsModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        type={modalType}
+        data={detailsData}
+        loading={detailsLoading}
+        builder={selectedBuilder}
+      />
+
+      {/* Analysis Modal */}
+      <Modal
+        title={
+          <Typography.Text style={{ color: 'var(--color-text-main)' }}>
+            {selectedAnalysisResponse ? (
+              <>
+                {selectedTaskDetails?.task_title || 'Task Analysis'}
+                <span style={{ 
+                  marginLeft: '12px', 
+                  fontSize: '14px', 
+                  fontWeight: 'normal',
+                  color: 'var(--color-text-secondary)' 
+                }}>
+                  - {selectedAnalysisResponse.builder_name}
+                </span>
+                {selectedAnalysisResponse.submission_date && (
+                  <span style={{ 
+                    marginLeft: '8px', 
+                    fontSize: '14px', 
+                    fontWeight: 'normal',
+                    color: 'var(--color-text-secondary)' 
+                  }}>
+                    ({dayjs(selectedAnalysisResponse.submission_date).format('MMM DD, YYYY')})
+                  </span>
+                )}
+              </>
+            ) : (
+              'Task Analysis'
+            )}
+          </Typography.Text>
+        }
+        open={analysisModalVisible}
+        onCancel={() => setAnalysisModalVisible(false)}
+        footer={null}
+        width={1200}
+      >
+        {selectedAnalysisResponse ? (
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            {/* Header Card with Score */}
+            <Card bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+              <div style={{ marginBottom: '8px' }}>
+                <Title level={4} style={{ marginBottom: '4px', color: 'var(--color-text-main)' }}>
+                  {selectedTaskDetails?.task_title || 'Task Analysis'}
+                </Title>
+                <Text type="secondary" style={{ fontSize: '1em', color: 'var(--color-text-secondary)' }}>
+                  {selectedAnalysisResponse.builder_name}
+                  {selectedAnalysisResponse.score && (
+                    <>
+                      {', '}
+                      <Tag className={getGradeTagClass(getLetterGrade(selectedAnalysisResponse.score))}>
+                        {getLetterGrade(selectedAnalysisResponse.score)}
+                      </Tag>
+                    </>
+                  )}
+                </Text>
+              </div>
+            </Card>
+
+            {/* Analyzed Content */}
+            {selectedAnalysisResponse.response && (
+              <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Analyzed Content</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+                <div style={{ background: 'var(--color-bg-main)', padding: '12px', borderRadius: '4px', maxHeight: '300px', overflowY: 'auto' }}>
+                  {renderAnalyzedContent(selectedAnalysisResponse.response)}
+                </div>
+              </Card>
+            )}
+
+            {(() => {
+              const analysis = parseAnalysisForModal(selectedAnalysisResponse.analysis);
+              const analysisError = !analysis || analysis.feedback === 'Error parsing analysis data.';
+              
+              if (analysisError) {
+                return (
+                  <Alert message="Error parsing analysis data" description="Some or all of the automated analysis could not be displayed." type="warning" showIcon />
+                );
+              }
+
+              return (
+                <>
+                  {/* Submission Summary */}
+                  {analysis?.submission_summary && (
+                    <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Submission Summary</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+                      <Paragraph style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg-main)', padding: '12px', borderRadius: '4px', color: 'var(--color-text-secondary)' }}>
+                        {analysis.submission_summary}
+                      </Paragraph>
+                    </Card>
+                  )}
+
+                  {/* Feedback */}
+                  {analysis?.feedback && (
+                    <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Feedback</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+                      <Paragraph style={{ whiteSpace: 'pre-wrap', background: 'var(--color-bg-main)', padding: '12px', borderRadius: '4px', color: 'var(--color-text-secondary)' }}>
+                        {analysis.feedback}
+                      </Paragraph>
+                    </Card>
+                  )}
+
+                  {/* Criteria and Areas for Improvement */}
+                  <Row gutter={[24, 24]}>
+                    {analysis?.criteria_met && analysis.criteria_met.length > 0 && (
+                      <Col xs={24} md={12}>
+                        <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Criteria Met</Title>} bordered={false} style={{ height: '100%', background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+                          <Space wrap size={[8, 8]}>
+                            {analysis.criteria_met.map((item, index) => <Tag className="criteria-met-tag" key={`crit-${index}`}>{item}</Tag>)}
+                          </Space>
+                        </Card>
+                      </Col>
+                    )}
+
+                    {analysis?.areas_for_improvement && analysis.areas_for_improvement.length > 0 && (
+                      <Col xs={24} md={12}>
+                        <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Areas for Improvement</Title>} bordered={false} style={{ height: '100%', background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+                          <Space wrap size={[8, 8]}>
+                            {analysis.areas_for_improvement.map((item, index) => <Tag className="areas-for-improvement-tag" key={`area-${index}`}>{item}</Tag>)}
+                          </Space>
+                        </Card>
+                      </Col>
+                    )}
+                  </Row>
+
+                  {/* Specific Findings */}
+                  {analysis?.specific_findings && typeof analysis.specific_findings === 'object' && Object.keys(analysis.specific_findings).length > 0 && (
+                    <Card title={<Title level={5} style={{color: 'var(--color-text-main)'}}>Specific Findings</Title>} bordered={false} style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-main)', borderRadius: '8px' }}>
+                      <Row gutter={[24, 24]}>
+                        {Object.entries(analysis.specific_findings).map(([category, findings], catIndex) => (
+                          <Col xs={24} md={12} key={`find-cat-col-${catIndex}`}>
+                            <div key={`find-cat-${catIndex}`} style={{ marginBottom: '20px', paddingLeft: '0', borderLeft: 'none', height: '100%' }}>
+                              <Title level={5} style={{ textTransform: 'capitalize', marginBottom: '10px', textDecoration: 'underline', color: 'var(--color-text-main)'}}>{category.replace(/_/g, ' ')}</Title>
+                              {findings?.strengths && findings.strengths.length > 0 && (
+                                <div style={{ marginBottom: '10px' }}>
+                                  <Text strong style={{color: 'var(--color-text-main)'}}>Strengths:</Text>
+                                  <ul style={{ margin: '8px 0 0 20px', padding: 0, listStyleType: 'disc', color: 'var(--color-text-secondary)' }}>
+                                    {findings.strengths.map((item, index) => <li key={`str-${catIndex}-${index}`} style={{ marginBottom: '4px'}}>{item}</li>)}
+                                  </ul>
+                                </div>
+                              )}
+                              {findings?.weaknesses && findings.weaknesses.length > 0 && (
+                                <div>
+                                  <Text strong style={{color: 'var(--color-text-main)'}}>Weaknesses:</Text>
+                                  <ul style={{ margin: '8px 0 0 20px', padding: 0, listStyleType: 'disc', color: 'var(--color-text-secondary)' }}>
+                                    {findings.weaknesses.map((item, index) => <li key={`weak-${catIndex}-${index}`} style={{ marginBottom: '4px'}}>{item}</li>)}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </Col>
+                        ))}
+                      </Row>
+                    </Card>
+                  )}
+                </>
+              );
+            })()}
+          </Space>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <Text type="secondary">Failed to load task analysis</Text>
           </div>
         )}
       </Modal>
