@@ -1190,8 +1190,9 @@ const JuneL2SelectionsView = () => {
             Export CSV
           </Button>
           <Text type="secondary" style={{ fontSize: '12px' }}>
-            {filteredBuilders.length !== sortedBuilders.length && 
-              `${filteredBuilders.length} of ${sortedBuilders.length} builders`}
+            {filteredBuilders.length !== sortedBuilders.length 
+              ? `${filteredBuilders.length} of ${sortedBuilders.length} builders (filtered)`
+              : `${filteredBuilders.length} builders`}
           </Text>
         </Space>
       </div>
@@ -1234,22 +1235,7 @@ const JuneL2SelectionsView = () => {
             dataSource={filteredBuilders}
             rowKey="user_id"
             scroll={{ x: 'max-content' }}
-            pagination={{
-              pageSize: 15,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total, range) => {
-                const filteredTotal = filteredBuilders.length;
-                const allTotal = sortedBuilders.length;
-                if (filteredTotal === allTotal) {
-                  return `${range[0]}-${range[1]} of ${total} builders`;
-                } else {
-                  return `${range[0]}-${range[1]} of ${total} filtered builders (${allTotal} total)`;
-                }
-              },
-              size: 'default',
-              showLessItems: false
-            }}
+            pagination={false}
             style={{ borderRadius: '8px' }}
           />
         )}
