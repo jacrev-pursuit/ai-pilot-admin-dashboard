@@ -899,14 +899,14 @@ const JuneL2SelectionsView = () => {
         );
       },
     },
-    // NEW: Recent Loom Video column (condensed)
+    // NEW: Final Demo Recording column
     {
       title: (
         <div style={{ textAlign: 'center' }}>
-          Latest Video
+          Final Demo
         </div>
       ),
-      key: 'recent_loom_video',
+      key: 'final_demo_video',
       width: '8%',
       render: (text, record) => {
         const loomUrl = record.latest_loom_url;
@@ -929,7 +929,7 @@ const JuneL2SelectionsView = () => {
         return (
           <div style={{ textAlign: 'center' }}>
             <Text type="secondary" style={{ fontSize: '10px' }}>
-              No video
+              No demo
             </Text>
           </div>
         );

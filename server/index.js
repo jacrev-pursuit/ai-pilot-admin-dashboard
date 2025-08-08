@@ -303,24 +303,22 @@ app.get('/api/builders', async (req, res) => {
             ${levelFilterCondition.replace(/se\./g, 'se_vtm.')}
           GROUP BY ts.user_id
       ),
-      -- NEW: Get most recent loom URL and associated task/submission IDs for each builder
-      MostRecentLoomVideo AS (
+      -- NEW: Get Final Demo Recording submissions (Task ID 863) for each builder
+      FinalDemoSubmissions AS (
           SELECT 
               ts.user_id,
-              va.loom_url as latest_loom_url,
+              COALESCE(va.loom_url, ts.content) as latest_loom_url,
               ts.task_id as latest_task_id,
               ts.id as latest_submission_id,
               ROW_NUMBER() OVER (PARTITION BY ts.user_id ORDER BY ts.created_at DESC) as rn
           FROM \`${taskSubmissionsTable}\` ts
           INNER JOIN \`${usersTable}\` u ON ts.user_id = u.user_id
-          INNER JOIN SingleEnrollmentPerUser se_mrlv ON LOWER(u.email) = LOWER(se_mrlv.builder_email)
+          INNER JOIN SingleEnrollmentPerUser se_fds ON LOWER(u.email) = LOWER(se_fds.builder_email)
           LEFT JOIN \`${PROJECT_ID}.${DATASET}.video_analyses\` va ON CAST(ts.id AS STRING) = va.submission_id AND CAST(ts.user_id AS STRING) = va.user_id
-          WHERE DATE(ts.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
-            AND LOWER(ts.content) LIKE '%loom.com%'
+          WHERE ts.task_id = 863  -- Final Demo Recording and Submission task
             AND u.role = 'builder'
-            AND va.loom_url IS NOT NULL
-            AND va.loom_url != ''
-            ${levelFilterCondition.replace(/se\./g, 'se_mrlv.')}
+            AND (LOWER(ts.content) LIKE '%loom.com%' OR (va.loom_url IS NOT NULL AND va.loom_url != ''))
+            ${levelFilterCondition.replace(/se\./g, 'se_fds.')}
       ),
       -- Task Completion Percentage CTEs (SIMPLIFIED) --
       GradedTasksPerCohort AS (
@@ -443,10 +441,10 @@ app.get('/api/builders', async (req, res) => {
         COALESCE(am.attendance_percentage, 0) as attendance_percentage,
         COALESCE(am.days_attended, 0) as days_attended,
         COALESCE(am.total_curriculum_days, 0) as total_curriculum_days,
-        -- NEW: Get most recent loom URL and associated IDs for each builder
-        COALESCE(mrlv.latest_loom_url, '') as latest_loom_url,
-        mrlv.latest_task_id,
-        mrlv.latest_submission_id
+        -- NEW: Get Final Demo Recording submission URL and associated IDs for each builder
+        COALESCE(fds.latest_loom_url, '') as latest_loom_url,
+        fds.latest_task_id,
+        fds.latest_submission_id
       FROM BaseMetrics bm
       LEFT JOIN PeerFeedbackDistribution pfd ON bm.user_id = pfd.user_id
       LEFT JOIN GradeDistribution gd ON bm.user_id = gd.user_id
@@ -454,7 +452,7 @@ app.get('/api/builders', async (req, res) => {
       LEFT JOIN AttendanceMetrics am ON bm.user_id = am.user_id
       LEFT JOIN GradedTasksPerUser gtpu ON bm.user_id = gtpu.user_id
       LEFT JOIN GradedTasksPerCohort gtpc ON SPLIT(bm.level, ' - ')[OFFSET(0)] = gtpc.user_cohort
-      LEFT JOIN MostRecentLoomVideo mrlv ON bm.user_id = mrlv.user_id AND mrlv.rn = 1
+      LEFT JOIN FinalDemoSubmissions fds ON bm.user_id = fds.user_id AND fds.rn = 1
     `;
 
     // Build params object conditionally
