@@ -24,6 +24,7 @@ import BuilderDetailsModal from './BuilderDetailsModal';
 import DemoRatingModal from './DemoRatingModal';
 import PeerFeedbackChart from './PeerFeedbackChart';
 import { getLetterGrade, getGradeTagClass } from '../utils/gradingUtils';
+import { api } from '../utils/api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -32,7 +33,7 @@ const JuneL2SelectionsView = () => {
   // State with all-time date range and level for June 2025 - L2
   const [startDate] = useState(dayjs('2000-01-01').startOf('day')); // All time start
   const [endDate] = useState(dayjs('2100-12-31').endOf('day')); // All time end
-  const [selectedLevel] = useState('June 2025 - L1'); // Fixed to June 2025 - L1 (data source)
+  const [selectedLevel] = useState('September 2025 - L1'); // Fixed to September 2025 - L1 (data source)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -62,6 +63,7 @@ const JuneL2SelectionsView = () => {
   // Filter state - Excel style with arrays of selected values
   const [selectedBuilderNames, setSelectedBuilderNames] = useState([]);
   const [selectedSelectionStatuses, setSelectedSelectionStatuses] = useState([]);
+  const [selectedFinalDemoStatuses, setSelectedFinalDemoStatuses] = useState([]);
   
   // Search state for filter dropdowns
   const [builderNameSearch, setBuilderNameSearch] = useState('');
@@ -93,7 +95,7 @@ const JuneL2SelectionsView = () => {
         level: selectedLevel
       });
 
-      const response = await fetch(`/api/builders?${params}`);
+      const response = await api.get(`/api/builders?${params}`);
       if (!response.ok) {
         throw new Error('Failed to fetch builders data');
       }
@@ -138,14 +140,7 @@ const JuneL2SelectionsView = () => {
       };
       
       console.log('Saving demo feedback with data:', dataWithSelection);
-      
-      const response = await fetch('/api/human-review', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataWithSelection)
-      });
+      const response = await api.post('/api/human-review', dataWithSelection);
 
       if (!response.ok) {
         throw new Error('Failed to save demo feedback');
@@ -198,7 +193,7 @@ const JuneL2SelectionsView = () => {
     try {
       const feedbackPromises = builders.map(async (builder) => {
         try {
-          const response = await fetch(`/api/human-review/${builder.user_id}`);
+          const response = await api.get(`/api/human-review/${builder.user_id}`);
           if (response.ok) {
             const data = await response.json();
             return { builderId: builder.user_id, feedback: data.data || [] };
@@ -270,14 +265,7 @@ const JuneL2SelectionsView = () => {
         };
 
         console.log('Saving selection status with data:', selectionData);
-
-        const response = await fetch('/api/human-review', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(selectionData)
-        });
+        const response = await api.post('/api/human-review', selectionData);
 
         if (!response.ok) {
           throw new Error('Failed to save selection status');
@@ -381,6 +369,12 @@ const JuneL2SelectionsView = () => {
     if (sortConfig.key === 'demo_rating') {
       aValue = videoRatings[a.user_id] || 0;
       bValue = videoRatings[b.user_id] || 0;
+    } else if (sortConfig.key === 'final_demo_status') {
+      // Sort by final demo submission status
+      const aHasDemo = a.latest_loom_url && a.latest_loom_url.includes('loom.com');
+      const bHasDemo = b.latest_loom_url && b.latest_loom_url.includes('loom.com');
+      aValue = aHasDemo ? 1 : 0; // 1 for submitted, 0 for not submitted
+      bValue = bHasDemo ? 1 : 0;
     } else {
       aValue = a[sortConfig.key];
       bValue = b[sortConfig.key];
@@ -422,7 +416,13 @@ const JuneL2SelectionsView = () => {
     const selectionMatches = selectedSelectionStatuses.length === 0 || 
       selectedSelectionStatuses.includes(selectionStatus);
     
-    return nameMatches && selectionMatches;
+    // Filter by final demo status
+    const hasFinalDemo = builder.latest_loom_url && builder.latest_loom_url.includes('loom.com');
+    const finalDemoStatus = hasFinalDemo ? 'submitted' : 'not_submitted';
+    const finalDemoMatches = selectedFinalDemoStatuses.length === 0 || 
+      selectedFinalDemoStatuses.includes(finalDemoStatus);
+    
+    return nameMatches && selectionMatches && finalDemoMatches;
   });
 
   // Export function
@@ -528,7 +528,7 @@ const JuneL2SelectionsView = () => {
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `june-l2-selections-${dayjs().format('YYYY-MM-DD')}.csv`);
+      link.setAttribute('download', `l2-selections-${dayjs().format('YYYY-MM-DD')}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -670,7 +670,10 @@ const JuneL2SelectionsView = () => {
   // Excel-style filter menu for selection status
   const getSelectionStatusFilterMenu = () => {
     const uniqueStatuses = getUniqueSelectionStatuses();
-    const allSelected = selectedSelectionStatuses.length === 0;
+    
+    // Simplified logic: checkboxes reflect what's actually in selectedSelectionStatuses
+    const allSelected = uniqueStatuses.length > 0 && uniqueStatuses.every(status => selectedSelectionStatuses.includes(status));
+    const someSelected = uniqueStatuses.some(status => selectedSelectionStatuses.includes(status)) && !allSelected;
     
     const statusLabels = {
       'strong': '✅ Strong',
@@ -680,46 +683,120 @@ const JuneL2SelectionsView = () => {
     };
     
     return (
-      <Menu onClick={(e) => e.domEvent.stopPropagation()} style={{ maxHeight: '300px', overflowY: 'auto' }}>
-        <Menu.Item key="select-all" style={{ borderBottom: '1px solid #f0f0f0' }}>
+      <Menu 
+        onClick={(e) => e.domEvent.stopPropagation()} 
+        style={{ maxHeight: '400px', overflowY: 'auto', minWidth: '200px' }}
+      >
+        {/* Controls Row */}
+        <Menu.Item key="controls" style={{ borderBottom: '1px solid #f0f0f0', padding: '8px' }}>
           <Checkbox
             checked={allSelected}
-            indeterminate={selectedSelectionStatuses.length > 0 && selectedSelectionStatuses.length < uniqueStatuses.length}
+            indeterminate={someSelected}
             onChange={(e) => {
               if (e.target.checked) {
-                setSelectedSelectionStatuses([]);
-              } else {
+                // Add all statuses to selection
                 setSelectedSelectionStatuses([...uniqueStatuses]);
+              } else {
+                // Remove all statuses from selection
+                setSelectedSelectionStatuses([]);
               }
             }}
           >
             Select All
           </Checkbox>
         </Menu.Item>
-        {uniqueStatuses.map(status => (
-          <Menu.Item key={status}>
-            <Checkbox
-              checked={selectedSelectionStatuses.length === 0 || selectedSelectionStatuses.includes(status)}
-              onChange={(e) => {
-                if (selectedSelectionStatuses.length === 0) {
-                  // Currently showing all, clicking unchecked means exclude this item
-                  setSelectedSelectionStatuses(uniqueStatuses.filter(s => s !== status));
-                } else {
-                  // Some items are filtered
-                  if (selectedSelectionStatuses.includes(status)) {
-                    // Item is selected, remove it
-                    setSelectedSelectionStatuses(prev => prev.filter(s => s !== status));
-                  } else {
-                    // Item is not selected, add it
+        
+        {/* Individual Status Checkboxes */}
+        <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+          {uniqueStatuses.map(status => (
+            <Menu.Item key={status}>
+              <Checkbox
+                checked={selectedSelectionStatuses.includes(status)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    // Add this status to selection
                     setSelectedSelectionStatuses(prev => [...prev, status]);
+                  } else {
+                    // Remove this status from selection
+                    setSelectedSelectionStatuses(prev => prev.filter(s => s !== status));
                   }
-                }
-              }}
-            >
-              {statusLabels[status] || status}
-            </Checkbox>
-          </Menu.Item>
-        ))}
+                }}
+              >
+                {statusLabels[status] || status}
+              </Checkbox>
+            </Menu.Item>
+          ))}
+        </div>
+      </Menu>
+    );
+  };
+
+  // Excel-style filter menu for final demo status  
+  const getFinalDemoFilterMenu = () => {
+    const uniqueStatuses = ['submitted', 'not_submitted'];
+    
+    // Simplified logic: checkboxes reflect what's actually in selectedFinalDemoStatuses
+    const allSelected = uniqueStatuses.length > 0 && uniqueStatuses.every(status => selectedFinalDemoStatuses.includes(status));
+    const someSelected = uniqueStatuses.some(status => selectedFinalDemoStatuses.includes(status)) && !allSelected;
+    
+    const statusLabels = {
+      'submitted': '✅ Submitted',
+      'not_submitted': '❌ Not Submitted'
+    };
+    
+    const handleSaveFilter = () => {
+      // Filter is applied immediately, no save needed
+    };
+    
+    const handleCancelFilter = () => {
+      setSelectedFinalDemoStatuses([]); // Reset to empty (no filter applied)
+    };
+    
+    return (
+      <Menu 
+        onClick={(e) => e.domEvent.stopPropagation()} 
+        style={{ maxHeight: '400px', overflowY: 'auto', minWidth: '200px' }}
+      >
+        {/* Controls Row */}
+        <Menu.Item key="controls" style={{ borderBottom: '1px solid #f0f0f0', padding: '8px' }}>
+          <Checkbox
+            checked={allSelected}
+            indeterminate={someSelected}
+            onChange={(e) => {
+              if (e.target.checked) {
+                // Add all statuses to selection
+                setSelectedFinalDemoStatuses([...uniqueStatuses]);
+              } else {
+                // Remove all statuses from selection
+                setSelectedFinalDemoStatuses([]);
+              }
+            }}
+          >
+            Select All
+          </Checkbox>
+        </Menu.Item>
+        
+        {/* Individual Status Checkboxes */}
+        <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+          {uniqueStatuses.map(status => (
+            <Menu.Item key={status}>
+              <Checkbox
+                checked={selectedFinalDemoStatuses.includes(status)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    // Add this status to selection
+                    setSelectedFinalDemoStatuses(prev => [...prev, status]);
+                  } else {
+                    // Remove this status from selection
+                    setSelectedFinalDemoStatuses(prev => prev.filter(s => s !== status));
+                  }
+                }}
+              >
+                {statusLabels[status] || status}
+              </Checkbox>
+            </Menu.Item>
+          ))}
+        </div>
       </Menu>
     );
   };
@@ -902,12 +979,37 @@ const JuneL2SelectionsView = () => {
     // NEW: Final Demo Recording column
     {
       title: (
-        <div style={{ textAlign: 'center' }}>
-          Final Demo
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <div 
+            onClick={() => handleSort('final_demo_status')} 
+            style={{ 
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: sortConfig.key === 'final_demo_status' ? 'bold' : 'normal',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            Final Demo {getSortIcon('final_demo_status')}
+          </div>
+          <Dropdown 
+            overlay={getFinalDemoFilterMenu()} 
+            trigger={['click']}
+            placement="bottomRight"
+          >
+            <FilterOutlined 
+              style={{ 
+                fontSize: '12px', 
+                cursor: 'pointer',
+                color: selectedFinalDemoStatuses.length > 0 ? '#1890ff' : '#8c8c8c'
+              }}
+            />
+          </Dropdown>
         </div>
       ),
       key: 'final_demo_video',
-      width: '8%',
+      width: '10%',
       render: (text, record) => {
         const loomUrl = record.latest_loom_url;
         
@@ -1113,7 +1215,7 @@ const JuneL2SelectionsView = () => {
     setBuildersError(null);
 
     try {
-      const response = await fetch(`/api/builders/${record.user_id}/details?type=${type}&startDate=${startDate.format('YYYY-MM-DD')}&endDate=${endDate.format('YYYY-MM-DD')}`);
+      const response = await api.get(`/api/builders/${record.user_id}/details?type=${type}&startDate=${startDate.format('YYYY-MM-DD')}&endDate=${endDate.format('YYYY-MM-DD')}`);
       if (!response.ok) {
         throw new Error('Failed to fetch builder details');
       }
@@ -1133,7 +1235,7 @@ const JuneL2SelectionsView = () => {
       <div style={{ textAlign: 'center', padding: '50px' }}>
         <Spin size="large" />
         <div style={{ marginTop: '20px' }}>
-          <Text>Loading June L2 selections data...</Text>
+          <Text>Loading L2 selections data...</Text>
         </div>
       </div>
     );
@@ -1161,20 +1263,21 @@ const JuneL2SelectionsView = () => {
       </style>
       {/* Header */}
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Title level={2}>June L2 Selections</Title>
+        <Title level={2}>L2 selections</Title>
         <Space>
           <Tag color="green" style={{ fontSize: '14px', padding: '4px 8px' }}>
-            June 2025 - L1 Data
+            September 2025 - L1 Data
           </Tag>
           <Tag color="purple" style={{ fontSize: '14px', padding: '4px 8px' }}>
             All Time Data
           </Tag>
-          {(selectedBuilderNames.length > 0 || selectedSelectionStatuses.length > 0) && (
+          {(selectedBuilderNames.length > 0 || selectedSelectionStatuses.length > 0 || selectedFinalDemoStatuses.length > 0) && (
             <Button 
               size="small"
               onClick={() => {
                 setSelectedBuilderNames([]);
                 setSelectedSelectionStatuses([]);
+                setSelectedFinalDemoStatuses([]);
               }}
               style={{ fontSize: '11px' }}
             >
@@ -1213,7 +1316,7 @@ const JuneL2SelectionsView = () => {
       <Card 
         title={
           <span style={{ color: '#ffffff' }}>
-            <UserOutlined /> June L2 Builder Performance Overview
+            <UserOutlined /> L2 Builder Performance Overview
           </span>
         }
         style={{ marginBottom: '24px' }}

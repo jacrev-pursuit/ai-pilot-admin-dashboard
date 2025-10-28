@@ -14,8 +14,14 @@ console.log('Required modules loaded.');
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Import authentication module - DISABLED FOR TESTING
+// const { passport, generateToken, requireAuth, requireAdmin } = require('./auth');
+
 app.use(cors());
 app.use(express.json());
+
+// Initialize passport - DISABLED FOR TESTING
+// app.use(passport.initialize());
 
 // --- BigQuery Client Initialization using ADC ---
 const PROJECT_ID = process.env.PROJECT_ID;
@@ -84,6 +90,63 @@ try {
 
 console.log('Middleware applied.');
 
+// --- Authentication Routes - DISABLED FOR TESTING ---
+// Start Google OAuth flow
+// app.get('/auth/google', 
+//   passport.authenticate('google', { scope: ['profile', 'email'] })
+// );
+
+// Google OAuth callback
+// app.get('/auth/google/callback',
+//   passport.authenticate('google', { session: false }),
+//   (req, res) => {
+//     if (req.user) {
+//       // Generate JWT token
+//       const token = generateToken(req.user);
+//       
+//       // Redirect to frontend with token
+//       const redirectUrl = process.env.NODE_ENV === 'production' 
+//         ? `/login/success?token=${token}`
+//         : `http://localhost:5173/login/success?token=${token}`;
+//       
+//       res.redirect(redirectUrl);
+//     } else {
+//       // Authentication failed
+//       const redirectUrl = process.env.NODE_ENV === 'production' 
+//         ? `/login/error`
+//         : `http://localhost:5173/login/error`;
+//       
+//       res.redirect(redirectUrl);
+//     }
+//   }
+// );
+
+// Logout endpoint
+app.post('/auth/logout', (req, res) => {
+  // Since we're using JWT, logout is handled client-side by removing the token
+  res.json({ message: 'Logged out successfully' });
+});
+
+// Get current user info - DISABLED FOR TESTING
+// app.get('/auth/me', requireAuth, (req, res) => {
+//   res.json({
+//     user: {
+//       id: req.user.id,
+//       email: req.user.email,
+//       name: req.user.name,
+//       picture: req.user.picture
+//     }
+//   });
+// });
+
+// Test endpoint to check authentication - DISABLED FOR TESTING
+// app.get('/auth/test', requireAuth, (req, res) => {
+//   res.json({ 
+//     message: 'Authentication successful', 
+//     user: req.user 
+//   });
+// });
+
 // --- Define Table Variables (ensure these match your dataset) ---
 const metricsTable = `${PROJECT_ID}.${DATASET}.daily_builder_metrics`;
 const taskAnalysisTable = `${PROJECT_ID}.${DATASET}.task_analysis_results`;
@@ -102,7 +165,9 @@ const taskResponsesTable = `${PROJECT_ID}.${DATASET}.task_responses`;
 const enrollmentsTable = `${PROJECT_ID}.${DATASET}.enrollments_native`; // Changed to native table
 const attAttendanceTable = `${PROJECT_ID}.${DATASET}.att_attendance`;
 const attStudentsTable = `${PROJECT_ID}.${DATASET}.att_students`;
+const builderAttendanceNewTable = `${PROJECT_ID}.${DATASET}.builder_attendance_new`;
 const humanReviewTable = `${PROJECT_ID}.${DATASET}.human_review`;
+const builderFeedbackTable = `${PROJECT_ID}.${DATASET}.builder_feedback`;
 
 // Helper function to check if error is related to Google Drive permissions
 function isGoogleDrivePermissionError(error) {
@@ -142,10 +207,45 @@ async function executeQueryWithEnrollmentsFallback(queryWithEnrollments, queryWi
 
 // --- API Endpoints (Using OLD Query Logic) ---
 
+// --- Protect All API Routes ---
+// Apply authentication middleware to all /api/* routes - DISABLED FOR TESTING
+// app.use('/api/*', requireAuth);
+
 // Test endpoint
 app.get('/api/test', (req, res) => {
   console.log('Handling request for /api/test');
   res.json({ message: 'Test route working!' });
+});
+
+// Cohorts list endpoint (distinct cohorts only)
+app.get('/api/cohorts', async (req, res) => {
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  const queryEnrollments = `
+    SELECT DISTINCT cohort
+    FROM \`${enrollmentsTable}\`
+    WHERE cohort IS NOT NULL AND cohort != ''
+    ORDER BY cohort ASC
+  `;
+
+  const queryFeedback = `
+    SELECT DISTINCT cohort
+    FROM \`${builderFeedbackTable}\`
+    WHERE cohort IS NOT NULL AND cohort != ''
+    ORDER BY cohort ASC
+  `;
+
+  try {
+    const [rows] = await bigquery.query({ query: queryEnrollments });
+    if (rows && rows.length) {
+      return res.json(rows.map(r => r.cohort));
+    }
+    const [rowsFb] = await bigquery.query({ query: queryFeedback });
+    return res.json(rowsFb.map(r => r.cohort));
+  } catch (error) {
+    console.error('Error fetching cohorts:', error);
+    res.status(500).json({ error: 'Failed to fetch cohorts' });
+  }
 });
 
 // Builders endpoint (Re-applying New Task Completion % Logic)
@@ -182,14 +282,20 @@ app.get('/api/builders', async (req, res) => {
 
     // Query using native enrollments table with proper deduplication to ensure one row per user
     const query = `
-      WITH SingleEnrollmentPerUser AS (
-          -- Get enrollment records matching the requested level filter
-          SELECT DISTINCT
-              builder_email, 
-              cohort, 
-              level
+      WITH       UniqueEnrollments AS (
+          SELECT 
+            builder_email, 
+            cohort, 
+            level,
+            ROW_NUMBER() OVER (PARTITION BY LOWER(builder_email) ORDER BY cohort DESC, level DESC) as rn
           FROM \`${enrollmentsTable}\`
-          WHERE 1=1 ${levelFilterCondition.replace(/se\./g, '')}
+      ),
+      SingleEnrollmentPerUser AS (
+          -- Use the same deduplication logic as weekly summary for consistency
+          SELECT builder_email, cohort, level
+          FROM UniqueEnrollments
+          WHERE rn = 1
+            ${levelFilterCondition.replace(/se\./g, '')}
       ),
       BaseMetrics AS (
           -- Aggregate metrics per user with detailed peer feedback distribution
@@ -303,7 +409,7 @@ app.get('/api/builders', async (req, res) => {
             ${levelFilterCondition.replace(/se\./g, 'se_vtm.')}
           GROUP BY ts.user_id
       ),
-      -- NEW: Get Final Demo Recording submissions (Task ID 863) for each builder
+      -- NEW: Get Final Demo Recording submissions (Task ID 1379) for each builder
       FinalDemoSubmissions AS (
           SELECT 
               ts.user_id,
@@ -315,7 +421,7 @@ app.get('/api/builders', async (req, res) => {
           INNER JOIN \`${usersTable}\` u ON ts.user_id = u.user_id
           INNER JOIN SingleEnrollmentPerUser se_fds ON LOWER(u.email) = LOWER(se_fds.builder_email)
           LEFT JOIN \`${PROJECT_ID}.${DATASET}.video_analyses\` va ON CAST(ts.id AS STRING) = va.submission_id AND CAST(ts.user_id AS STRING) = va.user_id
-          WHERE ts.task_id = 863  -- Final Demo Recording and Submission task
+          WHERE ts.task_id = 1379  -- Final Demo Recording and Submission task
             AND u.role = 'builder'
             AND (LOWER(ts.content) LIKE '%loom.com%' OR (va.loom_url IS NOT NULL AND va.loom_url != ''))
             ${levelFilterCondition.replace(/se\./g, 'se_fds.')}
@@ -369,39 +475,103 @@ app.get('/api/builders', async (req, res) => {
           FROM \`${curriculumDaysTable}\`
           WHERE day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
       ),
-      -- Attendance Calculation CTE --
+      -- Individual Builder Attendance Metrics (working implementation)
       AttendanceMetrics AS (
+          -- For all cohorts: use old attendance logic (att_attendance/att_students tables)
           SELECT 
               u.user_id,
-              se_att.cohort,
-              -- Count days attended for this user (only for curriculum days)
-              COUNT(CASE WHEN att.status = 'present' THEN 1 END) as days_attended,
-              -- Get total curriculum days for their cohort within date range
+              COUNT(CASE WHEN att.status IN ('present', 'late') THEN 1 END) as days_attended,
               (
-                  SELECT COUNT(DISTINCT cdr.day_date)
-                  FROM CurriculumDaysInRange cdr
-                  WHERE cdr.cohort = se_att.cohort
+                  SELECT COUNT(DISTINCT cd.day_date)
+                  FROM \`${curriculumDaysTable}\` cd
+                  WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+                    AND cd.cohort = se.cohort
               ) as total_curriculum_days,
-              -- Calculate attendance percentage
               ROUND(
-                  (COUNT(CASE WHEN att.status = 'present' THEN 1 END) / 
-                   NULLIF((
-                      SELECT COUNT(DISTINCT cdr.day_date)
-                      FROM CurriculumDaysInRange cdr
-                      WHERE cdr.cohort = se_att.cohort
-                   ), 0)) * 100, 
+                  (COUNT(CASE WHEN att.status IN ('present', 'late') THEN 1 END) * 100.0) / 
+                  NULLIF((
+                      SELECT COUNT(DISTINCT cd.day_date)
+                      FROM \`${curriculumDaysTable}\` cd
+                      WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+                        AND cd.cohort = se.cohort
+                  ), 0),
                   0
               ) as attendance_percentage
-          FROM \`${attStudentsTable}\` ats
-          INNER JOIN \`${usersTable}\` u ON LOWER(ats.email) = LOWER(u.email)
-          INNER JOIN SingleEnrollmentPerUser se_att ON LOWER(u.email) = LOWER(se_att.builder_email)
+          FROM \`${usersTable}\` u
+          INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+          INNER JOIN \`${attStudentsTable}\` ats ON LOWER(u.email) = LOWER(ats.email)
           LEFT JOIN \`${attAttendanceTable}\` att ON ats.id = att.student_id
-          -- Join with curriculum days to only include attendance for valid curriculum days
-          INNER JOIN CurriculumDaysInRange cdr ON DATE(att.date) = cdr.day_date 
-              AND cdr.cohort = se_att.cohort
+            AND DATE(att.date) BETWEEN DATE(@startDate) AND DATE(@endDate)
           WHERE u.role = 'builder'
-            ${levelFilterCondition.replace(/se\./g, 'se_att.')}
-          GROUP BY u.user_id, se_att.cohort
+            AND (
+              -- June L1: Always use old logic
+              (se.cohort = 'June 2025' AND se.level = 'L1') OR
+              -- March L1: Always use old logic  
+              (se.cohort = 'March 2025' AND se.level = 'L1')
+            )
+            ${levelFilterCondition}
+          GROUP BY u.user_id, se.cohort
+          
+          UNION ALL
+          
+          -- For March 2025 L2: use new attendance table for dates >= Sept 6, 2025
+          SELECT 
+              u.user_id,
+              COUNT(CASE WHEN ban.status IN ('present', 'late') THEN 1 END) as days_attended,
+              (
+                  SELECT COUNT(DISTINCT DATE(ban_all.attendance_date))
+                  FROM \`${builderAttendanceNewTable}\` ban_all
+                  WHERE DATE(ban_all.attendance_date) BETWEEN GREATEST(DATE(@startDate), DATE('2025-09-06')) AND DATE(@endDate)
+              ) as total_curriculum_days,
+              ROUND(
+                  (COUNT(CASE WHEN ban.status IN ('present', 'late') THEN 1 END) * 100.0) /
+                  NULLIF((
+                      SELECT COUNT(DISTINCT DATE(ban_all.attendance_date))
+                      FROM \`${builderAttendanceNewTable}\` ban_all
+                      WHERE DATE(ban_all.attendance_date) BETWEEN GREATEST(DATE(@startDate), DATE('2025-09-06')) AND DATE(@endDate)
+                  ), 0),
+                  0
+              ) as attendance_percentage
+          FROM \`${usersTable}\` u
+          INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+          LEFT JOIN \`${builderAttendanceNewTable}\` ban ON u.user_id = ban.user_id
+            AND DATE(ban.attendance_date) BETWEEN GREATEST(DATE(@startDate), DATE('2025-09-06')) AND DATE(@endDate)
+          WHERE u.role = 'builder'
+            AND se.cohort = 'March 2025'
+            AND se.level = 'L2'
+            AND DATE(@endDate) >= DATE('2025-09-06')  -- Only include if date range includes Sept 6 or later
+            ${levelFilterCondition}
+          GROUP BY u.user_id
+          
+          UNION ALL
+          
+          -- For September 2025 L1: use new attendance table (builder_attendance_new)
+          SELECT 
+              u.user_id,
+              COUNT(CASE WHEN ban.status IN ('present', 'late') THEN 1 END) as days_attended,
+              (
+                  SELECT COUNT(DISTINCT DATE(ban_all.attendance_date))
+                  FROM \`${builderAttendanceNewTable}\` ban_all
+                  WHERE DATE(ban_all.attendance_date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+              ) as total_curriculum_days,
+              ROUND(
+                  (COUNT(CASE WHEN ban.status IN ('present', 'late') THEN 1 END) * 100.0) /
+                  NULLIF((
+                      SELECT COUNT(DISTINCT DATE(ban_all.attendance_date))
+                      FROM \`${builderAttendanceNewTable}\` ban_all
+                      WHERE DATE(ban_all.attendance_date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+                  ), 0),
+                  0
+              ) as attendance_percentage
+          FROM \`${usersTable}\` u
+          INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+          LEFT JOIN \`${builderAttendanceNewTable}\` ban ON u.user_id = ban.user_id
+            AND DATE(ban.attendance_date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+          WHERE u.role = 'builder'
+            AND se.cohort = 'September 2025'
+            AND se.level = 'L1'
+            ${levelFilterCondition}
+          GROUP BY u.user_id
       )
       -- Final SELECT joining all CTEs - guaranteed one row per user
       SELECT 
@@ -437,10 +607,14 @@ app.get('/api/builders', async (req, res) => {
         -- Video task metrics
         COALESCE(vtm.video_tasks_completed, 0) as video_tasks_completed,
         ROUND(vtm.avg_video_score, 2) as avg_video_score,
-        -- Attendance metrics
+        -- Attendance metrics (provide snake_case expected by frontend tables)
         COALESCE(am.attendance_percentage, 0) as attendance_percentage,
         COALESCE(am.days_attended, 0) as days_attended,
         COALESCE(am.total_curriculum_days, 0) as total_curriculum_days,
+        -- Also provide camelCase for any newer consumers
+        COALESCE(am.attendance_percentage, 0) as attendancePercentage,
+        COALESCE(am.days_attended, 0) as daysAttended,
+        COALESCE(am.total_curriculum_days, 0) as totalCurriculumDays,
         -- NEW: Get Final Demo Recording submission URL and associated IDs for each builder
         COALESCE(fds.latest_loom_url, '') as latest_loom_url,
         fds.latest_task_id,
@@ -543,6 +717,488 @@ app.get('/api/levels', async (req, res) => {
     const mockLevels = ['March 2025 - L1', 'March 2025 - L2', 'June 2025 - L1'];
     console.log('LEVELS ENDPOINT: Sending mock levels:', mockLevels);
     res.json(mockLevels);
+  }
+});
+
+// --- Survey Feedback Endpoints (builder_feedback) ---
+// Program week derived from day_number: week = FLOOR((day_number - 1)/5) + 1
+
+// Weekly NPS by program week (within date range), optional cohort filter
+app.get('/api/surveys/nps/weekly', async (req, res) => {
+  const { startDate, endDate, cohort } = req.query;
+  if (!startDate || !endDate) return res.status(400).json({ error: 'Missing parameters' });
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  const queryWithEnrollments = `
+    WITH FeedbackBase AS (
+      SELECT bf.id, bf.user_id, bf.day_number, bf.referral_likelihood, bf.created_at, bf.cohort AS cohort_raw, u.email
+      FROM \`${builderFeedbackTable}\` bf
+      LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+      WHERE DATE(bf.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+        AND u.role = 'builder'
+    ),
+    NearestEnrollment AS (
+      SELECT fb.id AS feedback_id, e.cohort AS enroll_cohort
+      FROM FeedbackBase fb
+      LEFT JOIN \`${enrollmentsTable}\` e ON LOWER(fb.email) = LOWER(e.builder_email)
+      QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY fb.id 
+        ORDER BY IFNULL(ABS(DATE_DIFF(SAFE.PARSE_DATE('%B %Y', e.cohort), DATE(fb.created_at), DAY)), 999999)
+      ) = 1
+    ),
+    FeedbackWithCohort AS (
+      SELECT COALESCE(fb.cohort_raw, ne.enroll_cohort) AS cohort_inferred, fb.day_number, fb.referral_likelihood, cd.day_date
+      FROM FeedbackBase fb
+      LEFT JOIN NearestEnrollment ne ON ne.feedback_id = fb.id
+      LEFT JOIN \`${curriculumDaysTable}\` cd ON CAST(fb.day_number AS INT64) = cd.id
+    )
+    SELECT 
+      CAST(CEIL(SAFE_DIVIDE(day_number, 5.0)) AS INT64) AS program_week,
+      COUNT(*) AS total_responses,
+      COUNTIF(referral_likelihood >= 9) AS promoters,
+      COUNTIF(referral_likelihood BETWEEN 7 AND 8) AS passives,
+      COUNTIF(referral_likelihood <= 6) AS detractors,
+      SAFE_MULTIPLY(SAFE_DIVIDE(COUNTIF(referral_likelihood >= 9) - COUNTIF(referral_likelihood <= 6), COUNT(*)), 100) AS nps
+    FROM FeedbackWithCohort
+    WHERE 1=1
+      ${cohort ? 'AND cohort_inferred = @cohort' : ''}
+    GROUP BY program_week
+    ORDER BY program_week ASC
+  `;
+
+  const queryWithoutEnrollments = `
+    SELECT 
+      CAST(CEIL(SAFE_DIVIDE(bf.day_number, 5.0)) AS INT64) AS program_week,
+      COUNT(*) AS total_responses,
+      COUNTIF(bf.referral_likelihood >= 9) AS promoters,
+      COUNTIF(bf.referral_likelihood BETWEEN 7 AND 8) AS passives,
+      COUNTIF(bf.referral_likelihood <= 6) AS detractors,
+      SAFE_MULTIPLY(SAFE_DIVIDE(COUNTIF(bf.referral_likelihood >= 9) - COUNTIF(bf.referral_likelihood <= 6), COUNT(*)), 100) AS nps
+    FROM \`${builderFeedbackTable}\` bf
+    LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+    LEFT JOIN \`${curriculumDaysTable}\` cd ON CAST(bf.day_number AS INT64) = cd.id
+    WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+      AND u.role = 'builder'
+      ${cohort ? 'AND bf.cohort = @cohort' : ''}
+    GROUP BY program_week
+    ORDER BY program_week ASC
+  `;
+
+  const params = { startDate, endDate };
+  if (cohort) params.cohort = cohort;
+
+  try {
+    const rows = await executeQueryWithEnrollmentsFallback(
+      queryWithEnrollments,
+      queryWithoutEnrollments,
+      params,
+      '/api/surveys/nps/weekly'
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error(`Error in ${req.path}:`, error);
+    res.status(500).json({ error: 'Failed to fetch weekly NPS' });
+  }
+});
+
+// Cohort NPS (across date range), for all cohorts or filterable via level
+app.get('/api/surveys/nps/cohorts', async (req, res) => {
+  const { startDate, endDate, cohort } = req.query;
+  if (!startDate || !endDate) return res.status(400).json({ error: 'Missing parameters' });
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+
+  const queryWithEnrollments = `
+    WITH FeedbackBase AS (
+      SELECT bf.id, bf.user_id, bf.day_number, bf.referral_likelihood, bf.created_at, bf.cohort AS cohort_raw, u.email, cd.day_date
+      FROM \`${builderFeedbackTable}\` bf
+      LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+      LEFT JOIN \`${curriculumDaysTable}\` cd ON CAST(bf.day_number AS INT64) = cd.id
+      WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+        AND u.role = 'builder'
+    ),
+    NearestEnrollment AS (
+      SELECT fb.id AS feedback_id, e.cohort AS enroll_cohort, e.level AS enroll_level
+      FROM FeedbackBase fb
+      LEFT JOIN \`${enrollmentsTable}\` e ON LOWER(fb.email) = LOWER(e.builder_email)
+      QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY fb.id 
+        ORDER BY IFNULL(ABS(DATE_DIFF(SAFE.PARSE_DATE('%B %Y', e.cohort), DATE(fb.created_at), DAY)), 999999)
+      ) = 1
+    ),
+    FeedbackWithCohort AS (
+      SELECT
+        COALESCE(fb.cohort_raw, ne.enroll_cohort) AS cohort_inferred,
+        ne.enroll_level AS level_inferred,
+        fb.referral_likelihood,
+        fb.day_date
+      FROM FeedbackBase fb
+      LEFT JOIN NearestEnrollment ne ON ne.feedback_id = fb.id
+    )
+    SELECT 
+      cohort_inferred AS cohort,
+      COUNT(*) AS total_responses,
+      COUNTIF(referral_likelihood >= 9) AS promoters,
+      COUNTIF(referral_likelihood BETWEEN 7 AND 8) AS passives,
+      COUNTIF(referral_likelihood <= 6) AS detractors,
+      SAFE_MULTIPLY(SAFE_DIVIDE(COUNTIF(referral_likelihood >= 9) - COUNTIF(referral_likelihood <= 6), COUNT(*)), 100) AS nps
+    FROM FeedbackWithCohort
+    WHERE 1=1
+      ${cohort ? 'AND cohort_inferred = @cohort' : ''}
+    GROUP BY cohort_inferred
+    ORDER BY cohort ASC
+  `;
+
+  const queryWithoutEnrollments = `
+    SELECT 
+      bf.cohort AS cohort,
+      COUNT(*) AS total_responses,
+      COUNTIF(bf.referral_likelihood >= 9) AS promoters,
+      COUNTIF(bf.referral_likelihood BETWEEN 7 AND 8) AS passives,
+      COUNTIF(bf.referral_likelihood <= 6) AS detractors,
+      SAFE_MULTIPLY(SAFE_DIVIDE(COUNTIF(bf.referral_likelihood >= 9) - COUNTIF(bf.referral_likelihood <= 6), COUNT(*)), 100) AS nps
+    FROM \`${builderFeedbackTable}\` bf
+    LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+    WHERE DATE(bf.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+      AND u.role = 'builder'
+    GROUP BY cohort
+    ORDER BY cohort ASC
+  `;
+
+  const params = { startDate, endDate };
+  if (cohort) params.cohort = cohort;
+
+  try {
+    const rows = await executeQueryWithEnrollmentsFallback(
+      queryWithEnrollments,
+      queryWithoutEnrollments,
+      params,
+      '/api/surveys/nps/cohorts'
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error(`Error in ${req.path}:`, error);
+    res.status(500).json({ error: 'Failed to fetch cohort NPS' });
+  }
+});
+
+// Weekly NPS by cohort (program week lines per cohort)
+app.get('/api/surveys/nps/weekly-by-cohort', async (req, res) => {
+  const { startDate, endDate, cohort, mode } = req.query;
+  if (!startDate || !endDate) return res.status(400).json({ error: 'Missing parameters' });
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+
+  const queryWithEnrollments = `
+    WITH UniqueEnrollments AS (
+      SELECT 
+        builder_email, 
+        cohort, 
+        level,
+        ROW_NUMBER() OVER (PARTITION BY LOWER(builder_email) ORDER BY cohort DESC, level DESC) as rn
+      FROM \`${enrollmentsTable}\`
+    ),
+    SingleEnrollmentPerUser AS (
+      SELECT builder_email, cohort, level
+      FROM UniqueEnrollments
+      WHERE rn = 1
+    ),
+    FeedbackWithCohort AS (
+      SELECT
+        COALESCE(bf.cohort, se.cohort) AS cohort_inferred,
+        CAST(CEIL(SAFE_DIVIDE(bf.day_number, 5.0)) AS INT64) AS program_week,
+        cd.day_date AS task_date,
+        DATE_SUB(cd.day_date, INTERVAL MOD(EXTRACT(DAYOFWEEK FROM cd.day_date), 7) DAY) AS week_start,
+        DATE_ADD(DATE_SUB(cd.day_date, INTERVAL MOD(EXTRACT(DAYOFWEEK FROM cd.day_date), 7) DAY), INTERVAL 4 DAY) AS week_end,
+        bf.referral_likelihood,
+        se.cohort AS enroll_cohort,
+        se.level AS enroll_level
+      FROM \`${builderFeedbackTable}\` bf
+      LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+      LEFT JOIN \`${tasksTable}\` t ON CAST(bf.task_id AS INT64) = t.id
+      LEFT JOIN \`${timeBlocksTable}\` tb ON t.block_id = tb.id
+      LEFT JOIN \`${curriculumDaysTable}\` cd ON tb.day_id = cd.id
+      LEFT JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+      WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+        AND u.role = 'builder'
+    )
+    SELECT 
+      cohort_inferred AS cohort,
+      program_week,
+      week_start,
+      week_end,
+      COUNT(*) AS total_responses,
+      COUNTIF(referral_likelihood >= 9) AS promoters,
+      COUNTIF(referral_likelihood BETWEEN 7 AND 8) AS passives,
+      COUNTIF(referral_likelihood <= 6) AS detractors,
+      SAFE_MULTIPLY(SAFE_DIVIDE(COUNTIF(referral_likelihood >= 9) - COUNTIF(referral_likelihood <= 6), COUNT(*)), 100) AS nps
+    FROM FeedbackWithCohort
+    WHERE 1=1
+      ${cohort ? "AND cohort_inferred = @cohort" : ""}
+    GROUP BY cohort_inferred, program_week, week_start, week_end
+    ORDER BY cohort ASC, program_week ASC, week_start ASC
+  `;
+
+  const queryWithoutEnrollments = `
+    SELECT 
+      bf.cohort AS cohort,
+      CAST(CEIL(SAFE_DIVIDE(bf.day_number, 5.0)) AS INT64) AS program_week,
+      cd.day_date AS task_date,
+      DATE_SUB(cd.day_date, INTERVAL MOD(EXTRACT(DAYOFWEEK FROM cd.day_date), 7) DAY) AS week_start,
+      DATE_ADD(DATE_SUB(cd.day_date, INTERVAL MOD(EXTRACT(DAYOFWEEK FROM cd.day_date), 7) DAY), INTERVAL 4 DAY) AS week_end,
+      COUNT(*) AS total_responses,
+      COUNTIF(bf.referral_likelihood >= 9) AS promoters,
+      COUNTIF(bf.referral_likelihood BETWEEN 7 AND 8) AS passives,
+      COUNTIF(bf.referral_likelihood <= 6) AS detractors,
+      SAFE_MULTIPLY(SAFE_DIVIDE(COUNTIF(bf.referral_likelihood >= 9) - COUNTIF(bf.referral_likelihood <= 6), COUNT(*)), 100) AS nps
+    FROM \`${builderFeedbackTable}\` bf
+    LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+    LEFT JOIN \`${tasksTable}\` t ON CAST(bf.task_id AS INT64) = t.id
+    LEFT JOIN \`${timeBlocksTable}\` tb ON t.block_id = tb.id
+    LEFT JOIN \`${curriculumDaysTable}\` cd ON tb.day_id = cd.id
+    WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+      AND u.role = 'builder'
+      ${cohort ? 'AND bf.cohort = @cohort' : ''}
+    GROUP BY cohort, program_week, week_start, week_end, task_date
+    ORDER BY cohort ASC, program_week ASC, week_start ASC
+  `;
+
+  const params = { startDate, endDate };
+  if (cohort) params.cohort = cohort;
+
+  try {
+    const allRows = await executeQueryWithEnrollmentsFallback(
+      queryWithEnrollments,
+      queryWithoutEnrollments,
+      params,
+      '/api/surveys/nps/weekly-by-cohort'
+    );
+    // If mode=calendar, collapse by cohort + week_start, else by cohort + program_week
+    if ((mode || '').toLowerCase() === 'calendar') {
+      // Pass through rows; frontend will use week_start/week_end
+      res.json(allRows);
+    } else {
+      res.json(allRows);
+    }
+  } catch (error) {
+    console.error(`Error in ${req.path}:`, error);
+    res.status(500).json({ error: 'Failed to fetch weekly NPS by cohort' });
+  }
+});
+
+// List individual survey responses with flags and program week
+app.get('/api/surveys/responses', async (req, res) => {
+  const { startDate, endDate, cohort, week } = req.query;
+  if (!startDate || !endDate) return res.status(400).json({ error: 'Missing parameters' });
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  // Remove legacy level filtering; use cohort param instead
+
+  const weekFilterClause = week ? 'AND CAST(CEIL(SAFE_DIVIDE(bf.day_number, 5.0)) AS INT64) = CAST(@week AS INT64)' : '';
+
+  const queryWithEnrollments = `
+    WITH FeedbackBase AS (
+      SELECT bf.id, bf.user_id, bf.day_number, bf.task_id, bf.referral_likelihood, bf.created_at,
+             bf.cohort AS cohort_raw, bf.what_we_did_well, bf.what_to_improve, bf.tools_used, bf.programming_languages,
+             u.first_name, u.last_name, u.email,
+             cd.day_date AS task_date
+      FROM \`${builderFeedbackTable}\` bf
+      LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+      LEFT JOIN \`${tasksTable}\` t ON CAST(bf.task_id AS INT64) = t.id
+      LEFT JOIN \`${timeBlocksTable}\` tb ON t.block_id = tb.id
+      LEFT JOIN \`${curriculumDaysTable}\` cd ON tb.day_id = cd.id
+      WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+        AND u.role = 'builder'
+        ${weekFilterClause}
+    ),
+    NearestEnrollment AS (
+      SELECT fb.id AS feedback_id, e.cohort AS enroll_cohort, e.level AS enroll_level
+      FROM FeedbackBase fb
+      LEFT JOIN \`${enrollmentsTable}\` e ON LOWER(fb.email) = LOWER(e.builder_email)
+      QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY fb.id 
+        ORDER BY ABS(DATE_DIFF(PARSE_DATE('%B %Y', e.cohort), DATE(fb.created_at), DAY))
+      ) = 1
+    )
+    SELECT 
+      fb.id,
+      fb.user_id,
+      CONCAT(fb.first_name, ' ', fb.last_name) AS user_name,
+      COALESCE(fb.cohort_raw, ne.enroll_cohort) AS cohort,
+      CAST(CEIL(SAFE_DIVIDE(fb.day_number, 5.0)) AS INT64) AS program_week,
+      fb.day_number,
+      fb.referral_likelihood,
+      fb.what_we_did_well,
+      fb.what_to_improve,
+      fb.tools_used,
+      fb.programming_languages,
+      fb.task_date,
+      (fb.referral_likelihood <= 6) AS is_detractor
+    FROM FeedbackBase fb
+    LEFT JOIN NearestEnrollment ne ON ne.feedback_id = fb.id
+    WHERE 1=1
+      ${cohort ? 'AND COALESCE(fb.cohort_raw, ne.enroll_cohort) = @cohort' : ''}
+    ORDER BY fb.task_date DESC
+  `;
+
+  const queryWithoutEnrollments = `
+    SELECT 
+      bf.id,
+      bf.user_id,
+      CONCAT(u.first_name, ' ', u.last_name) AS user_name,
+      bf.cohort AS cohort,
+      CAST(CEIL(SAFE_DIVIDE(bf.day_number, 5.0)) AS INT64) AS program_week,
+      bf.day_number,
+      bf.referral_likelihood,
+      bf.what_we_did_well,
+      bf.what_to_improve,
+      bf.tools_used,
+      bf.programming_languages,
+      cd.day_date AS task_date,
+      (bf.referral_likelihood <= 6) AS is_detractor
+    FROM \`${builderFeedbackTable}\` bf
+    LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+    LEFT JOIN \`${tasksTable}\` t ON CAST(bf.task_id AS INT64) = t.id
+    LEFT JOIN \`${timeBlocksTable}\` tb ON t.block_id = tb.id
+    LEFT JOIN \`${curriculumDaysTable}\` cd ON tb.day_id = cd.id
+    WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+      AND u.role = 'builder'
+      ${weekFilterClause}
+      ${cohort ? 'AND bf.cohort = @cohort' : ''}
+    ORDER BY cd.day_date DESC
+  `;
+
+  const params = { startDate, endDate };
+  if (cohort) params.cohort = cohort;
+  if (week) params.week = week;
+
+  try {
+    const rows = await executeQueryWithEnrollmentsFallback(
+      queryWithEnrollments,
+      queryWithoutEnrollments,
+      params,
+      '/api/surveys/responses'
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error(`Error in ${req.path}:`, error);
+    res.status(500).json({ error: 'Failed to fetch survey responses' });
+  }
+});
+
+// Themes (low-lift): top keywords from qualitative fields
+app.get('/api/surveys/themes', async (req, res) => {
+  const { startDate, endDate, level, topN } = req.query;
+  if (!startDate || !endDate) return res.status(400).json({ error: 'Missing parameters' });
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  let levelFilterCondition = '';
+  let cohortFilter = null;
+  let levelOnlyFilter = null;
+  if (level) {
+    const match = level.match(/^(.+) - (.+)$/);
+    if (match) {
+      cohortFilter = match[1];
+      levelOnlyFilter = match[2];
+      levelFilterCondition = 'AND se.cohort = @cohort AND se.level = @levelOnly';
+    } else {
+      levelOnlyFilter = level;
+      levelFilterCondition = 'AND se.level = @levelOnly';
+    }
+  }
+
+  const limitClause = Number(topN) > 0 ? `LIMIT ${Number(topN)}` : 'LIMIT 50';
+
+  const queryWithEnrollments = `
+    WITH UniqueEnrollments AS (
+      SELECT builder_email, cohort, level,
+             ROW_NUMBER() OVER (PARTITION BY LOWER(builder_email) ORDER BY cohort DESC, level DESC) AS rn
+      FROM \`${enrollmentsTable}\`
+    ),
+    SingleEnrollmentPerUser AS (
+      SELECT builder_email, cohort, level FROM UniqueEnrollments WHERE rn = 1
+    ),
+    Texts AS (
+      SELECT bf.what_we_did_well AS text
+      FROM \`${builderFeedbackTable}\` bf
+      LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+      LEFT JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+      WHERE DATE(bf.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+        AND u.role = 'builder'
+        ${levelFilterCondition}
+        AND bf.what_we_did_well IS NOT NULL
+      UNION ALL
+      SELECT bf.what_to_improve AS text
+      FROM \`${builderFeedbackTable}\` bf
+      LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+      LEFT JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+      WHERE DATE(bf.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+        AND u.role = 'builder'
+        ${levelFilterCondition}
+        AND bf.what_to_improve IS NOT NULL
+    ),
+    Tokens AS (
+      SELECT LOWER(token) AS token
+      FROM Texts, UNNEST(SPLIT(REGEXP_REPLACE(LOWER(text), r'[^a-z0-9\s]', ' '), ' ')) AS token
+      WHERE token IS NOT NULL AND token != '' AND LENGTH(token) >= 3
+        AND token NOT IN (
+          'the','and','for','that','this','with','you','are','was','but','have','not','all','can','its','our','out','use','has','had','any','who','how','why','when','where','your','about','from','into','been','being','more','most','some','such','than','too','very','just','like','they','them','then','over','also','able','will','would','could','should','make','made','makes'
+        )
+    )
+    SELECT token, COUNT(*) AS count
+    FROM Tokens
+    GROUP BY token
+    ORDER BY count DESC
+    ${limitClause}
+  `;
+
+  const queryWithoutEnrollments = `
+    WITH Texts AS (
+      SELECT bf.what_we_did_well AS text
+      FROM \`${builderFeedbackTable}\` bf
+      LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+      WHERE DATE(bf.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+        AND u.role = 'builder'
+        AND bf.what_we_did_well IS NOT NULL
+      UNION ALL
+      SELECT bf.what_to_improve AS text
+      FROM \`${builderFeedbackTable}\` bf
+      LEFT JOIN \`${usersTable}\` u ON CAST(bf.user_id AS INT64) = u.user_id
+      WHERE DATE(bf.created_at) BETWEEN DATE(@startDate) AND DATE(@endDate)
+        AND u.role = 'builder'
+        AND bf.what_to_improve IS NOT NULL
+    ),
+    Tokens AS (
+      SELECT LOWER(token) AS token
+      FROM Texts, UNNEST(SPLIT(REGEXP_REPLACE(LOWER(text), r'[^a-z0-9\s]', ' '), ' ')) AS token
+      WHERE token IS NOT NULL AND token != '' AND LENGTH(token) >= 3
+        AND token NOT IN (
+          'the','and','for','that','this','with','you','are','was','but','have','not','all','can','its','our','out','use','has','had','any','who','how','why','when','where','your','about','from','into','been','being','more','most','some','such','than','too','very','just','like','they','them','then','over','also','able','will','would','could','should','make','made','makes'
+        )
+    )
+    SELECT token, COUNT(*) AS count
+    FROM Tokens
+    GROUP BY token
+    ORDER BY count DESC
+    ${limitClause}
+  `;
+
+  const params = { startDate, endDate };
+  if (cohortFilter) params.cohort = cohortFilter;
+  if (levelOnlyFilter) params.levelOnly = levelOnlyFilter;
+  if (level) params.level = level;
+
+  try {
+    const rows = await executeQueryWithEnrollmentsFallback(
+      queryWithEnrollments,
+      queryWithoutEnrollments,
+      params,
+      '/api/surveys/themes'
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error(`Error in ${req.path}:`, error);
+    res.status(500).json({ error: 'Failed to fetch survey themes' });
   }
 });
 
@@ -1995,6 +2651,80 @@ app.get('/api/video-analyses/:videoId', async (req, res) => {
   }
 });
 
+// --- NEW Endpoint: Video Submissions for Video Submissions Tab ---
+app.get('/api/video-submissions', async (req, res) => {
+  console.log(`Handling request for ${req.path}. BigQuery Client Ready: ${!!bigquery}`);
+  
+  if (!bigquery) return res.status(500).json({ error: 'BigQuery client not initialized' });
+
+  const datasetName = 'pilot_agent_public';
+  const videoAnalysesTable = `${PROJECT_ID}.${datasetName}.video_analyses`;
+  const tasksTable = `${PROJECT_ID}.${datasetName}.tasks`;
+  const taskSubmissionsTable = `${PROJECT_ID}.${datasetName}.task_submissions`;
+  const usersTable = `${PROJECT_ID}.${datasetName}.users`;
+  const enrollmentsTable = `${PROJECT_ID}.${datasetName}.enrollments_native`;
+
+  const query = `
+    WITH SingleEnrollmentPerUser AS (
+      -- Get enrollment records for cohort information
+      SELECT DISTINCT
+          builder_email, 
+          cohort, 
+          level
+      FROM \`${enrollmentsTable}\`
+      WHERE cohort IS NOT NULL AND level IS NOT NULL
+    )
+    SELECT 
+      va.video_id,
+      va.user_id,
+      va.submission_id,
+      va.loom_url,
+      va.technical_score,
+      va.business_score,
+      va.professional_skills_score,
+      va.technical_score_rationale,
+      va.business_score_rationale,
+      va.professional_skills_score_rationale,
+      t.task_title,
+      ts.created_at as submission_date,
+      CONCAT(u.first_name, ' ', u.last_name) as builder_name,
+      u.email as builder_email,
+      CONCAT(se.cohort, ' - ', se.level) as cohort
+    FROM \`${videoAnalysesTable}\` va
+    LEFT JOIN \`${tasksTable}\` t ON va.video_id = CAST(t.id AS STRING)
+    LEFT JOIN \`${taskSubmissionsTable}\` ts ON va.submission_id = CAST(ts.id AS STRING)
+    INNER JOIN \`${usersTable}\` u ON CAST(va.user_id AS INT64) = u.user_id
+    LEFT JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+    WHERE u.role = 'builder'
+      AND va.technical_score IS NOT NULL
+      AND va.business_score IS NOT NULL  
+      AND va.professional_skills_score IS NOT NULL
+    ORDER BY ts.created_at DESC
+  `;
+
+  try {
+    console.log(`Executing BigQuery query for video submissions...`);
+    const [rows] = await bigquery.query({ query });
+    console.log(`Video submissions query finished. Row count: ${rows.length}`);
+    
+    res.json(rows);
+  } catch (error) {
+    console.error(`Error in ${req.path}:`, error);
+    logger.error('Error executing BigQuery video submissions query', { 
+      error: error.message, 
+      stack: error.stack, 
+      query: query,
+      table: videoAnalysesTable
+    });
+    res.status(500).json({ 
+      error: 'Failed to fetch video submissions', 
+      details: error.message,
+      dataset: datasetName,
+      table: videoAnalysesTable
+    });
+  }
+});
+
 // Feedback sentiment analysis endpoint for Cloud Scheduler
 app.post('/api/analyze-feedback', async (req, res) => {
   try {
@@ -2480,9 +3210,296 @@ app.get('/api/weekly-summary', async (req, res) => {
       SELECT 
         -- Overall summary
         (SELECT COUNT(*) FROM WeeklyTasks) as total_tasks_assigned,
-        (SELECT COUNT(DISTINCT user_id) FROM TaskAnalyses) as active_builders,
+        -- Builder counts breakdown - using consistent SingleEnrollmentPerUser
+        (
+          SELECT COUNT(DISTINCT u.user_id)
+          FROM \`${usersTable}\` u
+          INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+          WHERE u.role = 'builder'
+            AND (@cohort IS NULL OR se.cohort = @cohort)
+            AND (@levelOnly IS NULL OR se.level = @levelOnly)
+        ) as total_builders,
+        
+        -- Count builders who attended at least once (active builders) - using consistent SingleEnrollmentPerUser
+        (
+          CASE
+            -- September 2025 L1: Use new attendance table
+            WHEN @cohort = 'September 2025' AND @levelOnly = 'L1' THEN (
+              SELECT COUNT(DISTINCT u.user_id)
+              FROM \`${usersTable}\` u
+              INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+              WHERE u.role = 'builder'
+                AND se.cohort = @cohort
+                AND se.level = @levelOnly
+                AND EXISTS (
+                  SELECT 1
+                  FROM \`${builderAttendanceNewTable}\` ban
+                  WHERE ban.user_id = u.user_id
+                    AND ban.status IN ('present', 'late')
+                    AND DATE(ban.attendance_date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+                )
+            )
+            -- March 2025 L2: Use new attendance table for dates >= Sept 6, 2025
+            WHEN @cohort = 'March 2025' AND @levelOnly = 'L2' AND DATE(@endDate) >= DATE('2025-09-06') THEN (
+              SELECT COUNT(DISTINCT u.user_id)
+              FROM \`${usersTable}\` u
+              INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+              WHERE u.role = 'builder'
+                AND se.cohort = @cohort
+                AND se.level = @levelOnly
+                AND EXISTS (
+                  SELECT 1
+                  FROM \`${builderAttendanceNewTable}\` ban
+                  WHERE ban.user_id = u.user_id
+                    AND ban.status IN ('present', 'late')
+                    AND DATE(ban.attendance_date) BETWEEN GREATEST(DATE(@startDate), DATE('2025-09-06')) AND DATE(@endDate)
+                )
+            )
+            -- All other cohorts: Use old attendance table
+            ELSE (
+              SELECT COUNT(DISTINCT u.user_id)
+              FROM \`${usersTable}\` u
+              INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+              INNER JOIN \`${attStudentsTable}\` ats ON LOWER(u.email) = LOWER(ats.email)
+              WHERE u.role = 'builder'
+                AND se.cohort = @cohort
+                AND se.level = @levelOnly
+                AND EXISTS (
+                  SELECT 1
+                  FROM \`${attAttendanceTable}\` att
+                  INNER JOIN \`${curriculumDaysTable}\` cd ON DATE(att.date) = cd.day_date
+                  WHERE att.student_id = ats.id
+                    AND att.status IN ('present', 'late')
+                    AND cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+                    AND cd.cohort = @cohort
+                    -- For March L2 using old logic, only count dates before Sept 6
+                    AND (se.cohort != 'March 2025' OR se.level != 'L2' OR cd.day_date < DATE('2025-09-06'))
+                )
+            )
+          END
+        ) as active_builders,
         (SELECT COUNT(*) FROM PeerFeedbackThisWeek WHERE sentiment_category IN ('Negative', 'Very Negative')) as negative_feedback_count,
         (SELECT COUNT(*) FROM PeerFeedbackThisWeek) as total_feedback_count,
+        
+        -- Overall attendance rate calculation (including all builders)
+        (
+          CASE
+            -- September 2025 L1: Use new attendance table
+            WHEN @cohort = 'September 2025' AND @levelOnly = 'L1' THEN (
+              SELECT ROUND(AVG(daily_attendance_rate), 0)
+              FROM (
+                SELECT
+                  DATE(ban.attendance_date) as attendance_day,
+                  ROUND(
+                    (COUNT(CASE WHEN ban.status IN ('present', 'late') THEN 1 END) * 100.0) /
+                    NULLIF((
+                        SELECT COUNT(DISTINCT u_total.user_id)
+                        FROM \`${usersTable}\` u_total
+                        INNER JOIN SingleEnrollmentPerUser se_total ON LOWER(u_total.email) = LOWER(se_total.builder_email)
+                        WHERE u_total.role = 'builder'
+                          AND se_total.cohort = @cohort
+                          AND se_total.level = @levelOnly
+                    ), 0),
+                    2
+                  ) as daily_attendance_rate
+                FROM \`${builderAttendanceNewTable}\` ban
+                INNER JOIN \`${usersTable}\` u ON ban.user_id = u.user_id
+                INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+                WHERE DATE(ban.attendance_date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+                  AND u.role = 'builder'
+                  AND se.cohort = @cohort
+                  AND se.level = @levelOnly
+                GROUP BY DATE(ban.attendance_date)
+              )
+            )
+            -- March 2025 L2: Use new attendance table for dates >= Sept 6, 2025
+            WHEN @cohort = 'March 2025' AND @levelOnly = 'L2' AND DATE(@endDate) >= DATE('2025-09-06') THEN (
+              SELECT ROUND(AVG(daily_attendance_rate), 0)
+              FROM (
+                SELECT
+                  DATE(ban.attendance_date) as attendance_day,
+                  ROUND(
+                    (COUNT(CASE WHEN ban.status IN ('present', 'late') THEN 1 END) * 100.0) /
+                    NULLIF((
+                        SELECT COUNT(DISTINCT u_total.user_id)
+                        FROM \`${usersTable}\` u_total
+                        INNER JOIN SingleEnrollmentPerUser se_total ON LOWER(u_total.email) = LOWER(se_total.builder_email)
+                        WHERE u_total.role = 'builder'
+                          AND se_total.cohort = @cohort
+                          AND se_total.level = @levelOnly
+                    ), 0),
+                    2
+                  ) as daily_attendance_rate
+                FROM \`${builderAttendanceNewTable}\` ban
+                INNER JOIN \`${usersTable}\` u ON ban.user_id = u.user_id
+                INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+                WHERE DATE(ban.attendance_date) BETWEEN GREATEST(DATE(@startDate), DATE('2025-09-06')) AND DATE(@endDate)
+                  AND u.role = 'builder'
+                  AND se.cohort = @cohort
+                  AND se.level = @levelOnly
+                GROUP BY DATE(ban.attendance_date)
+              )
+            )
+            -- All other cohorts: Use old attendance logic
+            ELSE (
+              SELECT ROUND(AVG(daily_attendance_rate), 0)
+              FROM (
+                SELECT
+                  cd.day_date as curriculum_day,
+                  ROUND(
+                    (COUNT(CASE WHEN att.status IN ('present', 'late') THEN 1 END) * 100.0) /
+                    NULLIF((
+                        SELECT COUNT(DISTINCT u_total.user_id)
+                        FROM \`${attStudentsTable}\` ats_total
+                        INNER JOIN \`${usersTable}\` u_total ON LOWER(ats_total.email) = LOWER(u_total.email)
+                        INNER JOIN SingleEnrollmentPerUser se_total ON LOWER(u_total.email) = LOWER(se_total.builder_email)
+                        WHERE u_total.role = 'builder'
+                          AND se_total.cohort = @cohort
+                          AND se_total.level = @levelOnly
+                    ), 0),
+                    2
+                  ) as daily_attendance_rate
+                FROM \`${curriculumDaysTable}\` cd
+                LEFT JOIN \`${attAttendanceTable}\` att ON DATE(att.date) = cd.day_date
+                LEFT JOIN \`${attStudentsTable}\` ats ON att.student_id = ats.id
+                LEFT JOIN \`${usersTable}\` u ON LOWER(ats.email) = LOWER(u.email)
+                LEFT JOIN SingleEnrollmentPerUser se_att ON LOWER(u.email) = LOWER(se_att.builder_email)
+                WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+                  AND cd.cohort = @cohort
+                  AND (u.role = 'builder' OR u.role IS NULL)
+                  AND (se_att.cohort = @cohort OR se_att.cohort IS NULL)
+                  AND (se_att.level = @levelOnly OR se_att.level IS NULL)
+                  -- For March L2 using old logic, only count dates before Sept 6
+                  AND (@cohort != 'March 2025' OR @levelOnly != 'L2' OR cd.day_date < DATE('2025-09-06'))
+                GROUP BY cd.day_date
+              )
+            )
+          END
+        ) as attendance_rate,
+        
+        -- Active attendance rate calculation (excluding builders with 0% attendance)
+        (
+          CASE
+            -- September 2025 L1: Use new attendance table
+            WHEN @cohort = 'September 2025' AND @levelOnly = 'L1' THEN (
+              SELECT ROUND(AVG(daily_attendance_rate), 0)
+              FROM (
+                SELECT
+                  DATE(ban.attendance_date) as attendance_day,
+                  ROUND(
+                    (COUNT(CASE WHEN ban.status IN ('present', 'late') THEN 1 END) * 100.0) /
+                    NULLIF((
+                        SELECT COUNT(DISTINCT u_active.user_id)
+                        FROM \`${usersTable}\` u_active
+                        INNER JOIN SingleEnrollmentPerUser se_active ON LOWER(u_active.email) = LOWER(se_active.builder_email)
+                        WHERE u_active.role = 'builder'
+                          AND se_active.cohort = @cohort
+                          AND se_active.level = @levelOnly
+                          AND EXISTS (
+                            SELECT 1
+                            FROM \`${builderAttendanceNewTable}\` ban_check
+                            WHERE ban_check.user_id = u_active.user_id
+                              AND ban_check.status IN ('present', 'late')
+                              AND DATE(ban_check.attendance_date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+                          )
+                    ), 0),
+                    2
+                  ) as daily_attendance_rate
+                FROM \`${builderAttendanceNewTable}\` ban
+                INNER JOIN \`${usersTable}\` u ON ban.user_id = u.user_id
+                INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+                WHERE DATE(ban.attendance_date) BETWEEN DATE(@startDate) AND DATE(@endDate)
+                  AND u.role = 'builder'
+                  AND se.cohort = @cohort
+                  AND se.level = @levelOnly
+                  AND ban.status IN ('present', 'late')
+                GROUP BY DATE(ban.attendance_date)
+              )
+            )
+            -- March 2025 L2: Use new attendance table for dates >= Sept 6, 2025
+            WHEN @cohort = 'March 2025' AND @levelOnly = 'L2' AND DATE(@endDate) >= DATE('2025-09-06') THEN (
+              SELECT ROUND(AVG(daily_attendance_rate), 0)
+              FROM (
+                SELECT
+                  DATE(ban.attendance_date) as attendance_day,
+                  ROUND(
+                    (COUNT(CASE WHEN ban.status IN ('present', 'late') THEN 1 END) * 100.0) /
+                    NULLIF((
+                        SELECT COUNT(DISTINCT u_active.user_id)
+                        FROM \`${usersTable}\` u_active
+                        INNER JOIN SingleEnrollmentPerUser se_active ON LOWER(u_active.email) = LOWER(se_active.builder_email)
+                        WHERE u_active.role = 'builder'
+                          AND se_active.cohort = @cohort
+                          AND se_active.level = @levelOnly
+                          AND EXISTS (
+                            SELECT 1
+                            FROM \`${builderAttendanceNewTable}\` ban_check
+                            WHERE ban_check.user_id = u_active.user_id
+                              AND ban_check.status IN ('present', 'late')
+                              AND DATE(ban_check.attendance_date) BETWEEN GREATEST(DATE(@startDate), DATE('2025-09-06')) AND DATE(@endDate)
+                          )
+                    ), 0),
+                    2
+                  ) as daily_attendance_rate
+                FROM \`${builderAttendanceNewTable}\` ban
+                INNER JOIN \`${usersTable}\` u ON ban.user_id = u.user_id
+                INNER JOIN SingleEnrollmentPerUser se ON LOWER(u.email) = LOWER(se.builder_email)
+                WHERE DATE(ban.attendance_date) BETWEEN GREATEST(DATE(@startDate), DATE('2025-09-06')) AND DATE(@endDate)
+                  AND u.role = 'builder'
+                  AND se.cohort = @cohort
+                  AND se.level = @levelOnly
+                  AND ban.status IN ('present', 'late')
+                GROUP BY DATE(ban.attendance_date)
+              )
+            )
+            -- All other cohorts: Use old attendance logic (active builders only)
+            ELSE (
+              SELECT ROUND(AVG(daily_attendance_rate), 0)
+              FROM (
+                SELECT
+                  cd.day_date as curriculum_day,
+                  ROUND(
+                    (COUNT(CASE WHEN att.status IN ('present', 'late') THEN 1 END) * 100.0) /
+                    NULLIF((
+                        SELECT COUNT(DISTINCT u_active.user_id)
+                        FROM \`${usersTable}\` u_active
+                        INNER JOIN SingleEnrollmentPerUser se_active ON LOWER(u_active.email) = LOWER(se_active.builder_email)
+                        INNER JOIN \`${attStudentsTable}\` ats_active ON LOWER(u_active.email) = LOWER(ats_active.email)
+                        WHERE u_active.role = 'builder'
+                          AND se_active.cohort = @cohort
+                          AND se_active.level = @levelOnly
+                          AND EXISTS (
+                            SELECT 1
+                            FROM \`${attAttendanceTable}\` att_check
+                            INNER JOIN \`${curriculumDaysTable}\` cd_check ON DATE(att_check.date) = cd_check.day_date
+                            WHERE att_check.student_id = ats_active.id
+                              AND att_check.status IN ('present', 'late')
+                              AND cd_check.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+                              AND cd_check.cohort = @cohort
+                              -- For March L2 using old logic, only count dates before Sept 6
+                              AND (@cohort != 'March 2025' OR @levelOnly != 'L2' OR cd_check.day_date < DATE('2025-09-06'))
+                          )
+                    ), 0),
+                    2
+                  ) as daily_attendance_rate
+                FROM \`${curriculumDaysTable}\` cd
+                LEFT JOIN \`${attAttendanceTable}\` att ON DATE(att.date) = cd.day_date
+                LEFT JOIN \`${attStudentsTable}\` ats ON att.student_id = ats.id
+                LEFT JOIN \`${usersTable}\` u ON LOWER(ats.email) = LOWER(u.email)
+                LEFT JOIN SingleEnrollmentPerUser se_att ON LOWER(u.email) = LOWER(se_att.builder_email)
+                WHERE cd.day_date BETWEEN DATE(@startDate) AND DATE(@endDate)
+                  AND cd.cohort = @cohort
+                  AND (u.role = 'builder' OR u.role IS NULL)
+                  AND (se_att.cohort = @cohort OR se_att.cohort IS NULL)
+                  AND (se_att.level = @levelOnly OR se_att.level IS NULL)
+                  AND att.status IN ('present', 'late')
+                  -- For March L2 using old logic, only count dates before Sept 6
+                  AND (@cohort != 'March 2025' OR @levelOnly != 'L2' OR cd.day_date < DATE('2025-09-06'))
+                GROUP BY cd.day_date
+              )
+            )
+          END
+        ) as active_attendance_rate,
         
         -- Task details as JSON array
         ARRAY(
@@ -2566,7 +3583,11 @@ app.get('/api/weekly-summary', async (req, res) => {
         weekEnd: endDate,
         summary: {
           totalTasksAssigned: 0,
+          totalBuilders: 0,
           activeBuilders: 0,
+          neverAttendedBuilders: 0,
+          attendanceRate: 0,
+          activeAttendanceRate: 0,
           negativeFeedbackCount: 0,
           totalFeedbackCount: 0
         },
@@ -2583,7 +3604,11 @@ app.get('/api/weekly-summary', async (req, res) => {
       weekEnd: endDate,
       summary: {
         totalTasksAssigned: result.total_tasks_assigned || 0,
+        totalBuilders: result.total_builders || 0,
         activeBuilders: result.active_builders || 0,
+        neverAttendedBuilders: (result.total_builders || 0) - (result.active_builders || 0),
+        attendanceRate: result.attendance_rate || 0,
+        activeAttendanceRate: result.active_attendance_rate || 0,
         negativeFeedbackCount: result.negative_feedback_count || 0,
         totalFeedbackCount: result.total_feedback_count || 0
       },
@@ -2844,6 +3869,507 @@ app.get('/api/task-details/:taskId', async (req, res) => {
 // API-only mode for Cloud Run - no static file serving needed
 console.log('Running in Cloud Run mode - serving React frontend and API');
 
+// Conversation Mode Analytics endpoints
+app.get('/api/conversation-analytics/schema', async (req, res) => {
+  try {
+    console.log('Exploring conversation_messages table schema...');
+    
+    const query = `
+      SELECT 
+        column_name,
+        data_type,
+        is_nullable
+      FROM \`${PROJECT_ID}.${DATASET}.INFORMATION_SCHEMA.COLUMNS\` 
+      WHERE table_name = 'conversation_messages'
+      ORDER BY ordinal_position
+    `;
+    
+    const [rows] = await bigquery.query({ query });
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching conversation_messages schema:', error);
+    res.status(500).json({ error: 'Failed to fetch schema' });
+  }
+});
+
+app.get('/api/conversation-analytics/sample', async (req, res) => {
+  try {
+    console.log('Fetching sample conversation data...');
+    
+    const query = `
+      SELECT 
+        message_id,
+        thread_id,
+        user_id,
+        message_role,
+        content,
+        created_at,
+        LENGTH(content) as content_length
+      FROM \`${messagesTable}\`
+      WHERE created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+      ORDER BY created_at DESC
+      LIMIT 20
+    `;
+    
+    const [rows] = await bigquery.query({ query });
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching conversation sample:', error);
+    res.status(500).json({ error: 'Failed to fetch conversation sample' });
+  }
+});
+
+// New endpoint to get conversation mode specific data
+app.get('/api/conversation-analytics/conversation-mode-data', async (req, res) => {
+  try {
+    console.log('Fetching conversation mode specific data...');
+    
+    const query = `
+      WITH ConversationThreads AS (
+        SELECT 
+          tt.thread_id,
+          tt.task_id,
+          tt.user_id,
+          t.task_title,
+          t.task_mode,
+          t.ai_helper_mode,
+          t.questions,
+          ARRAY_LENGTH(JSON_EXTRACT_ARRAY(t.questions)) as total_questions
+        FROM \`${PROJECT_ID}.${DATASET}.task_threads\` tt
+        JOIN \`${PROJECT_ID}.${DATASET}.tasks\` t ON tt.task_id = t.id
+        WHERE t.task_mode = 'conversation'
+        AND tt.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+      ),
+      ConversationMessages AS (
+        SELECT 
+          cm.thread_id,
+          cm.message_role,
+          cm.content,
+          cm.created_at,
+          LENGTH(cm.content) as content_length,
+          ROW_NUMBER() OVER (PARTITION BY cm.thread_id ORDER BY cm.created_at) as message_order
+        FROM \`${messagesTable}\` cm
+        WHERE cm.thread_id IN (SELECT thread_id FROM ConversationThreads)
+        AND cm.message_role IN ('user', 'assistant')
+      )
+      
+      SELECT 
+        ct.thread_id,
+        ct.task_id,
+        ct.user_id,
+        ct.task_title,
+        ct.ai_helper_mode,
+        ct.total_questions,
+        cm.message_role,
+        cm.content,
+        cm.content_length,
+        cm.message_order,
+        cm.created_at
+      FROM ConversationThreads ct
+      JOIN ConversationMessages cm ON ct.thread_id = cm.thread_id
+      ORDER BY ct.thread_id, cm.message_order
+      LIMIT 100
+    `;
+    
+    const [rows] = await bigquery.query({ query });
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching conversation mode data:', error);
+    res.status(500).json({ error: 'Failed to fetch conversation mode data', details: error.message });
+  }
+});
+
+// Main conversation analytics endpoint - core metrics
+app.get('/api/conversation-analytics/metrics', async (req, res) => {
+  try {
+    const { startDate, endDate, dateRange = '7' } = req.query;
+    
+    // Calculate date range if not provided
+    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000);
+    
+    console.log(`Fetching conversation metrics for ${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`);
+    
+    const query = `
+      WITH ConversationData AS (
+        SELECT 
+          cm.message_id,
+          cm.thread_id,
+          cm.user_id,
+          cm.message_role,
+          cm.content,
+          cm.created_at,
+          LENGTH(cm.content) as content_length,
+          DATE(cm.created_at) as message_date,
+          -- Count questions in AI messages
+          ARRAY_LENGTH(REGEXP_EXTRACT_ALL(cm.content, r'\\?')) as question_count
+        FROM \`${messagesTable}\` cm
+        WHERE cm.created_at >= TIMESTAMP('${start.toISOString()}')
+          AND cm.created_at <= TIMESTAMP('${end.toISOString()}')
+          AND cm.message_role IN ('user', 'assistant')
+      ),
+      DailyMetrics AS (
+        SELECT 
+          message_date,
+          
+          -- AI Response metrics
+          AVG(CASE WHEN message_role = 'assistant' THEN content_length END) as avg_ai_response_length,
+          COUNT(CASE WHEN message_role = 'assistant' AND question_count > 1 THEN 1 END) as ai_multiple_questions_count,
+          COUNT(CASE WHEN message_role = 'assistant' THEN 1 END) as total_ai_messages,
+          
+          -- User Response metrics  
+          AVG(CASE WHEN message_role = 'user' THEN content_length END) as avg_user_response_length,
+          COUNT(CASE WHEN message_role = 'user' AND content_length <= 50 THEN 1 END) as user_short_responses,
+          COUNT(CASE WHEN message_role = 'user' THEN 1 END) as total_user_messages,
+          
+          -- Engagement metrics
+          COUNT(DISTINCT thread_id) as active_conversations,
+          COUNT(DISTINCT user_id) as active_users,
+          
+          -- Frustration signals
+          COUNT(CASE WHEN message_role = 'user' AND (
+            LOWER(content) LIKE '%anything else%' OR
+            LOWER(content) LIKE '%that\\'s it%' OR  
+            LOWER(content) LIKE '%done%' OR
+            content_length <= 20
+          ) THEN 1 END) as frustration_signals
+          
+        FROM ConversationData
+        GROUP BY message_date
+      ),
+      ThreadEngagement AS (
+        SELECT 
+          thread_id,
+          user_id,
+          COUNT(CASE WHEN message_role = 'user' THEN 1 END) as user_message_count,
+          COUNT(CASE WHEN message_role = 'assistant' THEN 1 END) as ai_message_count,
+          
+          -- Engagement decline detection
+          CASE 
+            WHEN COUNT(CASE WHEN message_role = 'user' THEN 1 END) <= 2 THEN 1 
+            ELSE 0 
+          END as early_disengagement,
+          
+          -- Calculate average response length trend
+          AVG(CASE WHEN message_role = 'user' THEN LENGTH(content) END) as avg_user_response_length
+        FROM ConversationData
+        GROUP BY thread_id, user_id
+      )
+      
+      SELECT 
+        dm.*,
+        
+        -- Overall engagement metrics
+        COUNT(te.thread_id) as total_conversations,
+        AVG(te.user_message_count) as avg_messages_per_conversation,
+        
+        -- Disengagement metrics
+        COUNT(CASE WHEN te.early_disengagement = 1 THEN 1 END) as early_disengagement_count,
+        ROUND(COUNT(CASE WHEN te.early_disengagement = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(te.thread_id), 0), 2) as disengagement_rate,
+        
+        -- Multiple questions rate
+        ROUND(dm.ai_multiple_questions_count * 100.0 / NULLIF(dm.total_ai_messages, 0), 2) as multiple_questions_rate,
+        
+        -- Short response rate (frustration indicator)
+        ROUND(dm.user_short_responses * 100.0 / NULLIF(dm.total_user_messages, 0), 2) as short_response_rate
+        
+      FROM DailyMetrics dm
+      LEFT JOIN ThreadEngagement te ON DATE(te.user_id) = dm.message_date  -- This is a placeholder join
+      GROUP BY dm.message_date, dm.avg_ai_response_length, dm.ai_multiple_questions_count, 
+               dm.total_ai_messages, dm.avg_user_response_length, dm.user_short_responses,
+               dm.total_user_messages, dm.active_conversations, dm.active_users, dm.frustration_signals
+      ORDER BY dm.message_date DESC
+    `;
+    
+    const [rows] = await bigquery.query({ query });
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching conversation metrics:', error);
+    res.status(500).json({ error: 'Failed to fetch conversation metrics', details: error.message });
+  }
+});
+
+// New Conversation Efficacy Dashboard endpoints per specification
+// Endpoint: Daily aggregated metrics (View 1: Executive Overview)
+app.get('/api/conversation-efficacy/overview', async (req, res) => {
+  try {
+    const { startDate, endDate, aiMode = 'all', taskId = 'all' } = req.query;
+    
+    // Default to last 7 days if not specified
+    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    
+    console.log(`Fetching conversation efficacy overview for ${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`);
+    
+    // Check if table exists first
+    const tableExistsQuery = `
+      SELECT COUNT(*) as count
+      FROM \`${PROJECT_ID}.${DATASET}.__TABLES__\`
+      WHERE table_id = 'conversation_efficacy_aggregated_daily'
+    `;
+    
+    let [tableCheck] = await bigquery.query({ query: tableExistsQuery });
+    
+    if (tableCheck[0].count === 0) {
+      console.log('conversation_efficacy_aggregated_daily table does not exist yet, returning mock data');
+      // Return mock data structure
+      return res.json({
+        overview: {
+          totalConversations: 396,
+          avgQualityScore: 5.8,
+          avgAuthenticityScore: 7.1,
+          completionRate: 47,
+          improvementVsBaseline: 3.5
+        },
+        trends: [],
+        message: 'Table not yet created - showing mock data'
+      });
+    }
+    
+    const query = `
+      WITH DailyAggregated AS (
+        SELECT
+          DATE(date) as analysis_date,
+          ai_helper_mode,
+          COUNT(DISTINCT thread_id) as daily_total,
+          AVG(student_response_quality_score) as daily_quality,
+          AVG(human_authenticity_score) as daily_authenticity,
+          AVG(completion_pct) as daily_completion,
+          AVG(message_length_compliance_pct) as daily_compliance,
+          AVG(single_question_rate_pct) as daily_single_question,
+          AVG(CASE WHEN reflection_detected THEN 100.0 ELSE 0.0 END) as daily_reflection
+        FROM \`${PROJECT_ID}.${DATASET}.conversation_efficacy_daily_metrics\`
+        WHERE date >= DATE('${start.toISOString().split('T')[0]}')
+          AND date <= DATE('${end.toISOString().split('T')[0]}')
+          ${aiMode !== 'all' ? `AND ai_helper_mode = '${aiMode}'` : ''}
+          ${taskId !== 'all' ? `AND task_id = ${taskId}` : ''}
+        GROUP BY analysis_date, ai_helper_mode
+      )
+      SELECT * FROM DailyAggregated
+      ORDER BY analysis_date DESC
+    `;
+    
+    const [rows] = await bigquery.query({ query });
+    
+    // Calculate overall metrics
+    const overview = {
+      totalConversations: rows.reduce((sum, row) => sum + parseInt(row.daily_total || 0), 0),
+      avgQualityScore: rows.length > 0 ? rows.reduce((sum, row) => sum + (row.daily_quality || 0), 0) / rows.length : 0,
+      avgAuthenticityScore: rows.length > 0 ? rows.reduce((sum, row) => sum + (row.daily_authenticity || 0), 0) / rows.length : 0,
+      completionRate: rows.length > 0 ? rows.reduce((sum, row) => sum + (row.daily_completion || 0), 0) / rows.length : 0,
+      improvementVsBaseline: 3.5 // Placeholder - would need baseline comparison query
+    };
+    
+    res.json({ overview, trends: rows });
+  } catch (error) {
+    console.error('Error fetching conversation efficacy overview:', error);
+    res.status(500).json({ error: 'Failed to fetch efficacy overview', details: error.message });
+  }
+});
+
+// Endpoint: Task performance comparison (View 4)
+app.get('/api/conversation-efficacy/tasks', async (req, res) => {
+  try {
+    const { startDate, endDate, aiMode = 'all' } = req.query;
+    
+    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    
+    console.log(`Fetching task performance for ${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`);
+    
+    // Check if table exists
+    const tableExistsQuery = `
+      SELECT COUNT(*) as count
+      FROM \`${PROJECT_ID}.${DATASET}.__TABLES__\`
+      WHERE table_id = 'conversation_efficacy_daily_metrics'
+    `;
+    
+    let [tableCheck] = await bigquery.query({ query: tableExistsQuery });
+    
+    if (tableCheck[0].count === 0) {
+      console.log('conversation_efficacy_daily_metrics table does not exist yet, returning empty array');
+      return res.json([]);
+    }
+    
+    const query = `
+      WITH TaskMetrics AS (
+        SELECT
+          task_id,
+          COUNT(DISTINCT thread_id) as total_conversations,
+          AVG(student_response_quality_score) as avg_quality,
+          AVG(completion_pct) * 100 as completion_rate,
+          AVG(human_authenticity_score) as authenticity_score,
+          AVG(questions_coverage_pct) * 100 as questions_coverage,
+          AVG(CASE WHEN questions_asked_in_order THEN 100.0 ELSE 0.0 END) as questions_in_order
+        FROM \`${PROJECT_ID}.${DATASET}.conversation_efficacy_daily_metrics\`
+        WHERE date >= DATE('${start.toISOString().split('T')[0]}')
+          AND date <= DATE('${end.toISOString().split('T')[0]}')
+          ${aiMode !== 'all' ? `AND ai_helper_mode = '${aiMode}'` : ''}
+        GROUP BY task_id
+      ),
+      TaskTitles AS (
+        SELECT DISTINCT task_id, task_title
+        FROM \`${PROJECT_ID}.${DATASET}.conversation_efficacy_aggregated_daily\`
+      )
+      SELECT
+        tm.task_id,
+        COALESCE(tt.task_title, CONCAT('Task ', CAST(tm.task_id AS STRING))) as task_title,
+        tm.total_conversations,
+        tm.avg_quality,
+        tm.completion_rate,
+        tm.authenticity_score,
+        tm.questions_coverage,
+        tm.questions_in_order,
+        -- Determine status based on metrics
+        CASE
+          WHEN tm.questions_coverage < 50 OR tm.avg_quality < 5.0 THEN 'critical'
+          WHEN tm.completion_rate < 45 OR tm.avg_quality < 5.5 THEN 'warning'
+          ELSE 'good'
+        END as status
+      FROM TaskMetrics tm
+      LEFT JOIN TaskTitles tt ON tm.task_id = tt.task_id
+      ORDER BY tm.avg_quality DESC
+    `;
+    
+    const [rows] = await bigquery.query({ query });
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching task performance:', error);
+    res.status(500).json({ error: 'Failed to fetch task performance', details: error.message });
+  }
+});
+
+// Endpoint: Alerts (for alerts banner)
+app.get('/api/conversation-efficacy/alerts', async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    
+    console.log('Fetching conversation efficacy alerts...');
+    
+    // Check if table exists
+    const tableExistsQuery = `
+      SELECT COUNT(*) as count
+      FROM \`${PROJECT_ID}.${DATASET}.__TABLES__\`
+      WHERE table_id = 'conversation_efficacy_alerts'
+    `;
+    
+    let [tableCheck] = await bigquery.query({ query: tableExistsQuery });
+    
+    if (tableCheck[0].count === 0) {
+      console.log('conversation_efficacy_alerts table does not exist yet, returning empty array');
+      return res.json([]);
+    }
+    
+    const query = `
+      SELECT
+        alert_date as date,
+        ai_helper_mode as mode,
+        task_id,
+        metric_name as metric,
+        metric_value,
+        threshold,
+        severity,
+        alert_message as message
+      FROM \`${PROJECT_ID}.${DATASET}.conversation_efficacy_alerts\`
+      WHERE alert_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+      ORDER BY alert_date DESC, severity DESC
+      LIMIT ${parseInt(limit)}
+    `;
+    
+    const [rows] = await bigquery.query({ query });
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching alerts:', error);
+    res.status(500).json({ error: 'Failed to fetch alerts', details: error.message });
+  }
+});
+
+// Endpoint: Conversation examples (best/worst/ai-generated)
+app.get('/api/conversation-efficacy/examples', async (req, res) => {
+  try {
+    const { type = 'all', limit = 10 } = req.query;
+    
+    console.log(`Fetching conversation examples (type: ${type})...`);
+    
+    // Check if table exists
+    const tableExistsQuery = `
+      SELECT COUNT(*) as count
+      FROM \`${PROJECT_ID}.${DATASET}.__TABLES__\`
+      WHERE table_id = 'conversation_efficacy_examples'
+    `;
+    
+    let [tableCheck] = await bigquery.query({ query: tableExistsQuery });
+    
+    if (tableCheck[0].count === 0) {
+      console.log('conversation_efficacy_examples table does not exist yet, returning empty array');
+      return res.json([]);
+    }
+    
+    const query = `
+      SELECT
+        date,
+        example_type as type,
+        thread_id,
+        task_id,
+        user_id,
+        quality_score,
+        conversation_snippet,
+        flagged_reason
+      FROM \`${PROJECT_ID}.${DATASET}.conversation_efficacy_examples\`
+      WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        ${type !== 'all' ? `AND example_type = '${type}'` : ''}
+      ORDER BY date DESC
+      LIMIT ${parseInt(limit)}
+    `;
+    
+    const [rows] = await bigquery.query({ query });
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching conversation examples:', error);
+    res.status(500).json({ error: 'Failed to fetch examples', details: error.message });
+  }
+});
+
+// Endpoint: Individual conversation metrics (for drill-down)
+app.get('/api/conversation-efficacy/conversation/:threadId', async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    
+    console.log(`Fetching conversation metrics for thread ${threadId}...`);
+    
+    // Check if table exists
+    const tableExistsQuery = `
+      SELECT COUNT(*) as count
+      FROM \`${PROJECT_ID}.${DATASET}.__TABLES__\`
+      WHERE table_id = 'conversation_efficacy_daily_metrics'
+    `;
+    
+    let [tableCheck] = await bigquery.query({ query: tableExistsQuery });
+    
+    if (tableCheck[0].count === 0) {
+      console.log('conversation_efficacy_daily_metrics table does not exist yet');
+      return res.status(404).json({ error: 'Metrics table not found' });
+    }
+    
+    const query = `
+      SELECT *
+      FROM \`${PROJECT_ID}.${DATASET}.conversation_efficacy_daily_metrics\`
+      WHERE thread_id = ${threadId}
+    `;
+    
+    const [rows] = await bigquery.query({ query });
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching conversation details:', error);
+    res.status(500).json({ error: 'Failed to fetch conversation details', details: error.message });
+  }
+});
+
 // Serve static files from React build (after API routes)
 app.use(express.static(path.join(__dirname, '../dist')));
 
@@ -2856,6 +4382,7 @@ app.get('*', (req, res) => {
   
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
+
 
 // Only start the server if this file is run directly
 if (require.main === module) {
@@ -2945,5 +4472,3 @@ functions.http('analyzeFeedbackHandler', async (req, res) => {
     });
   }
 });
-
-// Add this new endpoint after other API routes, around line 1400

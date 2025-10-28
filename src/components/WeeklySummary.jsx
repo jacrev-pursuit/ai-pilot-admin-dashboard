@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, Row, Col, DatePicker, Select, Typography, Spin, Alert, Table, Tag, Progress, Divider, Space, Button, Statistic, Modal, Switch, Pagination, message } from 'antd';
-import { CalendarOutlined, UserOutlined, FileTextOutlined, AlertOutlined, EyeOutlined, TrophyOutlined, BookOutlined, LinkOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { CalendarOutlined, UserOutlined, FileTextOutlined, AlertOutlined, EyeOutlined, TrophyOutlined, BookOutlined, LinkOutlined, InfoCircleOutlined, TeamOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getLetterGrade, getGradeTagClass } from '../utils/gradingUtils';
 import { Link } from 'react-router-dom';
@@ -10,6 +10,12 @@ import BuilderDetailsModal from './BuilderDetailsModal';
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
+
+// Helper to attach auth header
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('auth_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 // Grade colors for charts - updated to match detailed grading system
 const gradeColors = {
@@ -77,8 +83,8 @@ const WeeklySummary = () => {
     dayjs('2025-03-01').startOf('day')
   );
   const [endDate, setEndDate] = useState(
-    // Default to end of August 2025 to capture full cohort period
-    dayjs('2025-08-31').endOf('day')
+    // Default to today to capture all current data
+    dayjs().endOf('day')
   );
   const [selectedLevel, setSelectedLevel] = useState('March 2025 - L2');
   const [availableLevels, setAvailableLevels] = useState([]);
@@ -108,13 +114,20 @@ const WeeklySummary = () => {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [selectedBuilder, setSelectedBuilder] = useState(null);
 
+  // Add ref to track current request and prevent race conditions
+  const currentRequestRef = useRef(null);
+
   // Fetch available levels
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const response = await fetch('/api/levels');
+        const response = await fetch('/api/levels', {
+          headers: {
+            ...getAuthHeaders()
+          }
+        });
         const levels = await response.json();
-        setAvailableLevels(levels);
+        setAvailableLevels(Array.isArray(levels) ? levels : []);
       } catch (error) {
         console.error("Failed to fetch levels:", error);
       }
@@ -129,14 +142,19 @@ const WeeklySummary = () => {
     }
   }, [startDate, endDate, selectedLevel]);
 
-  // Re-fetch data when level filter changes
-  useEffect(() => {
-    if (summaryData) {
-      fetchBuildersData();
-    }
-  }, [selectedLevel]); // Will trigger when selectedLevel changes
+  // Remove the duplicate useEffect that was causing race conditions
+  // The fetchDateRangeSummary() function already calls fetchBuildersData()
 
   const fetchDateRangeSummary = async () => {
+    // Cancel any previous request
+    if (currentRequestRef.current) {
+      currentRequestRef.current.abort();
+    }
+
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    currentRequestRef.current = abortController;
+
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -149,7 +167,18 @@ const WeeklySummary = () => {
         params.append('level', selectedLevel);
       }
 
-      const response = await fetch(`/api/weekly-summary?${params}`);
+      const response = await fetch(`/api/weekly-summary?${params}`, {
+        headers: {
+          ...getAuthHeaders()
+        },
+        signal: abortController.signal
+      });
+      
+      // Check if request was aborted
+      if (abortController.signal.aborted) {
+        return;
+      }
+      
       const data = await response.json();
       
       if (response.ok) {
@@ -158,13 +187,19 @@ const WeeklySummary = () => {
         console.error('Error fetching summary:', data.error);
       }
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Request was cancelled');
+        return;
+      }
       console.error('Error fetching summary:', error);
     } finally {
       setLoading(false);
     }
     
-    // Fetch builders data for the same date range
-    await fetchBuildersData();
+    // Fetch builders data for the same date range (only if not aborted)
+    if (!abortController.signal.aborted) {
+      await fetchBuildersData();
+    }
   };
 
   // Fetch builders data
@@ -182,13 +217,31 @@ const WeeklySummary = () => {
         params.append('level', selectedLevel);
       }
 
-      const response = await fetch(`/api/builders?${params}`);
+      // Use the same AbortController if available
+      const signal = currentRequestRef.current?.signal;
+
+      const response = await fetch(`/api/builders?${params}`, {
+        headers: {
+          ...getAuthHeaders()
+        },
+        ...(signal && { signal })
+      });
+      
+      // Check if request was aborted
+      if (signal?.aborted) {
+        return;
+      }
+      
       if (!response.ok) {
         throw new Error('Failed to fetch builders data');
       }
       const data = await response.json();
       setBuilders(Array.isArray(data) ? data : []);
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Builders request was cancelled');
+        return;
+      }
       console.error('Error fetching builders data:', error);
       setBuildersError('Failed to fetch builders data. Please try again later.');
       setBuilders([]);
@@ -562,7 +615,11 @@ const WeeklySummary = () => {
         params.append('level', selectedLevel);
       }
 
-      const response = await fetch(`/api/task-details/${taskRecord.task_id}?${params}`);
+      const response = await fetch(`/api/task-details/${taskRecord.task_id}?${params}`, {
+        headers: {
+          ...getAuthHeaders()
+        }
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch task details');
       }
@@ -916,7 +973,11 @@ const WeeklySummary = () => {
     setBuildersError(null);
 
     try {
-      const response = await fetch(`/api/builders/${record.user_id}/details?type=${type}&startDate=${startDate.format('YYYY-MM-DD')}&endDate=${endDate.format('YYYY-MM-DD')}`);
+      const response = await fetch(`/api/builders/${record.user_id}/details?type=${type}&startDate=${startDate.format('YYYY-MM-DD')}&endDate=${endDate.format('YYYY-MM-DD')}`, {
+        headers: {
+          ...getAuthHeaders()
+        }
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch builder details');
       }
@@ -975,7 +1036,7 @@ const WeeklySummary = () => {
             style={{ minWidth: '200px' }}
             placeholder="Select Level"
           >
-            {availableLevels.map(level => (
+            {(Array.isArray(availableLevels) ? availableLevels : []).map(level => (
               <Option key={level} value={level}>{level}</Option>
             ))}
           </Select>
@@ -1011,9 +1072,23 @@ const WeeklySummary = () => {
             <Col xs={24} sm={12} md={6}>
               <Card>
                 <Statistic
-                  title="Tasks Graded"
-                  value={summaryData.summary.totalTasksAssigned}
-                  prefix={<FileTextOutlined />}
+                  title="Builders"
+                  value={summaryData.summary.totalBuilders}
+                  prefix={<TeamOutlined />}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Attendance Rate"
+                  value={summaryData.summary.attendanceRate || 0}
+                  suffix="%"
+                  prefix={<UserOutlined />}
+                  valueStyle={{ color: (() => {
+                    const rate = summaryData.summary.attendanceRate || 0;
+                    return rate >= 80 ? '#3f8600' : rate >= 60 ? '#bf9002' : '#cf1322';
+                  })() }}
                 />
               </Card>
             </Col>
@@ -1040,19 +1115,9 @@ const WeeklySummary = () => {
             <Col xs={24} sm={12} md={6}>
               <Card>
                 <Statistic
-                  title="Total Feedback"
-                  value={summaryData.summary.totalFeedbackCount}
-                  prefix={<CalendarOutlined />}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="Negative Feedback"
-                  value={summaryData.summary.negativeFeedbackCount}
-                  prefix={<AlertOutlined />}
-                  valueStyle={{ color: summaryData.summary.negativeFeedbackCount > 0 ? '#cf1322' : '#3f8600' }}
+                  title="Tasks Graded"
+                  value={summaryData.summary.totalTasksAssigned}
+                  prefix={<FileTextOutlined />}
                 />
               </Card>
             </Col>

@@ -253,6 +253,18 @@ const PilotOverview = () => {
         dayjs('2025-03-15'),
         dayjs()
       ]);
+    } else if (selectedLevel === 'September 2025 - L1') {
+      // Set date range to 9/1 - current date for September L1
+      setTrendDateRange([
+        dayjs('2025-09-01'),
+        dayjs()
+      ]);
+    } else if (selectedLevel === 'June 2025 - L1') {
+      // Set date range to 6/1 - current date for June L1
+      setTrendDateRange([
+        dayjs('2025-06-01'),
+        dayjs()
+      ]);
     }
     // If selectedLevel is null or other values, don't change the date range
     // This allows users to manually change dates without interference
