@@ -68,11 +68,12 @@ const Navigation = () => {
       icon: <BarChartOutlined />,
       label: <Link to="/survey-feedback">Survey Feedback</Link>,
     },
-    {
-      key: '/conversation-analytics',
-      icon: <RobotOutlined />,
-      label: <Link to="/conversation-analytics">Conversation Analytics</Link>,
-    },
+    // ARCHIVED: Conversation Analytics tab - hidden until ready
+    // {
+    //   key: '/conversation-analytics',
+    //   icon: <RobotOutlined />,
+    //   label: <Link to="/conversation-analytics">Conversation Analytics</Link>,
+    // },
     // ARCHIVED: Builders tab - code preserved but hidden from navigation
     // {
     //   key: '/builders',

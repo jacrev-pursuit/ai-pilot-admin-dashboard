@@ -229,7 +229,8 @@ const VideoSubmissions = () => {
   // Handle opening feedback modal
   const handleViewDetails = async (record) => {
     setFeedbackModalVisible(true);
-    await fetchVideoAnalysisDetails(record.video_id || record.submission_id);
+    // Use submission_id (unique per builder) instead of video_id (task id, shared across builders)
+    await fetchVideoAnalysisDetails(record.submission_id || record.video_id);
   };
 
   // Parse rationale JSON for display
